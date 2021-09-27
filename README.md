@@ -1,43 +1,48 @@
-# made-emotts-2021
+# MADE 2020-2021 Emotional Text-to-Speech Synthesis
 
-План:
-1. Начать с нейтрального синтеза для бейзлайна (на тройку). Вводим метрику.
-
-Базовая архитектура:
-- feature extractor: Attention-based Tacotron / Non-Attentive Tacotron (multi-speaker);
-- vocoder: pretrained HifiGAN / pretrained LPCNet.
+## Basic Architecture
+- feature extractor:
+    - Attention-based Tacotron 2;
+    - Non-Attentive Tacotron (multi-speaker);
+- vocoder:
+    - pretrained HiFi-GAN (better performance, but needs fine-tuning);
+    - pretrained LPCNet (worse sound quality, but may be easier to train).
 
 Attention-based Tacotron: teacher forcing (during training; feed golden previous mel).
 
-Датасеты:
-- Single-speaker:
-    - LJSpeech (1st priority)
-    - Nancy (academic, needs request)
-- Multi-speaker:
-    - VCTK (1st priority)
-    - libritts
+## 1. Neutral Synthesis (baseline)
 
-Data proprocessing:
-    - basic preprocessing: pausation cutting (threshold-based method on spectrogram / VAD (pyvad));
-    - feature extraction: mel-spectrum (80-dim);
-    - normalization (channel-wise): std = 1, mean = 0;
-    - text phonemization: espeak-ng phonemizer (choose American/English accent);
-    - reformat dataset: audio-id|preprocessed-text-transcript.
+Introduce a metric for emotion synthesis evaluation.
+
+### Datasets
+- Single-speaker:
+    - **LJSpeech (1st priority, easier to download)**;
+    - Nancy (needs an academic request, but corpus quality is better than LJSpeech);
+- Multi-speaker:
+    - **VCTK (1st priority, but has issues with pauses (see below))**;
+    - libritts (more problematic without additional filtration / preprocessing).
+
+### Data Proprocessing
+- basic preprocessing: pausation cutting (threshold-based method on spectrogram / VAD (pyvad));
+- feature extraction: mel-spectrum (80-dim);
+- normalization (channel-wise): standard deviation = 1.0, mean = 0.0;
+- text phonemization: espeak-ng phonemizer (choose American / English accent);
+- metafile for Tacotron training: audio-id|preprocessed-text-transcript.
 
 Non-Attentive Tacotron specific data preprocessing:
-    - external phone-level aligner (forced aligner);
-        - MFA: output in TextGrid format (convert to durations: npy array of durations in seconds / in frames);
-        - Gentle (claimes to be able to align non-verbal emotion expression) (NOTE: for English only);
+- external phone-level aligner (forced aligner):
+    - MFA: output in TextGrid format (convert to durations: `npy`-array of durations in seconds / in frames);
+    - Gentle (claimes to be able to align non-verbal emotion expression) (NOTE: for English only).
 
-2. Модифицируем архитектуру для эмоционального синтеза.
-3. Ещё модифицируем архитектуру для ХОРОШЕГО эмоционального синтеза.
+## 2. Basic Emotional Synthesis
 
-Datasets with emotions: look for data with 22000 sample rate or more.
-- Emo-V-DB (problems with non-speech segments)
-- MSP: waiting for reply
-- Internal Huawei Russian dataset (cons: 1 speaker)
+### Datasets
+- Emo-V-DB (problems with non-speech segments);
+- MSP: waiting for reply;
+- Internal Huawei Russian dataset (cons: 1 speaker);
+- others (look for data with sample rate of 22 kHz or more).
 
-Emotional Speech Synthesis:
+## 3. Advanced Emotional Synthesis
 - lookup embedding;
 - GST-based (global style tokens): prosody transfer model;
-- modifications on top of GST;
+- modifications on top of GST.
