@@ -20,6 +20,8 @@
     [LPCNet repo by Mozilla](https://github.com/mozilla/LPCNet)
     
       Input features: 20-dim BFC features (18 bark cepstrum coefficients + 2 pitch features (pitch coef and pitch correlation)).
+      
+NOTE: Downsampling a raw audio is ok. Upsampling... might lead to synthesis quality degradation, need to check...
     
 Attention-based Tacotron: teacher forcing (during training; feed golden previous mel).
 
