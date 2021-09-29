@@ -5,9 +5,11 @@
     - Attention-based Tacotron 2;
     - Non-Attentive Tacotron (multi-speaker);
 - vocoder:
-    - pretrained HiFi-GAN (better performance, but needs fine-tuning);
-    - pretrained LPCNet (worse sound quality, but may be easier to train).
-
+    - pretrained HiFi-GAN (better performance, but needs fine-tuning; NOTE: pretrained models work with 22.05 kHz (sample rate) audio only);
+    [HiFiGAN repo](https://github.com/jik876/hifi-gan)
+    - pretrained LPCNet (worse sound quality, but may be easier to train; NOTE: sample rate = 16 kHz (hard coded in the mozilla repo)).
+    [LPCNet repo by Mozilla](https://github.com/mozilla/LPCNet)
+    
 Attention-based Tacotron: teacher forcing (during training; feed golden previous mel).
 
 ## 1. Neutral Synthesis (baseline)
