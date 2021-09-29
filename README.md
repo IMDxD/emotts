@@ -43,7 +43,7 @@ Introduce a metric for emotion synthesis evaluation.
 - normalization (channel-wise): standard deviation = 1.0, mean = 0.0;
 - text normalization and phonemization: espeak-ng phonemizer (choose American / English accent);
 
-Normalization: 123 -> hundred and twenty-three, 10/10/2021 -> tenth October two thousend twenty one
+Normalization: 123 -> hundred and twenty-three, 10/10/2021 -> tenth October two thousand twenty one
 
 Phonemization (like in the dictionary): thought -> θɔːt
 
