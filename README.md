@@ -41,8 +41,13 @@ Introduce a metric for emotion synthesis evaluation.
 - basic preprocessing: pausation cutting (threshold-based method on spectrogram / VAD (pyvad));
 - feature extraction: mel-spectrum (80-dim);
 - normalization (channel-wise): standard deviation = 1.0, mean = 0.0;
-- text phonemization: espeak-ng phonemizer (choose American / English accent);
-- metafile for Tacotron training: audio-id|preprocessed-text-transcript.
+- text normalization and phonemization: espeak-ng phonemizer (choose American / English accent);
+
+Normalization: 123 -> hundred and twenty-three, 10/10/2021 -> tenth October two thousend twenty one
+
+Phonemization (like in the dictionary): thought -> θɔːt
+
+- metafile for Tacotron training: audio-id|text-transcript|preprocessed-text-transcript.
 
 Non-Attentive Tacotron specific data preprocessing:
 - external phone-level aligner (forced aligner):
