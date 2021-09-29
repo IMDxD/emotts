@@ -55,7 +55,7 @@ Non-Attentive Tacotron specific data preprocessing:
 - Emo-V-DB (problems with non-speech segments);
 - [MSP-Podcast](https://ecs.utdallas.edu/research/researchlabs/msp-lab/MSP-Podcast.html) / [MSP-Improv](https://ecs.utdallas.edu/research/researchlabs/msp-lab/MSP-Improv.html): waiting for reply;
 - [MSP-Face](https://ecs.utdallas.edu/research/researchlabs/msp-lab/MSP-Face.html) : available for download without any special request (quality to be verified);
-- Internal Huawei Russian dataset (cons: 1 speaker);
+- Internal Huawei Russian dataset (cons: 1 speaker, access to only 1 of the 4 team members);
 - others (look for data with sample rate of 22 kHz or more).
 
 ## 3. Advanced Emotional Synthesis
