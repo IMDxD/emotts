@@ -5,10 +5,21 @@
     - Attention-based Tacotron 2;
     - Non-Attentive Tacotron (multi-speaker);
 - vocoder:
-    - pretrained HiFi-GAN (better performance, but needs fine-tuning; NOTE: pretrained models work with 22.05 kHz (sample rate) audio only);
+    - pretrained HiFi-GAN (better performance, but needs fine-tuning; 
+    
+      NOTE: pretrained models work with 22.05 kHz (sample rate) audio only);
+     
     [HiFiGAN repo](https://github.com/jik876/hifi-gan)
-    - pretrained LPCNet (worse sound quality, but may be easier to train; NOTE: sample rate = 16 kHz (hard coded in the mozilla repo)).
+    
+      Input features: 80-dim mel spectral features.
+    
+    - pretrained LPCNet (worse sound quality, but may be easier to train; 
+    
+      NOTE: sample rate = 16 kHz (hard coded in the mozilla repo)).
+      
     [LPCNet repo by Mozilla](https://github.com/mozilla/LPCNet)
+    
+      Input features: 20-dim BFC features (18 bark cepstrum coefficients + 2 pitch features (pitch coef and pitch correlation)).
     
 Attention-based Tacotron: teacher forcing (during training; feed golden previous mel).
 
