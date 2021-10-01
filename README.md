@@ -43,6 +43,8 @@ Introduce a metric for emotion synthesis evaluation.
 - normalization (channel-wise): standard deviation = 1.0, mean = 0.0;
 - text normalization and phonemization: espeak-ng phonemizer (choose American / English accent);
 
+NOTE: The phonetisation actually needs to correspond to the phonetisation used by the aligner. Since you are most likely to be using a pretrained aligner (although you may retrain MFA, for example, on your own data), one needs to take the phonemizer that was used for training that model. MFA has some built-in G2P models (G2P: grapheme to phoneme conversion = phonemization). So espeak may not be the optimal choise here, because you will have to retrain MFA / Gentle. Better look into what MFA / Gentle has to offer in terms of phonemizers. NOTE: at training stage MFA does not need a phonemizer, only a lexicon is needed. At inference you will need a standalone phonemizer. 
+
 Normalization: 123 -> hundred and twenty-three, 10/10/2021 -> tenth October two thousand twenty one
 
 Phonemization (like in the dictionary): thought -> θɔːt
