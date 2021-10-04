@@ -56,6 +56,21 @@ Non-Attentive Tacotron specific data preprocessing:
     - MFA: output in TextGrid format (convert to durations: `npy`-array of durations in seconds / in frames);
     - Gentle (claimes to be able to align non-verbal emotion expression) (NOTE: for English only).
 
+Aligner (at inference stage for training set preprocessing): takes as input (text graphemic, audio) + lexicon.
+
+Lexicon:
+  word \t phonemization_1
+  word \t phonemization_2
+  
+Output from aligner: alignment + phonetization 
+    --> extract phonetic transcripts from right side of alignments;
+    --> alignments --> durations --> duration loss;
+    
+--- Tacotron inference ---
+  * no durations, no alignemnts, MFA cannot work here;
+  * durations are predicted by Tacotron duration predictor;
+  * phonetisations need to preducted by another model (phonemizer);
+
 ## 2. Basic Emotional Synthesis
 
 ### Datasets
