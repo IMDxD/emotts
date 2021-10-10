@@ -1,7 +1,7 @@
-import torch
-import numpy as np
-from scipy.signal import get_window
 import librosa.util as librosa_util
+import numpy as np
+import torch
+from scipy.signal import get_window
 
 
 def window_sumsquare(

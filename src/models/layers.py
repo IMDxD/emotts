@@ -4,7 +4,10 @@ import torch
 from librosa.filters import mel as librosa_mel_fn
 from torch import nn
 
-from src.models.audio_processing import dynamic_range_compression, dynamic_range_decompression
+from src.models.audio_processing import (
+    dynamic_range_compression,
+    dynamic_range_decompression,
+)
 from src.models.stft import STFT
 
 

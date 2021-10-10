@@ -2,7 +2,6 @@ import torch
 from torch import nn
 from torch.nn import functional as f
 
-from src.models.layers import ConvNorm, LinearNorm, PositionalEncoding
 from src.models.config import (
     GaussianUpsampleConfig,
     TacatronConfig,
@@ -10,7 +9,8 @@ from src.models.config import (
     TacatronDurationConfig,
     TacatronRangeConfig,
 )
-from src.models.utils import norm_emb
+from src.models.layers import ConvNorm, LinearNorm, PositionalEncoding
+from src.models.utils import norm_emb_layer
 
 
 class Prenet(nn.Module):
@@ -221,8 +221,10 @@ class NonAttentiveTacatron(nn.Module):
         self.speaker_embedding = nn.Embedding(
             config.n_speakers, config.speaker_embedding_dim
         )
-        norm_emb(self.phonem_embedding, config.n_phonems, config.phonem_embedding_dim)
-        norm_emb(
+        norm_emb_layer(
+            self.phonem_embedding, config.n_phonems, config.phonem_embedding_dim
+        )
+        norm_emb_layer(
             self.speaker_embedding, config.n_speakers, config.speaker_embedding_dim
         )
         self.encoder = Encoder(
@@ -231,7 +233,8 @@ class NonAttentiveTacatron(nn.Module):
             config.encoder_config,
         )
         self.attention = GaussianUpsample(
-            config.phonem_embedding_dim + config.speaker_embedding_dim, config.positional_config
+            config.phonem_embedding_dim + config.speaker_embedding_dim,
+            config.positional_config,
         )
 
     def forward(self, inputs):
