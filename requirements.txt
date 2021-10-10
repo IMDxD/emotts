@@ -1,5 +1,6 @@
 enum34==1.1.10
 numpy==1.20.3
 scipy==1.7.1
-synthesizer==0.2.0
 torch==1.9.1
+
+librosa~=0.8.1
