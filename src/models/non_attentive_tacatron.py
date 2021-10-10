@@ -4,7 +4,7 @@ from torch.nn import functional as f
 
 from src.models.layers import ConvNorm, LinearNorm, PositionalEncoding
 from src.models.config import (
-    PositionalConfig,
+    GaussianUpsampleConfig,
     TacatronConfig,
     TacatronEncoderConfig,
     TacatronDurationConfig,
@@ -31,7 +31,6 @@ class Prenet(nn.Module):
 
 
 class Postnet(nn.Module):
-
     def __init__(self, hparams):
         super(Postnet, self).__init__()
         self.convolutions = nn.ModuleList()
@@ -141,7 +140,6 @@ class RangePredictor(nn.Module):
 
 
 class Encoder(nn.Module):
-
     def __init__(
         self, phonem_embedding_dim, speaker_embedding_dim, config: TacatronEncoderConfig
     ):
@@ -188,35 +186,30 @@ class Encoder(nn.Module):
 
 
 class GaussianUpsample(nn.Module):
-
-    def __init__(self, config: PositionalConfig):
+    def __init__(self, embedding_dim, config: GaussianUpsampleConfig):
 
         super(GaussianUpsample, self).__init__()
-        self.positional_encoder = PositionalEncoding(config.dimension)
-
-    def forward(self, encoder_outputs, durations, range_outputs, device='cuda'):
-        max_duration = encoder_outputs.sum(-1)
-        max_duration = max_duration.max()
-        e = torch.cumsum(durations, dim=-1).float()
-        c = (e - 0.5 * durations).unsqueeze(-1)
-        t = torch.arange(0, max_duration).view(1, 1, -1).to(device)
-
-        w_1 = torch.exp(-(range_outputs ** -2) * ((t - c) ** 2))
-
-        w_2 = (
-            torch.sum(
-                torch.exp(-(range_outputs ** -2) * ((t - c) ** 2)),
-                dim=1,
-                keepdim=True,
-            )
-            + 1e-20
+        self.eps = config.eps
+        self.dropout = config.attention_dropout
+        self.positional_encoder = PositionalEncoding(
+            embedding_dim, max_len=config.max_len, dropout=config.positional_dropout
         )
-        w = w_1 / w_2  # [B, L, T]
 
-        out = torch.matmul(w.transpose(1, 2), encoder_outputs)  # [B, T, ENC_DIM]
+    def forward(self, encoder_outputs, durations, range_outputs, device='cpu'):
+        max_duration = durations.sum(-1)
+        max_duration = max_duration.max()
+        duration_cumsum = torch.cumsum(durations, dim=1).float()
+        c = duration_cumsum - 0.5 * durations
+        t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(device)
+
+        weights = torch.exp(-(range_outputs ** -2) * ((t - c) ** 2)) / range_outputs
+        weights_norm = torch.sum(weights, dim=1, keepdim=True) + self.eps
+        weights = weights / weights_norm
+
+        out = torch.matmul(weights.transpose(1, 2), encoder_outputs)  # [B, T, ENC_DIM]
         out = self.positional_encoder(out)
 
-        return out
+        return f.dropout(out, p=self.dropout)
 
 
 class NonAttentiveTacatron(nn.Module):
@@ -237,12 +230,14 @@ class NonAttentiveTacatron(nn.Module):
             config.speaker_embedding_dim,
             config.encoder_config,
         )
-        self.attention = GaussianUpsample(config.positional_config)
+        self.attention = GaussianUpsample(
+            config.phonem_embedding_dim + config.speaker_embedding_dim, config.positional_config
+        )
 
     def forward(self, inputs):
-        text_inputs, text_lengths, mels, max_len, output_lengths, speaker_ids = inputs
-        text_lengths, output_lengths = text_lengths.data, output_lengths.data
-
+        # text_inputs, text_lengths, mels, max_len, output_lengths, speaker_ids = inputs
+        # text_lengths, output_lengths = text_lengths.data, output_lengths.data
+        text_inputs, text_lengths, speaker_ids = inputs
         embedded_phonems = self.phonem_embedding(text_inputs).transpose(1, 2)
         embedded_speakers = self.speaker_embedding(speaker_ids).transpose(1, 2)
 

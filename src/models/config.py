@@ -3,9 +3,12 @@ from typing import List, Optional
 
 
 @dataclass
-class PositionalConfig:
+class GaussianUpsampleConfig:
 
-    dimension: int = field(default=256)
+    eps: float = field(default=1e-20)
+    max_len: int = field(default=1024)
+    attention_dropout: float = field(default=0.1)
+    positional_dropout: float = field(default=0.1)
 
 
 @dataclass
@@ -37,7 +40,7 @@ class TacatronEncoderConfig:
 class TacatronConfig:
 
     encoder_config: TacatronEncoderConfig
-    positional_config = PositionalConfig
+    positional_config = GaussianUpsampleConfig
     mask_padding: bool = field(default=True)
     fp16_run: bool = field(default=False)
     n_mel_channels: int = field(default=80)
