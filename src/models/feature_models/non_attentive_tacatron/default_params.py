@@ -1,59 +1,6 @@
-from dataclasses import field, dataclass
+# type: ignore
+from dataclasses import dataclass, field
 from typing import List, Optional
-
-
-@dataclass
-class TacatronDurationConfig:
-
-    lstm_layers: int = field(default=2)
-    lstm_hidden: int = field(default=256)
-    dropout: float = field(default=0.5)
-
-
-@dataclass
-class TacatronRangeConfig:
-
-    lstm_layers: int = field(default=2)
-    lstm_hidden: int = field(default=256)
-    dropout: float = field(default=0.5)
-
-
-@dataclass
-class GaussianUpsampleConfig:
-
-    duration_config: TacatronDurationConfig
-    range_config: TacatronRangeConfig
-    eps: float = field(default=1e-20)
-    max_len: int = field(default=1024)
-    teacher_forcing_ratio: float = field(default=1.0)
-    attention_dropout: float = field(default=0.1)
-    positional_dropout: float = field(default=0.1)
-
-
-
-@dataclass
-class TacatronEncoderConfig:
-
-    n_convolutions: int = field(default=3)
-    kernel_size: int = field(default=5)
-    lstm_layers: int = field(default=1)
-    lstm_hidden: int = field(default=256)
-
-
-@dataclass
-class TacatronConfig:
-
-    encoder_config: TacatronEncoderConfig
-    attention_config: GaussianUpsampleConfig
-    device: str = field(default="cpu")
-    mask_padding: bool = field(default=True)
-    fp16_run: bool = field(default=False)
-    n_mel_channels: int = field(default=80)
-    n_frames_per_step: int = field(default=513)
-    n_phonems: int = field(default=4000)
-    phonem_embedding_dim: int = field(default=512)
-    n_speakers: int = field(default=4)
-    speaker_embedding_dim: int = field(default=256)
 
 
 @dataclass
