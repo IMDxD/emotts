@@ -153,6 +153,7 @@ class Attention(nn.Module):
         self.positional_encoder = PositionalEncoding(
             embedding_dim, max_len=config.max_len, dropout=config.positional_dropout
         )
+        self.teacher_forcing_ratio = config.teacher_forcing_ratio
         self.device = device
 
     def calc_scores(self, durations, ranges):
@@ -168,14 +169,17 @@ class Attention(nn.Module):
 
         return weights
 
-    def forward(self, embeddings, input_lengths):
+    def forward(self, embeddings, input_lengths, y_durations):
 
         input_lengths = input_lengths.cpu().numpy()
 
         durations = self.duration_predictor(embeddings, input_lengths)
         ranges = self.range_predictor(embeddings, durations, input_lengths)
 
-        scores = self.calc_scores(durations, ranges)
+        if random.uniform(0, 1) > self.teacher_forsing_ratio:
+            scores = self.calc_scores(y_durations, ranges)
+        else:
+            scores = self.calc_scores(durations, ranges)
 
         attented_embeddings = torch.matmul(scores.transpose(1, 2), embeddings)
         attented_embeddings = self.positional_encoder(attented_embeddings)
@@ -237,7 +241,7 @@ class Decoder(nn.Module):
         self.prenet_dim = config.prenet_dim
         self.max_decoder_steps = config.max_decoder_steps
         self.gate_threshold = config.gate_threshold
-        self.teacher_forcing_ratio = config.teacher_forsing_ratio
+        self.teacher_forcing_ratio = config.teacher_forcing_ratio
         self.p_attention_dropout = config.p_attention_dropout
         self.p_decoder_dropout = config.p_decoder_dropout
 
@@ -253,22 +257,22 @@ class Decoder(nn.Module):
             config.decoder_rnn_dim + config.encoder_embedding_dim,
             config.n_mel_channels * config.n_frames_per_step)
 
-    def forward(self, memory, ymels):
+    def forward(self, memory, y_mels):
 
         decoder_input = Variable(torch.zeros(memory.size(0), 1, self.n_mel_channels))
-        ymels = torch.cat((decoder_input, ymels[:, :-1, :]), dim=0)
-        ymels = self.prenet(ymels)
+        y_mels = torch.cat((decoder_input, y_mels[:, :-1, :]), dim=0)
+        y_mels = self.prenet(y_mels)
 
         mel_outputs = []
         decoder_state = None
-        decoder_input = torch.cat((ymels[:, 0, :], memory[:, 0, :]), dim=-1)
+        decoder_input = torch.cat((y_mels[:, 0, :], memory[:, 0, :]), dim=-1)
         for i in range(memory.size(1)):
             out, decoder_state = self.decoder_rnn(decoder_input.unsqueeze(1), decoder_state)
             out = torch.cat((out, memory[:, i, :].unsqueeze(1)), dim=-1)
             mel_out = self.linear_projection(out)
             mel_outputs.append(mel_out)
             if random.uniform(0, 1) > self.teacher_forcing_ratio:
-                decoder_input = ymels[:, i, :]
+                decoder_input = y_mels[:, i, :]
             else:
                 decoder_input = mel_out.squeeze(1)
             decoder_input = torch.cat((decoder_input, memory[:, i, :]), dim=-1)
@@ -319,7 +323,7 @@ class NonAttentiveTacatron(nn.Module):
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        return durations, mel_outputs_postnet
+        return durations, mel_outputs_postnet, mel_outputs
 
 
 if __name__ == "__main__":

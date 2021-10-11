@@ -25,6 +25,7 @@ class GaussianUpsampleConfig:
     range_config: TacatronRangeConfig
     eps: float = field(default=1e-20)
     max_len: int = field(default=1024)
+    teacher_forcing_ratio: float = field(default=1.0)
     attention_dropout: float = field(default=0.1)
     positional_dropout: float = field(default=0.1)
 
