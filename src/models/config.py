@@ -3,15 +3,6 @@ from typing import List, Optional
 
 
 @dataclass
-class GaussianUpsampleConfig:
-
-    eps: float = field(default=1e-20)
-    max_len: int = field(default=1024)
-    attention_dropout: float = field(default=0.1)
-    positional_dropout: float = field(default=0.1)
-
-
-@dataclass
 class TacatronDurationConfig:
 
     lstm_layers: int = field(default=2)
@@ -28,19 +19,32 @@ class TacatronRangeConfig:
 
 
 @dataclass
-class TacatronEncoderConfig:
+class GaussianUpsampleConfig:
 
     duration_config: TacatronDurationConfig
     range_config: TacatronRangeConfig
+    eps: float = field(default=1e-20)
+    max_len: int = field(default=1024)
+    attention_dropout: float = field(default=0.1)
+    positional_dropout: float = field(default=0.1)
+
+
+
+@dataclass
+class TacatronEncoderConfig:
+
     n_convolutions: int = field(default=3)
     kernel_size: int = field(default=5)
+    lstm_layers: int = field(default=2)
+    lstm_hidden: int = field(default=256)
 
 
 @dataclass
 class TacatronConfig:
 
     encoder_config: TacatronEncoderConfig
-    positional_config = GaussianUpsampleConfig
+    attention_config: GaussianUpsampleConfig
+    device: str = field(default="cpu")
     mask_padding: bool = field(default=True)
     fp16_run: bool = field(default=False)
     n_mel_channels: int = field(default=80)
