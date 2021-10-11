@@ -6,12 +6,18 @@ from torch import nn
 from torch.nn import functional as f
 
 from src.models.feature_models.non_attentive_tacatron.config import (
-    GaussianUpsampleConfig, TacatronConfig, TacatronDecoderConfig,
-    TacatronDurationConfig, TacatronEncoderConfig, TacatronPostNetConfig,
+    GaussianUpsampleConfig,
+    TacatronConfig,
+    TacatronDecoderConfig,
+    TacatronDurationConfig,
+    TacatronEncoderConfig,
+    TacatronPostNetConfig,
     TacatronRangeConfig,
 )
 from src.models.feature_models.non_attentive_tacatron.layers import (
-    ConvNorm, LinearNorm, PositionalEncoding,
+    ConvNorm,
+    LinearNorm,
+    PositionalEncoding,
 )
 from src.models.feature_models.non_attentive_tacatron.utils import (
     norm_emb_layer,
@@ -19,7 +25,7 @@ from src.models.feature_models.non_attentive_tacatron.utils import (
 
 
 class Prenet(nn.Module):
-    def __init__(self, in_dim: int, sizes: List[int]):
+    def __init__(self, in_dim: int, sizes: List[int], dropout: float):
         super().__init__()
         in_sizes = [in_dim] + sizes[:-1]
         self.layers = nn.ModuleList(
@@ -28,69 +34,65 @@ class Prenet(nn.Module):
                 for (in_size, out_size) in zip(in_sizes, sizes)
             ]
         )
+        self.dropout = dropout
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for linear in self.layers:
-            x = f.dropout(f.relu(linear(x)), p=0.5, training=True)
+            x = f.dropout(f.relu(linear(x)), p=self.dropout, training=self.training)
         return x
 
 
 class Postnet(nn.Module):
     def __init__(self, n_mel_channels: int, config: TacatronPostNetConfig):
         super().__init__()
-        self.dropout = config.dropout_rate
-        self.convolutions = nn.ModuleList()
+        self.dropout = config.dropout
+        convolutions: List[nn.Module] = []
 
-        self.convolutions.append(
-            nn.Sequential(
+        convolutions.append(
+            ConvNorm(
+                n_mel_channels,
+                config.embedding_dim,
+                kernel_size=config.kernel_size,
+                stride=1,
+                padding=int((config.kernel_size - 1) / 2),
+                dilation=1,
+                dropout_rate=config.dropout,
+                w_init_gain="tanh",
+            )
+        )
+        convolutions.append(nn.Tanh())
+
+        for _ in range(config.n_convolutions - 2):
+            convolutions.append(
                 ConvNorm(
-                    n_mel_channels,
+                    config.embedding_dim,
                     config.embedding_dim,
                     kernel_size=config.kernel_size,
                     stride=1,
                     padding=int((config.kernel_size - 1) / 2),
                     dilation=1,
                     w_init_gain="tanh",
-                ),
-                nn.BatchNorm1d(config.embedding_dim),
-            )
-        )
-
-        for _ in range(config.n_convolutions - 2):
-            self.convolutions.append(
-                nn.Sequential(
-                    ConvNorm(
-                        config.embedding_dim,
-                        config.embedding_dim,
-                        kernel_size=config.kernel_size,
-                        stride=1,
-                        padding=int((config.kernel_size - 1) / 2),
-                        dilation=1,
-                        w_init_gain="tanh",
-                    ),
-                    nn.BatchNorm1d(config.embedding_dim),
                 )
             )
+            convolutions.append(nn.Tanh())
 
-        self.convolutions.append(
-            nn.Sequential(
-                ConvNorm(
-                    config.embedding_dim,
-                    n_mel_channels,
-                    kernel_size=config.kernel_size,
-                    stride=1,
-                    padding=int((config.kernel_size - 1) / 2),
-                    dilation=1,
-                    w_init_gain="linear",
-                ),
-                nn.BatchNorm1d(n_mel_channels),
+        convolutions.append(
+            ConvNorm(
+                config.embedding_dim,
+                n_mel_channels,
+                kernel_size=config.kernel_size,
+                stride=1,
+                padding=int((config.kernel_size - 1) / 2),
+                dilation=1,
+                w_init_gain="linear",
             )
         )
+        self.convolutions = nn.Sequential(*convolutions)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for i in range(len(self.convolutions) - 1):
-            x = f.dropout(torch.tanh(self.convolutions[i](x)), self.dropout, self.training)
-        x = f.dropout(self.convolutions[-1](x), self.dropout, self.training)
+            x = torch.tanh(self.convolutions[i](x))
+        x = self.convolutions[-1](x)
 
         return x
 
@@ -207,49 +209,42 @@ class Encoder(nn.Module):
     def __init__(self, phonem_embedding_dim: int, config: TacatronEncoderConfig):
         super().__init__()
 
-        convolutions = [
-            nn.Sequential(
-                ConvNorm(
-                    phonem_embedding_dim,
-                    config.conv_channel,
-                    kernel_size=config.kernel_size,
-                    stride=1,
-                    padding=int((config.kernel_size - 1) / 2),
-                    dilation=1,
-                    w_init_gain="relu",
-                ),
-                nn.BatchNorm1d(phonem_embedding_dim),
+        convolutions: List[nn.Module] = [
+            ConvNorm(
+                phonem_embedding_dim,
+                config.conv_channel,
+                kernel_size=config.kernel_size,
+                stride=1,
+                padding=int((config.kernel_size - 1) / 2),
+                dilation=1,
+                dropout_rate=config.dropout,
+                w_init_gain="relu",
             )
         ]
+
         for _ in range(config.n_convolutions - 2):
-            conv_layer = nn.Sequential(
-                ConvNorm(
-                    config.conv_channel,
-                    config.conv_channel,
-                    kernel_size=config.kernel_size,
-                    stride=1,
-                    padding=int((config.kernel_size - 1) / 2),
-                    dilation=1,
-                    w_init_gain="relu",
-                ),
-                nn.BatchNorm1d(phonem_embedding_dim),
+            conv_layer = ConvNorm(
+                config.conv_channel,
+                config.conv_channel,
+                kernel_size=config.kernel_size,
+                stride=1,
+                padding=int((config.kernel_size - 1) / 2),
+                dilation=1,
+                w_init_gain="relu",
             )
             convolutions.append(conv_layer)
         convolutions.append(
-            nn.Sequential(
-                ConvNorm(
-                    config.conv_channel,
-                    phonem_embedding_dim,
-                    kernel_size=config.kernel_size,
-                    stride=1,
-                    padding=int((config.kernel_size - 1) / 2),
-                    dilation=1,
-                    w_init_gain="relu",
-                ),
-                nn.BatchNorm1d(phonem_embedding_dim),
-            )
+            ConvNorm(
+                config.conv_channel,
+                phonem_embedding_dim,
+                kernel_size=config.kernel_size,
+                stride=1,
+                padding=int((config.kernel_size - 1) / 2),
+                dilation=1,
+                w_init_gain="relu",
+            ),
         )
-        self.convolutions = nn.ModuleList(convolutions)
+        self.convolutions = nn.Sequential(*convolutions)
         self.lstm = nn.LSTM(
             phonem_embedding_dim,
             config.lstm_hidden,
@@ -261,9 +256,8 @@ class Encoder(nn.Module):
     def forward(
         self, phonem_emb: torch.Tensor, input_lengths: torch.Tensor
     ) -> torch.Tensor:
-        for conv in self.convolutions:
-            phonem_emb = f.dropout(f.relu(conv(phonem_emb)), 0.5, self.training)
 
+        phonem_emb = self.convolutions(phonem_emb)
         phonem_emb = phonem_emb.transpose(1, 2)
         phonem_emb_packed = nn.utils.rnn.pack_padded_sequence(
             phonem_emb, input_lengths, batch_first=True
@@ -287,9 +281,13 @@ class Decoder(nn.Module):
         self.n_mel_channels = n_mel_channels
         self.decoder_rnn_dim = config.decoder_rnn_dim
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
-        self.p_decoder_dropout = config.p_decoder_dropout
+        self.p_decoder_dropout = config.dropout
 
-        self.prenet = Prenet(n_mel_channels + attention_out_dim, config.prenet_layers)
+        self.prenet = Prenet(
+            n_mel_channels + attention_out_dim,
+            config.prenet_layers,
+            config.prenet_dropout,
+        )
 
         self.decoder_rnn = nn.LSTM(
             attention_out_dim,
@@ -332,20 +330,29 @@ class Decoder(nn.Module):
 
 
 class NonAttentiveTacatron(nn.Module):
-    def __init__(self, n_phonems: int, n_speakers: int, device: torch.device, config: TacatronConfig):
+    def __init__(
+        self,
+        n_phonems: int,
+        n_speakers: int,
+        device: torch.device,
+        config: TacatronConfig,
+    ):
         super().__init__()
         full_embedding_dim = config.phonem_embedding_dim + config.speaker_embedding_dim
-        self.phonem_embedding = nn.Embedding(
-            n_phonems, config.phonem_embedding_dim
-        )
+        self.phonem_embedding = nn.Embedding(n_phonems, config.phonem_embedding_dim)
         self.speaker_embedding = nn.Embedding(
-            n_speakers, config.speaker_embedding_dim,
+            n_speakers,
+            config.speaker_embedding_dim,
         )
         norm_emb_layer(
-            self.phonem_embedding, n_phonems, config.phonem_embedding_dim,
+            self.phonem_embedding,
+            n_phonems,
+            config.phonem_embedding_dim,
         )
         norm_emb_layer(
-            self.speaker_embedding, n_speakers, config.speaker_embedding_dim,
+            self.speaker_embedding,
+            n_speakers,
+            config.speaker_embedding_dim,
         )
         self.encoder = Encoder(
             config.phonem_embedding_dim,

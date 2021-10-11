@@ -29,6 +29,7 @@ class ConvNorm(torch.nn.Module):
         padding: int = None,
         dilation: int = 1,
         bias: bool = True,
+        dropout_rate: float = 0.1,
         w_init_gain: str = "linear",
     ):
         super().__init__()
@@ -49,10 +50,14 @@ class ConvNorm(torch.nn.Module):
         torch.nn.init.xavier_uniform_(
             self.conv.weight, gain=torch.nn.init.calculate_gain(w_init_gain)
         )
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout_rate)
+        self.batch_norm = nn.BatchNorm1d(out_channels)
 
     def forward(self, signal: torch.Tensor) -> torch.Tensor:
         conv_signal = self.conv(signal)
-        return conv_signal
+        normed_signal = self.batch_norm(conv_signal)
+        return self.dropout(self.relu(normed_signal))
 
 
 class PositionalEncoding(nn.Module):

@@ -34,10 +34,11 @@ class GaussianUpsampleConfig:
 class TacatronDecoderConfig:
 
     prenet_layers: List[int] = field(default_factory=[256, 256])  # type: ignore
+    prenet_dropout: float = field(default=0.5)
     decoder_rnn_dim: int = field(default=512)
     decoder_num_layers: int = field(default=3)
     teacher_forcing_ratio: float = field(default=1.0)
-    p_decoder_dropout: float = field(default=0.1)
+    dropout: float = field(default=0.1)
 
 
 @dataclass
@@ -48,6 +49,7 @@ class TacatronEncoderConfig:
     conv_channel: int = field(default=512)
     lstm_layers: int = field(default=1)
     lstm_hidden: int = field(default=256)
+    dropout: float = field(default=0.1)
 
 
 @dataclass
@@ -56,7 +58,7 @@ class TacatronPostNetConfig:
     embedding_dim: int = field(default=512)
     n_convolutions: int = field(default=5)
     kernel_size: int = field(default=5)
-    dropout_rate: float = field(default=0.1)
+    dropout: float = field(default=0.1)
 
 
 @dataclass
