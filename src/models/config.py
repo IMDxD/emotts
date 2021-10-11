@@ -35,7 +35,7 @@ class TacatronEncoderConfig:
 
     n_convolutions: int = field(default=3)
     kernel_size: int = field(default=5)
-    lstm_layers: int = field(default=2)
+    lstm_layers: int = field(default=1)
     lstm_hidden: int = field(default=256)
 
 

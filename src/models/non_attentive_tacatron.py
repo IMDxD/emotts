@@ -1,5 +1,7 @@
+import random
 import torch
 from torch import nn
+from torch.autograd import Variable
 from torch.nn import functional as f
 
 from src.models.config import (
@@ -31,53 +33,53 @@ class Prenet(nn.Module):
 
 
 class Postnet(nn.Module):
-    def __init__(self, hparams):
+    def __init__(self, config):
         super(Postnet, self).__init__()
         self.convolutions = nn.ModuleList()
 
         self.convolutions.append(
             nn.Sequential(
                 ConvNorm(
-                    hparams.n_mel_channels,
-                    hparams.postnet_embedding_dim,
-                    kernel_size=hparams.postnet_kernel_size,
+                    config.n_mel_channels,
+                    config.postnet_embedding_dim,
+                    kernel_size=config.postnet_kernel_size,
                     stride=1,
-                    padding=int((hparams.postnet_kernel_size - 1) / 2),
+                    padding=int((config.postnet_kernel_size - 1) / 2),
                     dilation=1,
                     w_init_gain="tanh",
                 ),
-                nn.BatchNorm1d(hparams.postnet_embedding_dim),
+                nn.BatchNorm1d(config.postnet_embedding_dim),
             )
         )
 
-        for i in range(1, hparams.postnet_n_convolutions - 1):
+        for i in range(1, config.postnet_n_convolutions - 1):
             self.convolutions.append(
                 nn.Sequential(
                     ConvNorm(
-                        hparams.postnet_embedding_dim,
-                        hparams.postnet_embedding_dim,
-                        kernel_size=hparams.postnet_kernel_size,
+                        config.postnet_embedding_dim,
+                        config.postnet_embedding_dim,
+                        kernel_size=config.postnet_kernel_size,
                         stride=1,
-                        padding=int((hparams.postnet_kernel_size - 1) / 2),
+                        padding=int((config.postnet_kernel_size - 1) / 2),
                         dilation=1,
                         w_init_gain="tanh",
                     ),
-                    nn.BatchNorm1d(hparams.postnet_embedding_dim),
+                    nn.BatchNorm1d(config.postnet_embedding_dim),
                 )
             )
 
         self.convolutions.append(
             nn.Sequential(
                 ConvNorm(
-                    hparams.postnet_embedding_dim,
-                    hparams.n_mel_channels,
-                    kernel_size=hparams.postnet_kernel_size,
+                    config.postnet_embedding_dim,
+                    config.n_mel_channels,
+                    kernel_size=config.postnet_kernel_size,
                     stride=1,
-                    padding=int((hparams.postnet_kernel_size - 1) / 2),
+                    padding=int((config.postnet_kernel_size - 1) / 2),
                     dilation=1,
                     w_init_gain="linear",
                 ),
-                nn.BatchNorm1d(hparams.n_mel_channels),
+                nn.BatchNorm1d(config.n_mel_channels),
             )
         )
 
@@ -160,7 +162,7 @@ class Attention(nn.Module):
         c = duration_cumsum - 0.5 * durations
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(self.device)
 
-        weights = torch.exp(-(ranges ** -2) * ((t - c) ** 2)) / ranges
+        weights = torch.exp(-(ranges ** -2) * ((t - c) ** 2))
         weights_norm = torch.sum(weights, dim=1, keepdim=True) + self.eps
         weights = weights / weights_norm
 
@@ -203,7 +205,7 @@ class Encoder(nn.Module):
         self.lstm = nn.LSTM(
             phonem_embedding_dim,
             config.lstm_hidden,
-            1,
+            num_layers=1,
             batch_first=True,
             bidirectional=True,
         )
@@ -223,6 +225,56 @@ class Encoder(nn.Module):
         phonem_emb, _ = nn.utils.rnn.pad_packed_sequence(phonem_emb, batch_first=True)
 
         return phonem_emb
+    
+    
+class Decoder(nn.Module):
+    def __init__(self, config):
+        super(Decoder, self).__init__()
+        self.n_mel_channels = config.n_mel_channels
+        self.encoder_embedding_dim = config.encoder_embedding_dim
+        self.attention_rnn_dim = config.attention_rnn_dim
+        self.decoder_rnn_dim = config.decoder_rnn_dim
+        self.prenet_dim = config.prenet_dim
+        self.max_decoder_steps = config.max_decoder_steps
+        self.gate_threshold = config.gate_threshold
+        self.teacher_forcing_ratio = config.teacher_forsing_ratio
+        self.p_attention_dropout = config.p_attention_dropout
+        self.p_decoder_dropout = config.p_decoder_dropout
+
+        self.prenet = Prenet(
+            config.n_mel_channels,
+            [config.prenet_dim, config.prenet_dim])
+
+        self.decoder_rnn = nn.LSTM(
+            config.attention_rnn_dim + config.encoder_embedding_dim,
+            config.decoder_rnn_dim, num_layers=config.decoder_num_layers, bidirectional=False, batch_first=True)
+
+        self.linear_projection = LinearNorm(
+            config.decoder_rnn_dim + config.encoder_embedding_dim,
+            config.n_mel_channels * config.n_frames_per_step)
+
+    def forward(self, memory, ymels):
+
+        decoder_input = Variable(torch.zeros(memory.size(0), 1, self.n_mel_channels))
+        ymels = torch.cat((decoder_input, ymels[:, :-1, :]), dim=0)
+        ymels = self.prenet(ymels)
+
+        mel_outputs = []
+        decoder_state = None
+        decoder_input = torch.cat((ymels[:, 0, :], memory[:, 0, :]), dim=-1)
+        for i in range(memory.size(1)):
+            out, decoder_state = self.decoder_rnn(decoder_input.unsqueeze(1), decoder_state)
+            out = torch.cat((out, memory[:, i, :].unsqueeze(1)), dim=-1)
+            mel_out = self.linear_projection(out)
+            mel_outputs.append(mel_out)
+            if random.uniform(0, 1) > self.teacher_forcing_ratio:
+                decoder_input = ymels[:, i, :]
+            else:
+                decoder_input = mel_out.squeeze(1)
+            decoder_input = torch.cat((decoder_input, memory[:, i, :]), dim=-1)
+
+        mel_outputs = torch.cat(mel_outputs, dim=1)
+        return mel_outputs
 
 
 class NonAttentiveTacatron(nn.Module):
@@ -249,10 +301,10 @@ class NonAttentiveTacatron(nn.Module):
             config.attention_config,
             config.device,
         )
+        self.decoder = Decoder(config)
 
     def forward(self, inputs):
-        text_inputs, text_lengths, mels, max_len, output_lengths, speaker_ids = inputs
-        text_lengths, output_lengths = text_lengths.data, output_lengths.data
+        text_inputs, text_lengths, mels, speaker_ids = inputs
 
         phonem_emb = self.phonem_embedding(text_inputs).transpose(1, 2)
         speaker_emb = self.speaker_embedding(speaker_ids)
@@ -263,8 +315,11 @@ class NonAttentiveTacatron(nn.Module):
         embeddings = torch.cat((phonem_emb, speaker_emb), dim=-1)
 
         durations, attented_embeddings = self.attention(embeddings, text_lengths)
+        mel_outputs = self.decoder(attented_embeddings, mels)
+        mel_outputs_postnet = self.postnet(mel_outputs)
+        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        return durations, attented_embeddings
+        return durations, mel_outputs_postnet
 
 
 if __name__ == "__main__":
