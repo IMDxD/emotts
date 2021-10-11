@@ -80,8 +80,10 @@ Output from aligner: alignment + phonetization
 - Internal Huawei Russian dataset (cons: 1 speaker, access to only 1 of the 4 team members);
 - others (look for data with sample rate of 22 kHz or more).
 
+### Realisation:
+- lookup embedding.
+
 ## 3. Advanced Emotional Synthesis
-- lookup embedding;
 - GST-based (global style tokens): prosody transfer model;
 - modifications on top of GST.
 
