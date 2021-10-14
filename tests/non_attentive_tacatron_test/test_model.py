@@ -1,23 +1,12 @@
 import torch
 
 from src.models.feature_models.non_attentive_tacatron.config import (
-    DecoderConfig,
-    DurationConfig,
-    EncoderConfig,
-    GaussianUpsampleConfig,
-    ModelConfig,
-    PostNetConfig,
-    RangeConfig,
+    DecoderConfig, DurationConfig, EncoderConfig, GaussianUpsampleConfig,
+    ModelConfig, PostNetConfig, RangeConfig,
 )
 from src.models.feature_models.non_attentive_tacatron.model import (
-    Attention,
-    Decoder,
-    DurationPredictor,
-    Prenet,
-    Encoder,
-    NonAttentiveTacatron,
-    Postnet,
-    RangePredictor,
+    Attention, Decoder, DurationPredictor, Encoder, NonAttentiveTacatron,
+    Postnet, Prenet, RangePredictor,
 )
 
 DECODER_CONFIG = DecoderConfig()
@@ -175,7 +164,7 @@ def test_postnet_layer():
     )
     out = layer(INPUT_MELS.transpose(1, 2))
     assert (
-            out.shape == expected_shape
+        out.shape == expected_shape
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
 
 
@@ -189,8 +178,8 @@ def test_model():
         durations.shape == expected_duration_shape
     ), f"Wrong shape, expected {expected_duration_shape}, got: {durations.shape}"
     assert (
-            mel_predicted.shape == expected_mel_shape
+        mel_predicted.shape == expected_mel_shape
     ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_fixed.shape}"
     assert (
-            mel_fixed.shape == expected_mel_shape
+        mel_fixed.shape == expected_mel_shape
     ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_predicted.shape}"
