@@ -3,7 +3,7 @@ from typing import List
 
 
 @dataclass
-class TacatronDurationConfig:
+class DurationConfig:
 
     lstm_layers: int = field(default=2)
     lstm_hidden: int = field(default=256)
@@ -11,7 +11,7 @@ class TacatronDurationConfig:
 
 
 @dataclass
-class TacatronRangeConfig:
+class RangeConfig:
 
     lstm_layers: int = field(default=2)
     lstm_hidden: int = field(default=256)
@@ -21,8 +21,8 @@ class TacatronRangeConfig:
 @dataclass
 class GaussianUpsampleConfig:
 
-    duration_config: TacatronDurationConfig
-    range_config: TacatronRangeConfig
+    duration_config: DurationConfig
+    range_config: RangeConfig
     eps: float = field(default=1e-20)
     positional_dim: int = field(default=32)
     teacher_forcing_ratio: float = field(default=1.0)
@@ -31,9 +31,9 @@ class GaussianUpsampleConfig:
 
 
 @dataclass
-class TacatronDecoderConfig:
+class DecoderConfig:
 
-    prenet_layers: List[int] = field(default_factory=[256, 256])  # type: ignore
+    prenet_layers: List[int] = field(default_factory=lambda: [256, 256])
     prenet_dropout: float = field(default=0.5)
     decoder_rnn_dim: int = field(default=512)
     decoder_num_layers: int = field(default=3)
@@ -42,7 +42,7 @@ class TacatronDecoderConfig:
 
 
 @dataclass
-class TacatronEncoderConfig:
+class EncoderConfig:
 
     n_convolutions: int = field(default=3)
     kernel_size: int = field(default=5)
@@ -53,7 +53,7 @@ class TacatronEncoderConfig:
 
 
 @dataclass
-class TacatronPostNetConfig:
+class PostNetConfig:
 
     embedding_dim: int = field(default=512)
     n_convolutions: int = field(default=5)
@@ -62,12 +62,12 @@ class TacatronPostNetConfig:
 
 
 @dataclass
-class TacatronConfig:
+class ModelConfig:
 
-    encoder_config: TacatronEncoderConfig
+    encoder_config: EncoderConfig
     attention_config: GaussianUpsampleConfig
-    decoder_config: TacatronDecoderConfig
-    postnet_config: TacatronPostNetConfig
+    decoder_config: DecoderConfig
+    postnet_config: PostNetConfig
     n_mel_channels: int = field(default=80)
     mask_padding: bool = field(default=True)
     phonem_embedding_dim: int = field(default=512)

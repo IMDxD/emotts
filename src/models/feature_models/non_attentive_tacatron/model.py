@@ -5,22 +5,22 @@ import torch
 from torch import nn
 from torch.nn import functional as f
 
-from src.models.feature_models.non_attentive_tacatron.config import (
+from .config import (
     GaussianUpsampleConfig,
-    TacatronConfig,
-    TacatronDecoderConfig,
-    TacatronDurationConfig,
-    TacatronEncoderConfig,
-    TacatronPostNetConfig,
-    TacatronRangeConfig,
+    ModelConfig,
+    DecoderConfig,
+    DurationConfig,
+    EncoderConfig,
+    PostNetConfig,
+    RangeConfig,
 )
-from src.models.feature_models.non_attentive_tacatron.layers import (
+from .layers import (
     ConvNorm,
     LinearNorm,
     PositionalEncoding,
 )
-from src.models.feature_models.non_attentive_tacatron.utils import (
-    norm_emb_layer,
+from .utils import (
+    norm_emb_layer, get_mask_from_lengths
 )
 
 
@@ -43,7 +43,7 @@ class Prenet(nn.Module):
 
 
 class Postnet(nn.Module):
-    def __init__(self, n_mel_channels: int, config: TacatronPostNetConfig):
+    def __init__(self, n_mel_channels: int, config: PostNetConfig):
         super().__init__()
         self.dropout = config.dropout
         convolutions: List[nn.Module] = []
@@ -98,7 +98,7 @@ class Postnet(nn.Module):
 
 
 class DurationPredictor(nn.Module):
-    def __init__(self, embedding_dim: int, config: TacatronDurationConfig):
+    def __init__(self, embedding_dim: int, config: DurationConfig):
         super().__init__()
 
         self.lstm = nn.LSTM(
@@ -109,10 +109,12 @@ class DurationPredictor(nn.Module):
             bidirectional=True,
         )
         self.dropout = config.dropout
-        self.projection = nn.Linear(config.lstm_hidden * 2, 1)
+        self.projection = LinearNorm(config.lstm_hidden * 2, 1, bias=False)
 
     def forward(self, x: torch.Tensor, input_lengths: torch.Tensor) -> torch.Tensor:
-        packed_x = nn.utils.rnn.pack_padded_sequence(x, input_lengths, batch_first=True)
+        packed_x = nn.utils.rnn.pack_padded_sequence(
+            x, input_lengths, batch_first=True, enforce_sorted=False
+        )
         self.lstm.flatten_parameters()
         outputs, _ = self.lstm(packed_x)
         outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
@@ -122,7 +124,7 @@ class DurationPredictor(nn.Module):
 
 
 class RangePredictor(nn.Module):
-    def __init__(self, embedding_dim: int, config: TacatronRangeConfig):
+    def __init__(self, embedding_dim: int, config: RangeConfig):
         super().__init__()
 
         self.lstm = nn.LSTM(
@@ -133,14 +135,16 @@ class RangePredictor(nn.Module):
             bidirectional=True,
         )
         self.dropout = config.dropout
-        self.projection = nn.Linear(config.lstm_hidden * 2, 1)
+        self.projection = LinearNorm(config.lstm_hidden * 2, 1)
 
     def forward(
         self, x: torch.Tensor, durations: torch.Tensor, input_lengths: torch.Tensor
     ) -> torch.Tensor:
 
         x = torch.cat((x, durations), dim=-1)
-        packed_x = nn.utils.rnn.pack_padded_sequence(x, input_lengths, batch_first=True)
+        packed_x = nn.utils.rnn.pack_padded_sequence(
+            x, input_lengths, batch_first=True, enforce_sorted=False
+        )
         self.lstm.flatten_parameters()
         outputs, _ = self.lstm(packed_x)
         outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
@@ -172,7 +176,7 @@ class Attention(nn.Module):
         self, durations: torch.Tensor, ranges: torch.Tensor
     ) -> torch.Tensor:
 
-        duration_cumsum = torch.cumsum(durations, dim=1).float()
+        duration_cumsum = durations.cumsum(dim=1).float()
         max_duration = duration_cumsum[:, -1, :].max()
         c = duration_cumsum - 0.5 * durations
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(self.device)
@@ -195,18 +199,20 @@ class Attention(nn.Module):
         durations = self.duration_predictor(embeddings, input_lengths)
         ranges = self.range_predictor(embeddings, durations, input_lengths)
 
-        if random.uniform(0, 1) > self.teacher_forsing_ratio:  # type: ignore
-            scores = self.calc_scores(y_durations, ranges)
-        else:
+        if random.uniform(0, 1) > self.teacher_forcing_ratio:  # type: ignore
             scores = self.calc_scores(durations, ranges)
+        else:
+            scores = self.calc_scores(y_durations.unsqueeze(2), ranges)
 
         attented_embeddings = torch.matmul(scores.transpose(1, 2), embeddings)
         attented_embeddings = self.positional_encoder(attented_embeddings)
+        mask = get_mask_from_lengths(y_durations.cumsum(dim=1)[:, -1], device=self.device)
+        attented_embeddings[mask] = 0
         return durations, attented_embeddings
 
 
 class Encoder(nn.Module):
-    def __init__(self, phonem_embedding_dim: int, config: TacatronEncoderConfig):
+    def __init__(self, phonem_embedding_dim: int, config: EncoderConfig):
         super().__init__()
 
         convolutions: List[nn.Module] = [
@@ -260,7 +266,7 @@ class Encoder(nn.Module):
         phonem_emb = self.convolutions(phonem_emb)
         phonem_emb = phonem_emb.transpose(1, 2)
         phonem_emb_packed = nn.utils.rnn.pack_padded_sequence(
-            phonem_emb, input_lengths, batch_first=True
+            phonem_emb, input_lengths, batch_first=True, enforce_sorted=False
         )
 
         self.lstm.flatten_parameters()
@@ -275,7 +281,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(
-        self, n_mel_channels: int, attention_out_dim: int, config: TacatronDecoderConfig
+        self, n_mel_channels: int, attention_out_dim: int, config: DecoderConfig
     ):
         super().__init__()
         self.n_mel_channels = n_mel_channels
@@ -335,7 +341,7 @@ class NonAttentiveTacatron(nn.Module):
         n_phonems: int,
         n_speakers: int,
         device: torch.device,
-        config: TacatronConfig,
+        config: ModelConfig,
     ):
         super().__init__()
         full_embedding_dim = config.phonem_embedding_dim + config.speaker_embedding_dim
@@ -375,9 +381,11 @@ class NonAttentiveTacatron(nn.Module):
 
     def forward(
         self,
-        inputs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+        inputs: Tuple[
+            torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
+        ],
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        text_inputs, text_lengths, mels, speaker_ids = inputs
+        text_inputs, text_lengths, speaker_ids, y_durations, y_mels = inputs
 
         phonem_emb = self.phonem_embedding(text_inputs).transpose(1, 2)
         speaker_emb = self.speaker_embedding(speaker_ids)
@@ -387,8 +395,10 @@ class NonAttentiveTacatron(nn.Module):
         speaker_emb = torch.repeat_interleave(speaker_emb, phonem_emb.shape[1], dim=1)
         embeddings = torch.cat((phonem_emb, speaker_emb), dim=-1)
 
-        durations, attented_embeddings = self.attention(embeddings, text_lengths)
-        mel_outputs = self.decoder(attented_embeddings, mels)
+        durations, attented_embeddings = self.attention(
+            embeddings, text_lengths, y_durations
+        )
+        mel_outputs = self.decoder(attented_embeddings, y_mels)
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
