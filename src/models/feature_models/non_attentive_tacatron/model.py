@@ -6,22 +6,11 @@ from torch import nn
 from torch.nn import functional as f
 
 from .config import (
-    GaussianUpsampleConfig,
-    ModelConfig,
-    DecoderConfig,
-    DurationConfig,
-    EncoderConfig,
-    PostNetConfig,
-    RangeConfig,
+    DecoderConfig, DurationConfig, EncoderConfig, GaussianUpsampleConfig,
+    ModelConfig, PostNetConfig, RangeConfig,
 )
-from .layers import (
-    ConvNorm,
-    LinearNorm,
-    PositionalEncoding,
-)
-from .utils import (
-    norm_emb_layer, get_mask_from_lengths
-)
+from .layers import ConvNorm, LinearNorm, PositionalEncoding
+from .utils import get_mask_from_lengths, norm_emb_layer
 
 
 class Prenet(nn.Module):

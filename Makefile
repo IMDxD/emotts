@@ -4,7 +4,7 @@ requirements:
 start: requirements
 
 test:
-	pytest --cov=backend --cov-fail-under 80 --blockage  --cov-report term-missing
+	pytest --cov=src --cov-fail-under 80 --blockage  --cov-report term-missing
 
 coverage-collect:
 	coverage run -m pytest

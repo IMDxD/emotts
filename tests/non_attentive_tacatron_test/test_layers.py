@@ -2,14 +2,12 @@ import pytest
 import torch
 
 from src.models.feature_models.non_attentive_tacatron.layers import (
-    ConvNorm,
-    PositionalEncoding,
-    LinearNorm,
+    ConvNorm, LinearNorm, PositionalEncoding,
 )
 
 
 @pytest.mark.parametrize(
-    "kernel_size, output_channel, dilation, input_tensor, expected_shape",
+    ("kernel_size", "output_channel", "dilation", "input_tensor", "expected_shape"),
     [
         pytest.param(3, 256, 1, torch.randn(16, 128, 24), (16, 256, 24)),
         pytest.param(5, 128, 3, torch.randn(16, 256, 32), (16, 128, 32)),
@@ -28,7 +26,7 @@ def test_conv_norm_layer(
 
 
 @pytest.mark.parametrize(
-    "dimension, input_tensor, expected_shape",
+    ("dimension", "input_tensor", "expected_shape"),
     [
         pytest.param(32, torch.randn(16, 24, 128), (16, 24, 160)),
         pytest.param(64, torch.randn(16, 32, 256), (16, 32, 320)),
@@ -43,7 +41,7 @@ def test_positional_encoding_layer(dimension, input_tensor, expected_shape):
 
 
 @pytest.mark.parametrize(
-    "dimension, input_tensor, expected_shape",
+    ("dimension", "input_tensor", "expected_shape"),
     [
         pytest.param(32, torch.randn(16, 24, 128), (16, 24, 32)),
         pytest.param(64, torch.randn(16, 32, 256), (16, 32, 64)),

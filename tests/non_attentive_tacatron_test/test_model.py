@@ -1,26 +1,12 @@
-import pytest
 import torch
 
-from src.models.feature_models.non_attentive_tacatron.model import (
-    Encoder,
-    Decoder,
-    DurationPredictor,
-    RangePredictor,
-    Prenet,
-    Postnet,
-    NonAttentiveTacatron,
-    Attention,
-)
 from src.models.feature_models.non_attentive_tacatron.config import (
-    ModelConfig,
-    DecoderConfig,
-    DurationConfig,
-    EncoderConfig,
-    GaussianUpsampleConfig,
-    PostNetConfig,
-    RangeConfig,
+    DecoderConfig, DurationConfig, EncoderConfig, GaussianUpsampleConfig,
+    ModelConfig, PostNetConfig, RangeConfig,
 )
-
+from src.models.feature_models.non_attentive_tacatron.model import (
+    Attention, DurationPredictor, Encoder, RangePredictor,
+)
 
 DECODER_CONFIG = DecoderConfig()
 DURATION_CONFIG = DurationConfig()
@@ -53,7 +39,7 @@ INPUT_MELS = torch.randn(
     16, DURATIONS_MAX.max(), MODEL_CONFIG.n_mel_channels, dtype=torch.float
 )
 for i, l in enumerate(DURATIONS_MAX):
-    INPUT_MELS[:, l:, :] = 0
+    INPUT_MELS[i, l:, :] = 0
 
 
 def test_encoder_layer():
