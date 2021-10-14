@@ -228,6 +228,7 @@ class Encoder(nn.Module):
                 w_init_gain="relu",
             )
             convolutions.append(conv_layer)
+
         convolutions.append(
             ConvNorm(
                 config.conv_channel,
@@ -279,13 +280,13 @@ class Decoder(nn.Module):
         self.p_decoder_dropout = config.dropout
 
         self.prenet = Prenet(
-            n_mel_channels + attention_out_dim,
+            n_mel_channels,
             config.prenet_layers,
             config.prenet_dropout,
         )
 
         self.decoder_rnn = nn.LSTM(
-            attention_out_dim,
+            attention_out_dim + config.prenet_layers[-1],
             config.decoder_rnn_dim,
             num_layers=config.decoder_num_layers,
             bidirectional=False,
@@ -299,13 +300,14 @@ class Decoder(nn.Module):
     def forward(self, memory: torch.Tensor, y_mels: torch.Tensor) -> torch.Tensor:
 
         previous_frame = torch.zeros(memory.shape[0], 1, self.n_mel_channels)
-        y_mels = torch.cat((previous_frame, y_mels[:, :-1, :]), dim=0)
-        y_mels = self.prenet(y_mels)
+        y_mels = torch.cat((previous_frame, y_mels[:, :-1, :]), dim=1)
+        previous_frame = previous_frame[:, 0, :]
 
         mel_outputs = []
         decoder_state = None
 
         for i in range(memory.shape[1]):
+            previous_frame = self.prenet(previous_frame)
             decoder_input: torch.Tensor = torch.cat(
                 (previous_frame, memory[:, i, :]), dim=-1
             )
@@ -316,9 +318,9 @@ class Decoder(nn.Module):
             mel_out = self.linear_projection(out)
             mel_outputs.append(mel_out)
             if random.uniform(0, 1) > self.teacher_forcing_ratio:
-                previous_frame = y_mels[:, i, :]
-            else:
                 previous_frame = mel_out.squeeze(1)
+            else:
+                previous_frame = y_mels[:, i, :]
 
         mel_tensor_outputs: torch.Tensor = torch.cat(mel_outputs, dim=1)
         return mel_tensor_outputs
@@ -377,7 +379,7 @@ class NonAttentiveTacatron(nn.Module):
         text_inputs, text_lengths, speaker_ids, y_durations, y_mels = inputs
 
         phonem_emb = self.phonem_embedding(text_inputs).transpose(1, 2)
-        speaker_emb = self.speaker_embedding(speaker_ids)
+        speaker_emb = self.speaker_embedding(speaker_ids).unsqueeze(1)
 
         phonem_emb = self.encoder(phonem_emb, text_lengths)
 
@@ -388,7 +390,7 @@ class NonAttentiveTacatron(nn.Module):
             embeddings, text_lengths, y_durations
         )
         mel_outputs = self.decoder(attented_embeddings, y_mels)
-        mel_outputs_postnet = self.postnet(mel_outputs)
-        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
+        mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
+        mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
 
         return durations, mel_outputs_postnet, mel_outputs

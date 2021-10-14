@@ -11,9 +11,12 @@ from src.models.feature_models.non_attentive_tacatron.config import (
 )
 from src.models.feature_models.non_attentive_tacatron.model import (
     Attention,
+    Decoder,
     DurationPredictor,
     Prenet,
     Encoder,
+    NonAttentiveTacatron,
+    Postnet,
     RangePredictor,
 )
 
@@ -31,9 +34,11 @@ MODEL_CONFIG = ModelConfig(
     decoder_config=DECODER_CONFIG,
     postnet_config=POSTNET_CONFIG,
 )
+N_PHONEMES = 100
+N_SPEAKER = 4
 EMBEDDING_DIM = MODEL_CONFIG.phonem_embedding_dim + MODEL_CONFIG.speaker_embedding_dim
-INPUT_PHONEMS = torch.randint(100, size=(16, 50), dtype=torch.long)
-INPUT_SPEAKERS = torch.randint(4, size=(16,), dtype=torch.long)
+INPUT_PHONEMES = torch.randint(N_PHONEMES, size=(16, 50), dtype=torch.long)
+INPUT_SPEAKERS = torch.randint(N_SPEAKER, size=(16,), dtype=torch.long)
 PHONEM_EMB = torch.randn(16, 50, MODEL_CONFIG.phonem_embedding_dim, dtype=torch.float)
 SPEAKER_EMB = torch.randn(16, MODEL_CONFIG.speaker_embedding_dim, dtype=torch.float)
 EMBEDDING = torch.cat(
@@ -51,9 +56,10 @@ for i, l in enumerate(DURATIONS_MAX):
     INPUT_MELS[i, l:, :] = 0
 ATTENTION_OUT_DIM = EMBEDDING_DIM + ATTENTION_CONFIG.positional_dim
 DECODER_RNN_OUT = torch.randn(16, 1, DECODER_CONFIG.decoder_rnn_dim)
-ENCODER_OUT = torch.randn((16, DURATIONS_MAX.max(), ATTENTION_OUT_DIM))
+ATTENTION_OUT = torch.randn((16, DURATIONS_MAX.max(), ATTENTION_OUT_DIM))
 for i, l in enumerate(DURATIONS_MAX):
-    ENCODER_OUT[i, l:, :] = 0
+    ATTENTION_OUT[i, l:, :] = 0
+MODEL_INPUT = (INPUT_PHONEMES, INPUT_LENGTH, INPUT_SPEAKERS, INPUT_DURATIONS, INPUT_MELS)
 
 
 def test_encoder_layer():
@@ -136,12 +142,55 @@ def test_prenet_layer():
     expected_shape = (16, 1, DECODER_CONFIG.prenet_layers[-1])
 
     layer = Prenet(
-        ATTENTION_OUT_DIM + DECODER_CONFIG.decoder_rnn_dim,
+        MODEL_CONFIG.n_mel_channels,
         DECODER_CONFIG.prenet_layers,
         dropout=DECODER_CONFIG.prenet_dropout,
     )
-    prenet_input = torch.cat((DECODER_RNN_OUT, ENCODER_OUT[:, 0, :]))
-    out = layer(prenet_input)
+    out = layer(INPUT_MELS[:, 0, :].unsqueeze(1))
     assert (
         out.shape == expected_shape
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
+
+
+def test_decoder_layer():
+    expected_shape = (16, DURATIONS_MAX.max(), MODEL_CONFIG.n_mel_channels)
+
+    layer = Decoder(
+        MODEL_CONFIG.n_mel_channels,
+        ATTENTION_OUT_DIM,
+        config=DECODER_CONFIG,
+    )
+    out = layer(ATTENTION_OUT, INPUT_MELS)
+    assert (
+        out.shape == expected_shape
+    ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
+
+
+def test_postnet_layer():
+    expected_shape = INPUT_MELS.transpose(1, 2).shape
+
+    layer = Postnet(
+        MODEL_CONFIG.n_mel_channels,
+        config=POSTNET_CONFIG,
+    )
+    out = layer(INPUT_MELS.transpose(1, 2))
+    assert (
+            out.shape == expected_shape
+    ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
+
+
+def test_model():
+    expected_mel_shape = INPUT_MELS.shape
+    expected_duration_shape = (16, 50, 1)
+
+    model = NonAttentiveTacatron(N_PHONEMES, N_SPEAKER, device=torch.device("cpu"), config=MODEL_CONFIG)
+    durations, mel_fixed, mel_predicted = model(MODEL_INPUT)
+    assert (
+        durations.shape == expected_duration_shape
+    ), f"Wrong shape, expected {expected_duration_shape}, got: {durations.shape}"
+    assert (
+            mel_predicted.shape == expected_mel_shape
+    ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_fixed.shape}"
+    assert (
+            mel_fixed.shape == expected_mel_shape
+    ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_predicted.shape}"
