@@ -1,11 +1,20 @@
 import torch
 
 from src.models.feature_models.non_attentive_tacatron.config import (
-    DecoderConfig, DurationConfig, EncoderConfig, GaussianUpsampleConfig,
-    ModelConfig, PostNetConfig, RangeConfig,
+    DecoderConfig,
+    DurationConfig,
+    EncoderConfig,
+    GaussianUpsampleConfig,
+    ModelConfig,
+    PostNetConfig,
+    RangeConfig,
 )
 from src.models.feature_models.non_attentive_tacatron.model import (
-    Attention, DurationPredictor, Encoder, RangePredictor,
+    Attention,
+    DurationPredictor,
+    Prenet,
+    Encoder,
+    RangePredictor,
 )
 
 DECODER_CONFIG = DecoderConfig()
@@ -40,6 +49,11 @@ INPUT_MELS = torch.randn(
 )
 for i, l in enumerate(DURATIONS_MAX):
     INPUT_MELS[i, l:, :] = 0
+ATTENTION_OUT_DIM = EMBEDDING_DIM + ATTENTION_CONFIG.positional_dim
+DECODER_RNN_OUT = torch.randn(16, 1, DECODER_CONFIG.decoder_rnn_dim)
+ENCODER_OUT = torch.randn((16, DURATIONS_MAX.max(), ATTENTION_OUT_DIM))
+for i, l in enumerate(DURATIONS_MAX):
+    ENCODER_OUT[i, l:, :] = 0
 
 
 def test_encoder_layer():
@@ -116,3 +130,18 @@ def test_attention_layer():
             out[idx, length:] == 0
         ).all(), "All values of tensor higher sequence length must be zero"
         assert (out[idx, length - 1] != 0).any(), f"Wrong zero vector for id = {idx}"
+
+
+def test_prenet_layer():
+    expected_shape = (16, 1, DECODER_CONFIG.prenet_layers[-1])
+
+    layer = Prenet(
+        ATTENTION_OUT_DIM + DECODER_CONFIG.decoder_rnn_dim,
+        DECODER_CONFIG.prenet_layers,
+        dropout=DECODER_CONFIG.prenet_dropout,
+    )
+    prenet_input = torch.cat((DECODER_RNN_OUT, ENCODER_OUT[:, 0, :]))
+    out = layer(prenet_input)
+    assert (
+        out.shape == expected_shape
+    ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
