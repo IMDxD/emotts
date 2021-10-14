@@ -75,6 +75,7 @@ class PositionalEncoding(nn.Module):
         pe: torch.Tensor = torch.zeros(1, x.shape[1], self.dimension)
         pe[0, :, 0::2] = torch.sin(position * div_term)
         pe[0, :, 1::2] = torch.cos(position * div_term)
+        pe = torch.repeat_interleave(pe, x.shape[0], 0)
 
         x = torch.cat((x, pe[: x.shape[0]]), dim=-1)
         return self.dropout(x)
