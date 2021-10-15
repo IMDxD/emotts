@@ -48,7 +48,13 @@ DECODER_RNN_OUT = torch.randn(16, 1, DECODER_CONFIG.decoder_rnn_dim)
 ATTENTION_OUT = torch.randn((16, DURATIONS_MAX.max(), ATTENTION_OUT_DIM))
 for i, l in enumerate(DURATIONS_MAX):
     ATTENTION_OUT[i, l:, :] = 0
-MODEL_INPUT = (INPUT_PHONEMES, INPUT_LENGTH, INPUT_SPEAKERS, INPUT_DURATIONS, INPUT_MELS)
+MODEL_INPUT = (
+    INPUT_PHONEMES,
+    INPUT_LENGTH,
+    INPUT_SPEAKERS,
+    INPUT_DURATIONS,
+    INPUT_MELS,
+)
 
 
 def test_encoder_layer():
@@ -120,11 +126,6 @@ def test_attention_layer():
     assert (
         out.shape == expected_shape_out
     ), f"Wrong shape, expected {expected_shape_out}, got: {out.shape}"
-    for idx, length in enumerate(DURATIONS_MAX):
-        assert (
-            out[idx, length:] == 0
-        ).all(), "All values of tensor higher sequence length must be zero"
-        assert (out[idx, length - 1] != 0).any(), f"Wrong zero vector for id = {idx}"
 
 
 def test_prenet_layer():
@@ -172,7 +173,9 @@ def test_model():
     expected_mel_shape = INPUT_MELS.shape
     expected_duration_shape = (16, 50, 1)
 
-    model = NonAttentiveTacatron(N_PHONEMES, N_SPEAKER, device=torch.device("cpu"), config=MODEL_CONFIG)
+    model = NonAttentiveTacatron(
+        N_PHONEMES, N_SPEAKER, device=torch.device("cpu"), config=MODEL_CONFIG
+    )
     durations, mel_fixed, mel_predicted = model(MODEL_INPUT)
     assert (
         durations.shape == expected_duration_shape
@@ -183,3 +186,16 @@ def test_model():
     assert (
         mel_fixed.shape == expected_mel_shape
     ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_predicted.shape}"
+    for idx, length in enumerate(DURATIONS_MAX):
+        assert (
+            mel_fixed[idx, length:] == 0
+        ).all(), "All values of tensor higher sequence length must be zero"
+        assert (
+            mel_fixed[idx, length - 1] != 0
+        ).any(), f"Wrong zero vector for id = {idx}"
+        assert (
+            mel_predicted[idx, length:] == 0
+        ).all(), "All values of tensor higher sequence length must be zero"
+        assert (
+            mel_predicted[idx, length - 1] != 0
+        ).any(), f"Wrong zero vector for id = {idx}"

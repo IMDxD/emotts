@@ -2,8 +2,15 @@ import pytest
 import torch
 
 from src.models.feature_models.non_attentive_tacatron.layers import (
-    ConvNorm, LinearNorm, PositionalEncoding,
+    ConvNorm, Idomp, LinearWithActivation, PositionalEncoding,
 )
+
+
+def test_idomp_layer():
+    input_tensor = torch.randn(16, 10, 2)
+    layer = Idomp()
+    out = layer(input_tensor)
+    assert (input_tensor == out).all(), "Layer must return tensor as it is"
 
 
 @pytest.mark.parametrize(
@@ -48,7 +55,7 @@ def test_positional_encoding_layer(dimension, input_tensor, expected_shape):
     ],
 )
 def test_liner_norm_layer(dimension, input_tensor, expected_shape):
-    layer = LinearNorm(input_tensor.shape[-1], dimension)
+    layer = LinearWithActivation(input_tensor.shape[-1], dimension)
     layer_out = layer(input_tensor)
     assert (
         layer_out.shape == expected_shape

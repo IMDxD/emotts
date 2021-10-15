@@ -9,7 +9,7 @@ from .config import (
     DecoderConfig, DurationConfig, EncoderConfig, GaussianUpsampleConfig,
     ModelConfig, PostNetConfig, RangeConfig,
 )
-from .layers import ConvNorm, LinearNorm, PositionalEncoding
+from .layers import ConvNorm, LinearWithActivation, PositionalEncoding
 from .utils import get_mask_from_lengths, norm_emb_layer
 
 
@@ -19,7 +19,9 @@ class Prenet(nn.Module):
         in_sizes = [in_dim] + sizes[:-1]
         self.layers = nn.ModuleList(
             [
-                LinearNorm(in_size, out_size, bias=False)
+                LinearWithActivation(
+                    in_size, out_size, bias=False, activation="SoftPlus"
+                )
                 for (in_size, out_size) in zip(in_sizes, sizes)
             ]
         )
@@ -98,7 +100,7 @@ class DurationPredictor(nn.Module):
             bidirectional=True,
         )
         self.dropout = config.dropout
-        self.projection = LinearNorm(config.lstm_hidden * 2, 1, bias=False)
+        self.projection = LinearWithActivation(config.lstm_hidden * 2, 1, bias=False)
 
     def forward(self, x: torch.Tensor, input_lengths: torch.Tensor) -> torch.Tensor:
         packed_x = nn.utils.rnn.pack_padded_sequence(
@@ -124,7 +126,7 @@ class RangePredictor(nn.Module):
             bidirectional=True,
         )
         self.dropout = config.dropout
-        self.projection = LinearNorm(config.lstm_hidden * 2, 1)
+        self.projection = LinearWithActivation(config.lstm_hidden * 2, 1)
 
     def forward(
         self, x: torch.Tensor, durations: torch.Tensor, input_lengths: torch.Tensor
@@ -164,7 +166,7 @@ class Attention(nn.Module):
     def calc_scores(
         self, durations: torch.Tensor, ranges: torch.Tensor
     ) -> torch.Tensor:
-
+        # Calc gaussian weight for Gaussian upsampling attention
         duration_cumsum = durations.cumsum(dim=1).float()
         max_duration = duration_cumsum[:, -1, :].max()
         c = duration_cumsum - 0.5 * durations
@@ -193,11 +195,9 @@ class Attention(nn.Module):
         else:
             scores = self.calc_scores(y_durations.unsqueeze(2), ranges)
 
-        attented_embeddings = torch.matmul(scores.transpose(1, 2), embeddings)
-        attented_embeddings = self.positional_encoder(attented_embeddings)
-        mask = get_mask_from_lengths(y_durations.cumsum(dim=1)[:, -1], device=self.device)
-        attented_embeddings[mask] = 0
-        return durations, attented_embeddings
+        embeddings_per_duration = torch.matmul(scores.transpose(1, 2), embeddings)
+        embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
+        return durations, embeddings_per_duration
 
 
 class Encoder(nn.Module):
@@ -293,7 +293,7 @@ class Decoder(nn.Module):
             batch_first=True,
         )
 
-        self.linear_projection = LinearNorm(
+        self.linear_projection = LinearWithActivation(
             config.decoder_rnn_dim + attention_out_dim, n_mel_channels
         )
 
@@ -335,6 +335,7 @@ class NonAttentiveTacatron(nn.Module):
         config: ModelConfig,
     ):
         super().__init__()
+        self.device = torch.device(device)
         full_embedding_dim = config.phonem_embedding_dim + config.speaker_embedding_dim
         self.phonem_embedding = nn.Embedding(n_phonems, config.phonem_embedding_dim)
         self.speaker_embedding = nn.Embedding(
@@ -392,5 +393,10 @@ class NonAttentiveTacatron(nn.Module):
         mel_outputs = self.decoder(attented_embeddings, y_mels)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
+        mask = get_mask_from_lengths(
+            y_durations.cumsum(dim=1)[:, -1], device=self.device
+        )
+        mel_outputs_postnet[mask] = 0
+        mel_outputs[mask] = 0
 
         return durations, mel_outputs_postnet, mel_outputs

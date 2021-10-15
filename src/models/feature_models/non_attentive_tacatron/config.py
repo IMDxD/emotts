@@ -23,11 +23,11 @@ class GaussianUpsampleConfig:
 
     duration_config: DurationConfig
     range_config: RangeConfig
-    eps: float = field(default=1e-20)
+    eps: float = field(default=1e-6)
     positional_dim: int = field(default=32)
     teacher_forcing_ratio: float = field(default=1.0)
     attention_dropout: float = field(default=0.1)
-    positional_dropout: float = field(default=0.1)
+    positional_dropout: float = field(default=0.0)
 
 
 @dataclass
