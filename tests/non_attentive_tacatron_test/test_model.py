@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import torch
 
 from src.models.feature_models.non_attentive_tacatron.config import (
@@ -55,9 +57,13 @@ MODEL_INPUT = (
     INPUT_DURATIONS,
     INPUT_MELS,
 )
+MODEL_INFERENCE_INPUT = (
+    INPUT_PHONEMES,
+    INPUT_SPEAKERS,
+)
 
 
-def test_encoder_layer():
+def test_encoder_layer_forward():
     expected_shape = (16, 50, MODEL_CONFIG.phonem_embedding_dim)
     layer = Encoder(ModelConfig.phonem_embedding_dim, config=ENCODER_CONFIG)
     out = layer(PHONEM_EMB.transpose(1, 2), INPUT_LENGTH)
@@ -71,7 +77,16 @@ def test_encoder_layer():
         assert (out[idx, length - 1] != 0).any(), f"Wrong zero vector for id = {idx}"
 
 
-def test_duration_layer():
+def test_encoder_layer_inference():
+    expected_shape = (16, 50, MODEL_CONFIG.phonem_embedding_dim)
+    layer = Encoder(ModelConfig.phonem_embedding_dim, config=ENCODER_CONFIG)
+    out = layer.inference(PHONEM_EMB.transpose(1, 2))
+    assert (
+        out.shape == expected_shape
+    ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
+
+
+def test_duration_layer_forward():
     expected_shape = (16, 50, 1)
     layer = DurationPredictor(EMBEDDING_DIM, config=DURATION_CONFIG)
     zero_value = layer.projection.linear_layer.bias
@@ -90,7 +105,16 @@ def test_duration_layer():
         ).any(), f"Wrong zero vector for id = {idx}"
 
 
-def test_range_layer():
+def test_duration_layer_inference():
+    expected_shape = (16, 50, 1)
+    layer = DurationPredictor(EMBEDDING_DIM, config=DURATION_CONFIG)
+    out = layer.inference(EMBEDDING)
+    assert (
+        out.shape == expected_shape
+    ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
+
+
+def test_range_layer_forward():
     expected_shape = (16, 50, 1)
     layer = RangePredictor(EMBEDDING_DIM, config=RANGE_CONFIG)
     zero_value = layer.projection.linear_layer.bias
@@ -109,7 +133,16 @@ def test_range_layer():
         ).any(), f"Wrong zero vector for id = {idx}"
 
 
-def test_attention_layer():
+def test_range_layer_forward_inference():
+    expected_shape = (16, 50, 1)
+    layer = RangePredictor(EMBEDDING_DIM, config=RANGE_CONFIG)
+    out = layer.inference(EMBEDDING, INPUT_DURATIONS.unsqueeze(2))
+    assert (
+        out.shape == expected_shape
+    ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
+
+
+def test_attention_layer_forward():
     expected_shape_out = (
         16,
         DURATIONS_MAX.max().item(),
@@ -123,6 +156,23 @@ def test_attention_layer():
     assert (
         dur.shape == expected_shape_dur
     ), f"Wrong shape, expected {expected_shape_dur}, got: {dur.shape}"
+    assert (
+        out.shape == expected_shape_out
+    ), f"Wrong shape, expected {expected_shape_out}, got: {out.shape}"
+
+
+@patch("src.models.feature_models.non_attentive_tacatron.model.DurationPredictor.inference")
+def test_attention_layer_inference(mock_duration):
+    mock_duration.return_value = INPUT_DURATIONS.unsqueeze(2)
+    expected_shape_out = (
+        16,
+        DURATIONS_MAX.max().item(),
+        EMBEDDING_DIM + ATTENTION_CONFIG.positional_dim,
+    )
+    layer = Attention(
+        EMBEDDING_DIM, config=ATTENTION_CONFIG, device=torch.device("cpu")
+    )
+    out = layer.inference(EMBEDDING)
     assert (
         out.shape == expected_shape_out
     ), f"Wrong shape, expected {expected_shape_out}, got: {out.shape}"
@@ -142,7 +192,7 @@ def test_prenet_layer():
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
 
 
-def test_decoder_layer():
+def test_decoder_layer_forward():
     expected_shape = (16, DURATIONS_MAX.max(), MODEL_CONFIG.n_mel_channels)
 
     layer = Decoder(
@@ -151,6 +201,20 @@ def test_decoder_layer():
         config=DECODER_CONFIG,
     )
     out = layer(ATTENTION_OUT, INPUT_MELS)
+    assert (
+        out.shape == expected_shape
+    ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
+
+
+def test_decoder_layer_inference():
+    expected_shape = (16, DURATIONS_MAX.max(), MODEL_CONFIG.n_mel_channels)
+
+    layer = Decoder(
+        MODEL_CONFIG.n_mel_channels,
+        ATTENTION_OUT_DIM,
+        config=DECODER_CONFIG,
+    )
+    out = layer.inference(ATTENTION_OUT)
     assert (
         out.shape == expected_shape
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
@@ -169,7 +233,7 @@ def test_postnet_layer():
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
 
 
-def test_model():
+def test_model_forward():
     expected_mel_shape = INPUT_MELS.shape
     expected_duration_shape = (16, 50, 1)
 
@@ -182,10 +246,10 @@ def test_model():
     ), f"Wrong shape, expected {expected_duration_shape}, got: {durations.shape}"
     assert (
         mel_predicted.shape == expected_mel_shape
-    ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_fixed.shape}"
+    ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_predicted.shape}"
     assert (
         mel_fixed.shape == expected_mel_shape
-    ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_predicted.shape}"
+    ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_fixed.shape}"
     for idx, length in enumerate(DURATIONS_MAX):
         assert (
             mel_fixed[idx, length:] == 0
@@ -199,3 +263,17 @@ def test_model():
         assert (
             mel_predicted[idx, length - 1] != 0
         ).any(), f"Wrong zero vector for id = {idx}"
+
+
+@patch("src.models.feature_models.non_attentive_tacatron.model.DurationPredictor.inference")
+def test_model_inference(mock_duration):
+    mock_duration.return_value = INPUT_DURATIONS.unsqueeze(2)
+    expected_mel_shape = INPUT_MELS.shape
+
+    model = NonAttentiveTacatron(
+        N_PHONEMES, N_SPEAKER, device=torch.device("cpu"), config=MODEL_CONFIG
+    )
+    mel_predicted = model.inference(MODEL_INFERENCE_INPUT)
+    assert (
+        mel_predicted.shape == expected_mel_shape
+    ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_predicted.shape}"
