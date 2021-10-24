@@ -59,11 +59,12 @@ MODEL_INPUT = (
 )
 MODEL_INFERENCE_INPUT = (
     INPUT_PHONEMES,
+    INPUT_LENGTH,
     INPUT_SPEAKERS,
 )
 
 
-def test_encoder_layer_forward():
+def test_encoder_layer():
     expected_shape = (16, 50, MODEL_CONFIG.phonem_embedding_dim)
     layer = Encoder(ModelConfig.phonem_embedding_dim, config=ENCODER_CONFIG)
     out = layer(PHONEM_EMB.transpose(1, 2), INPUT_LENGTH)
@@ -77,16 +78,7 @@ def test_encoder_layer_forward():
         assert (out[idx, length - 1] != 0).any(), f"Wrong zero vector for id = {idx}"
 
 
-def test_encoder_layer_inference():
-    expected_shape = (16, 50, MODEL_CONFIG.phonem_embedding_dim)
-    layer = Encoder(ModelConfig.phonem_embedding_dim, config=ENCODER_CONFIG)
-    out = layer.inference(PHONEM_EMB.transpose(1, 2))
-    assert (
-        out.shape == expected_shape
-    ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
-
-
-def test_duration_layer_forward():
+def test_duration_layer():
     expected_shape = (16, 50, 1)
     layer = DurationPredictor(EMBEDDING_DIM, config=DURATION_CONFIG)
     zero_value = layer.projection.linear_layer.bias
@@ -105,16 +97,7 @@ def test_duration_layer_forward():
         ).any(), f"Wrong zero vector for id = {idx}"
 
 
-def test_duration_layer_inference():
-    expected_shape = (16, 50, 1)
-    layer = DurationPredictor(EMBEDDING_DIM, config=DURATION_CONFIG)
-    out = layer.inference(EMBEDDING)
-    assert (
-        out.shape == expected_shape
-    ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
-
-
-def test_range_layer_forward():
+def test_range_layer():
     expected_shape = (16, 50, 1)
     layer = RangePredictor(EMBEDDING_DIM, config=RANGE_CONFIG)
     zero_value = layer.projection.linear_layer.bias
@@ -131,15 +114,6 @@ def test_range_layer_forward():
         assert (
             out[idx, length - 1] != zero_value
         ).any(), f"Wrong zero vector for id = {idx}"
-
-
-def test_range_layer_forward_inference():
-    expected_shape = (16, 50, 1)
-    layer = RangePredictor(EMBEDDING_DIM, config=RANGE_CONFIG)
-    out = layer.inference(EMBEDDING, INPUT_DURATIONS.unsqueeze(2))
-    assert (
-        out.shape == expected_shape
-    ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
 
 
 def test_attention_layer_forward():
@@ -161,7 +135,9 @@ def test_attention_layer_forward():
     ), f"Wrong shape, expected {expected_shape_out}, got: {out.shape}"
 
 
-@patch("src.models.feature_models.non_attentive_tacatron.model.DurationPredictor.inference")
+@patch(
+    "src.models.feature_models.non_attentive_tacatron.model.DurationPredictor.forward"
+)
 def test_attention_layer_inference(mock_duration):
     mock_duration.return_value = INPUT_DURATIONS.unsqueeze(2)
     expected_shape_out = (
@@ -172,7 +148,7 @@ def test_attention_layer_inference(mock_duration):
     layer = Attention(
         EMBEDDING_DIM, config=ATTENTION_CONFIG, device=torch.device("cpu")
     )
-    out = layer.inference(EMBEDDING)
+    out = layer.inference(EMBEDDING, INPUT_LENGTH)
     assert (
         out.shape == expected_shape_out
     ), f"Wrong shape, expected {expected_shape_out}, got: {out.shape}"
@@ -265,7 +241,9 @@ def test_model_forward():
         ).any(), f"Wrong zero vector for id = {idx}"
 
 
-@patch("src.models.feature_models.non_attentive_tacatron.model.DurationPredictor.inference")
+@patch(
+    "src.models.feature_models.non_attentive_tacatron.model.DurationPredictor.forward"
+)
 def test_model_inference(mock_duration):
     mock_duration.return_value = INPUT_DURATIONS.unsqueeze(2)
     expected_mel_shape = INPUT_MELS.shape

@@ -6,13 +6,8 @@ from torch import nn
 from torch.nn import functional as f
 
 from .config import (
-    DecoderConfig,
-    DurationConfig,
-    EncoderConfig,
-    GaussianUpsampleConfig,
-    ModelConfig,
-    PostNetConfig,
-    RangeConfig,
+    DecoderConfig, DurationConfig, EncoderConfig, GaussianUpsampleConfig,
+    ModelConfig, PostNetConfig, RangeConfig,
 )
 from .layers import ConvNorm, LinearWithActivation, PositionalEncoding
 from .utils import get_mask_from_lengths, norm_emb_layer
@@ -118,14 +113,6 @@ class DurationPredictor(nn.Module):
         x = self.projection(outputs)
         return x
 
-    def inference(self, x: torch.Tensor) -> torch.Tensor:
-
-        self.lstm.flatten_parameters()
-        outputs, _ = self.lstm(x)
-        x = self.projection(outputs)
-
-        return x
-
 
 class RangePredictor(nn.Module):
     def __init__(self, embedding_dim: int, config: RangeConfig):
@@ -153,14 +140,6 @@ class RangePredictor(nn.Module):
         outputs, _ = self.lstm(packed_x)
         outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
         outputs = f.dropout(outputs, self.dropout, self.training)
-        outputs = self.projection(outputs)
-        return outputs
-
-    def inference(self, x: torch.Tensor, durations: torch.Tensor) -> torch.Tensor:
-
-        x = torch.cat((x, durations), dim=-1)
-        self.lstm.flatten_parameters()
-        outputs, _ = self.lstm(x)
         outputs = self.projection(outputs)
         return outputs
 
@@ -220,10 +199,10 @@ class Attention(nn.Module):
         embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
         return durations, embeddings_per_duration
 
-    def inference(self, embeddings: torch.Tensor) -> torch.Tensor:
+    def inference(self, embeddings: torch.Tensor, input_lengths: torch.Tensor) -> torch.Tensor:
 
-        durations = self.duration_predictor.inference(embeddings)
-        ranges = self.range_predictor.inference(embeddings, durations)
+        durations = self.duration_predictor(embeddings, input_lengths)
+        ranges = self.range_predictor(embeddings, durations, input_lengths)
 
         scores = self.calc_scores(durations, ranges)
 
@@ -297,15 +276,6 @@ class Encoder(nn.Module):
         phonem_emb, _ = nn.utils.rnn.pad_packed_sequence(
             phonem_emb_packed, batch_first=True
         )
-
-        return phonem_emb
-
-    def inference(self, phonem_emb: torch.Tensor) -> torch.Tensor:
-        phonem_emb = self.convolutions(phonem_emb)
-        phonem_emb = phonem_emb.transpose(1, 2)
-
-        self.lstm.flatten_parameters()
-        phonem_emb_packed, _ = self.lstm(phonem_emb)
 
         return phonem_emb
 
@@ -465,18 +435,18 @@ class NonAttentiveTacatron(nn.Module):
 
         return durations, mel_outputs_postnet, mel_outputs
 
-    def inference(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
+    def inference(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> torch.Tensor:
 
-        text_inputs, speaker_ids = batch
+        text_inputs, text_lengths, speaker_ids = batch
         phonem_emb = self.phonem_embedding(text_inputs).transpose(1, 2)
         speaker_emb = self.speaker_embedding(speaker_ids).unsqueeze(1)
 
-        phonem_emb = self.encoder.inference(phonem_emb)
+        phonem_emb = self.encoder(phonem_emb, text_lengths)
 
         speaker_emb = torch.repeat_interleave(speaker_emb, phonem_emb.shape[1], dim=1)
         embeddings = torch.cat((phonem_emb, speaker_emb), dim=-1)
 
-        attented_embeddings = self.attention.inference(embeddings)
+        attented_embeddings = self.attention.inference(embeddings, text_lengths)
         mel_outputs = self.decoder.inference(attented_embeddings)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
