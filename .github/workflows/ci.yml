@@ -7,10 +7,6 @@ on:
     branches: [master]
 
 jobs:
-  setup:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -21,7 +17,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
