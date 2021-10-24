@@ -1,25 +1,7 @@
+# Based on the original HiFi-GAN [paper](https://arxiv.org/abs/2010.05646) and [repo](https://github.com/jik876/hifi-gan): 
 # HiFi-GAN: Generative Adversarial Networks for Efficient and High Fidelity Speech Synthesis
-
 ### Jungil Kong, Jaehyeon Kim, Jaekyoung Bae
 
-In our [paper](https://arxiv.org/abs/2010.05646), 
-we proposed HiFi-GAN: a GAN-based model capable of generating high fidelity speech efficiently.<br/>
-We provide our implementation and pretrained models as open source in this repository.
-
-**Abstract :**
-Several recent work on speech synthesis have employed generative adversarial networks (GANs) to produce raw waveforms. 
-Although such methods improve the sampling efficiency and memory usage, 
-their sample quality has not yet reached that of autoregressive and flow-based generative models. 
-In this work, we propose HiFi-GAN, which achieves both efficient and high-fidelity speech synthesis. 
-As speech audio consists of sinusoidal signals with various periods, 
-we demonstrate that modeling periodic patterns of an audio is crucial for enhancing sample quality. 
-A subjective human evaluation (mean opinion score, MOS) of a single speaker dataset indicates that our proposed method 
-demonstrates similarity to human quality while generating 22.05 kHz high-fidelity audio 167.9 times faster than 
-real-time on a single V100 GPU. We further show the generality of HiFi-GAN to the mel-spectrogram inversion of unseen 
-speakers and end-to-end speech synthesis. Finally, a small footprint version of HiFi-GAN generates samples 13.4 times 
-faster than real-time on CPU with comparable quality to an autoregressive counterpart.
-
-Visit our [demo website](https://jik876.github.io/hifi-gan-demo/) for audio samples.
 
 
 ## Pre-requisites
@@ -28,6 +10,14 @@ Visit our [demo website](https://jik876.github.io/hifi-gan-demo/) for audio samp
 3. Install python requirements. Please refer [requirements.txt](requirements.txt)
 4. Download and extract the [LJ Speech dataset](https://keithito.com/LJ-Speech-Dataset/).
 And move all wav files to `LJSpeech-1.1/wavs`
+
+## Preprocessing for flac files
+
+VCTK dataset has flac format which needs to be transformed to wav and then downsampled to ~22kHz:
+```
+python preprocess_flac.py --input_dir="/input_dir/" --output_dir="/output_dir/" --sample_rate=22050
+```
+Then one can use ```inference.py``` from below to compare the original wav with the generated one.
 
 
 ## Training
@@ -83,8 +73,10 @@ Example:
     ```
     python inference.py --checkpoint_file [generator checkpoint file path]
     ```
+MELs are automatically generated and fed through the generator. 
 Generated wav files are saved in `generated_files` by default.<br>
 You can change the path by adding `--output_dir` option.
+
 
 
 ## Inference for end-to-end speech synthesis
