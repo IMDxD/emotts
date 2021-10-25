@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from torch.utils.data import Dataset
-
 import tgt
+from torch import load as torch_load
+from torch.utils.data import Dataset
 
 
 class VCTK(Dataset):
@@ -60,32 +60,45 @@ class VCTK(Dataset):
             raise FileNotFoundError(f'Mels data not found at {self._mels_dir}.')
 
         # Extracting speaker IDs from the folder structure
-        self._speaker_ids = sorted(f.name for f in self._text_dir.iterdir() if f.is_dir())
-        self._sample_ids = []
-        print(self._speaker_ids)
+        texts = set(Path(x.parent.name) / x.stem
+                    for x in self._text_dir.rglob(f'*{self._text_ext}'))
+        mels = set(Path(x.parent.name) / x.stem
+                   for x in self._mels_dir.rglob(f'*{self._mels_ext}'))
 
-        wrong_speaker_ids = []
-        for speaker_id in self._speaker_ids:
-            utterance_dir = self._text_dir / speaker_id
-            speaker_sample_ids = []
-            for utterance_file in sorted(f for f in utterance_dir.iterdir() if f.suffix == self._text_ext):
-                utterance_id = utterance_file.stem
-                audio_path = (self._audio_dir / utterance_id).with_suffix(self._audio_ext)
-                if audio_path.exists():
-                    speaker_sample_ids.append(utterance_id.split("_"))
-            if len(speaker_sample_ids) == 0:
-                wrong_speaker_ids.append(speaker_id)
-            else:
-                self._sample_ids.extend(speaker_sample_ids)
+        self._samples = list(texts & mels)
+        broken_samples = texts - mels
+        # self._speaker_ids = list(set(x.parent.name for x in self._samples))
+        # print(f'Found {len(self._samples)} samples for {len(self._speaker_ids)} speakers.')
+        print(f'Found {len(self._samples)} samples.')
+        print(f'Number of broken samples: {len(broken_samples)}.')
 
-        # TODO: IF there are any, remove them from self._speaker_ids
-        if len(wrong_speaker_ids) > 0:
-            print(f'Speaker IDs with no audio: {wrong_speaker_ids}.')
-        
-        print(f'Found {len(self._sample_ids)} samples for {len(self._speaker_ids)} speakers.')
+        self._dataset = []
+        for sample in self._samples:
+            tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
+            text_grid = tgt.read_textgrid(tg_path)
+
+            assert 'phones' in text_grid.get_tier_names()
+            phones_tier = text_grid.get_tier_by_name('phones')
+
+            input_sample = {}
+            input_sample['num_phonemes'] = len(phones_tier.intervals)
+            input_sample['speaker_id'] = sample.parent.name
+            input_sample['phonemes'] = [interval.text for interval in phones_tier.intervals]
+            input_sample['durations'] = [interval.duration() for interval in phones_tier.intervals]
+
+            mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
+            mels = torch_load(mels_path)
+            input_sample['mels'] = mels
+
+            self._dataset.append(input_sample)
+
+        # In DataLoader, we want to put in batch samples
+        # with close num_phonemes values ([i:i + batch_size]),
+        # so we sort dataset here and never shuffle it afterwards:
+        self._dataset.sort(key=lambda x: x['num_phonemes'])
 
     def __len__(self):
-        raise NotImplementedError
+        return len(self._sample_ids)
 
     def __getitem__(self, idx):
-        raise NotImplementedError
+        return self._dataset[idx]

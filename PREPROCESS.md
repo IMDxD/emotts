@@ -75,7 +75,7 @@ MODEL_INPUT = (
 )
 
 + INPUT_PHONEMES: [batch_size x batch_phonemes_max_len] (dtype=torch.long)
-+ INPUT_LENGTH: [batch_size] (dtype=torch.long)  # number of phomenes
++ INPUT_LENGTH: [batch_size] (dtype=torch.long)  # number of phonemes
 + INPUT_SPEAKERS: [batch_size] (dtype=torch.long)  # speaker id
 + INPUT_DURATIONS: [batch_size x batch_phonemes_max_len] (dtype=torch.long)
 - INPUT_MELS: [batch_size x batch_max_total_duration x N_MEL_CHANNELS] (dtype=torch.float)
