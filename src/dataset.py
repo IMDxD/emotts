@@ -2,6 +2,9 @@ from pathlib import Path
 
 from torch.utils.data import Dataset
 
+import tgt
+
+
 class VCTK(Dataset):
     """Create VCTK Dataset
 
@@ -59,6 +62,7 @@ class VCTK(Dataset):
         # Extracting speaker IDs from the folder structure
         self._speaker_ids = sorted(f.name for f in self._text_dir.iterdir() if f.is_dir())
         self._sample_ids = []
+        print(self._speaker_ids)
 
         wrong_speaker_ids = []
         for speaker_id in self._speaker_ids:
@@ -79,3 +83,9 @@ class VCTK(Dataset):
             print(f'Speaker IDs with no audio: {wrong_speaker_ids}.')
         
         print(f'Found {len(self._sample_ids)} samples for {len(self._speaker_ids)} speakers.')
+
+    def __len__(self):
+        raise NotImplementedError
+
+    def __getitem__(self, idx):
+        raise NotImplementedError
