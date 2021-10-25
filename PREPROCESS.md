@@ -3,30 +3,30 @@
 ### Audio
 
 ```bash
-conda create -n emotts python=3.8 pip git
+conda create -n emotts python=3.8 pip git click tqdm
 conda activate emotts
+
 
 # 0. Selecting only one mic per speaker
 python src/preprocessing/01_preprocessing.py --input-dir data/raw/audio --output-dir data/processed/00_audio_single_mic --audio-ext flac
 
-# 1. Pausation cutting with VAD
 
-# pip install webrtcvad
+# 1. Pausation cutting with VAD
 conda install -y -c conda-forge pysoundfile
 conda install -y -c pytorch-lts pytorch torchaudio cudatoolkit=10.2  # CUDA 10.2
 # conda install -y -c pytorch-lts pytorch torchaudio cpuonly  # CPU
 python src/preprocessing/02_pausation_cutting.py --input-dir data/processed/00_audio_single_mic --output-dir data/processed/01_no_pause --target-sr 48000
 
-# 2. Resampling
 
+# 2. Resampling
 python src/preprocessing/03_resampling.py --input-dir data/processed/01_no_pause --output-dir data/processed/02_resampled --resample-rate 22050
 
-# 3. Audio to Mel
 
+# 3. Audio to Mel
 python src/preprocessing/04_wav_to_mel.py --input-dir data/processed/02_resampled --output-dir data/processed/03_mels
 
-# 4. Resamling & Normalization
 
+# 4. Resamling & Normalization
 conda install -y -c conda-forge openblas openfst pynini ngram baumwelch
 # pip install --no-input openblas openfst pynini ngram baumwelch
 
@@ -45,8 +45,8 @@ mkdir audio/wav
 find ./audio/raw -name "*.flac" -type f -execdir sox --norm=-3 {} -r 16k -c 1 `pwd`/audio/wav/{} \;
 echo "Number of clips" $(ls ./audio/wav/ | wc -l)
 
-# 5. Alignment with MFA
 
+# 5. Alignment with MFA
 cd .. && mkdir models && cd models
 
 # download a pretrained english acoustic model, and english lexicon
