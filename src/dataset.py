@@ -1,11 +1,21 @@
 from pathlib import Path
 
 import tgt
-from torch import load as torch_load
+import torch
 from torch.utils.data import Dataset
 
+from src.preprocessing.text.cmudict import valid_symbols
 
-class VCTK(Dataset):
+HOP_SIZE = 256
+PAUSE_TOKEN = "<SIL>"
+LEXICON_OOV_TOKEN = "spn"
+SAMPLE_RATE = 22050
+PHONEME_TO_IDX = {
+    phoneme: idx
+    for idx, phoneme in enumerate([PAUSE_TOKEN] + valid_symbols)
+}
+
+class VctkDataset(Dataset):
     """Create VCTK Dataset
 
     Args:
@@ -67,28 +77,43 @@ class VCTK(Dataset):
 
         self._samples = list(texts & mels)
         broken_samples = texts - mels
-        # self._speaker_ids = list(set(x.parent.name for x in self._samples))
-        # print(f'Found {len(self._samples)} samples for {len(self._speaker_ids)} speakers.')
-        print(f'Found {len(self._samples)} samples.')
         print(f'Number of broken samples: {len(broken_samples)}.')
 
         self._dataset = []
+        self._build_dataset()
+        print(f'Found {len(self._dataset)} samples.')
+
+    def _build_dataset(self):
         for sample in self._samples:
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
             text_grid = tgt.read_textgrid(tg_path)
 
-            assert 'phones' in text_grid.get_tier_names()
+            if 'phones' not in text_grid.get_tier_names():
+                continue
+
             phones_tier = text_grid.get_tier_by_name('phones')
 
             input_sample = {}
             input_sample['num_phonemes'] = len(phones_tier.intervals)
             input_sample['speaker_id'] = sample.parent.name
-            input_sample['phonemes'] = [interval.text for interval in phones_tier.intervals]
-            input_sample['durations'] = [interval.duration() for interval in phones_tier.intervals]
+
+            if LEXICON_OOV_TOKEN in [x.text for x in phones_tier.get_copy_with_gaps_filled()]:
+                continue
+
+            input_sample['phonemes'] = [PHONEME_TO_IDX[x.text] if x.text else PHONEME_TO_IDX[PAUSE_TOKEN]
+                                        for x in phones_tier.get_copy_with_gaps_filled()]
+            input_sample['durations'] = [x.duration() * SAMPLE_RATE / HOP_SIZE
+                                         for x in phones_tier.get_copy_with_gaps_filled()]
 
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
-            mels = torch_load(mels_path)
+            mels = torch.load(mels_path)
             input_sample['mels'] = mels
+
+            pad_size = mels.shape[-1] - sum(input_sample['durations'])
+            assert pad_size >= 0, f'Expected {mels.shape[-1]} mel frames, got {sum(input_sample["durations"])}'
+            if pad_size > 0:
+                input_sample['phonemes'].append(PAUSE_TOKEN)
+                input_sample['durations'].append(pad_size)
 
             self._dataset.append(input_sample)
 
@@ -98,7 +123,55 @@ class VCTK(Dataset):
         self._dataset.sort(key=lambda x: x['num_phonemes'])
 
     def __len__(self):
-        return len(self._sample_ids)
+        return len(self._dataset)
 
     def __getitem__(self, idx):
         return self._dataset[idx]
+
+
+class VctkCollate:
+    """
+    Zero-pads model inputs and targets based on number of frames per setep
+    """
+    def __init__(self, n_frames_per_step):
+        self.n_frames_per_step = n_frames_per_step
+
+    def __call__(self, batch):
+        """Collate's training batch from normalized text and mel-spectrogram
+        PARAMS
+        ------
+        batch: [text_normalized, mel_normalized]
+        """
+        # Right zero-pad all one-hot text sequences to max input length
+        input_lengths, ids_sorted_decreasing = torch.sort(
+            torch.LongTensor([len(x[0]) for x in batch]),
+            dim=0, descending=True)
+        max_input_len = input_lengths[0]
+
+        text_padded = torch.LongTensor(len(batch), max_input_len)
+        text_padded.zero_()
+        for i in range(len(ids_sorted_decreasing)):
+            text = batch[ids_sorted_decreasing[i]][0]
+            text_padded[i, :text.size(0)] = text
+
+        # Right zero-pad mel-spec
+        num_mels = batch[0][1].size(0)
+        max_target_len = max([x[1].size(1) for x in batch])
+        if max_target_len % self.n_frames_per_step != 0:
+            max_target_len += self.n_frames_per_step - max_target_len % self.n_frames_per_step
+            assert max_target_len % self.n_frames_per_step == 0
+
+        # include mel padded and gate padded
+        mel_padded = torch.FloatTensor(len(batch), num_mels, max_target_len)
+        mel_padded.zero_()
+        gate_padded = torch.FloatTensor(len(batch), max_target_len)
+        gate_padded.zero_()
+        output_lengths = torch.LongTensor(len(batch))
+        for i in range(len(ids_sorted_decreasing)):
+            mel = batch[ids_sorted_decreasing[i]][1]
+            mel_padded[i, :, :mel.size(1)] = mel
+            gate_padded[i, mel.size(1)-1:] = 1
+            output_lengths[i] = mel.size(1)
+
+        return text_padded, input_lengths, mel_padded, gate_padded, \
+            output_lengths
