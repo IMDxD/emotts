@@ -7,10 +7,9 @@ from torchaudio import load as torchaudio_load
 from torchaudio.transforms import MelSpectrogram
 from tqdm import tqdm
 
-
 # Based on https://github.com/Illumaria/made-emotts-2021/blob/non-attentive-tacotron/default_params.py
-F_MIN = 55
-F_MAX = 7600
+F_MIN = 0
+F_MAX = 8000
 HOP_SIZE = 256
 N_FFT = 1024
 N_MELS = 80  # required by HiFi-GAN

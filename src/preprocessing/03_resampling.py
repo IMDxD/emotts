@@ -2,11 +2,9 @@
 from pathlib import Path
 
 import click
-from torchaudio import (
-    info as torchaudio_info,
-    load as torchaudio_load,
-    save as torchaudio_save,
-)
+from torchaudio import info as torchaudio_info
+from torchaudio import load as torchaudio_load
+from torchaudio import save as torchaudio_save
 from torchaudio.transforms import Resample
 from tqdm import tqdm
 

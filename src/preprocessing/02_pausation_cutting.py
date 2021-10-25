@@ -5,6 +5,7 @@ import click
 import torch
 from tqdm import tqdm
 
+
 @click.command()
 @click.option('--input-dir', type=str,
               help='Directory with audios to process.')

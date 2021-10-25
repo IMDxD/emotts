@@ -1,13 +1,13 @@
 #/usr/bin/env python
 import sys
+
 print(sys.path)
 
 from pathlib import Path
 
 import click
-from tqdm import tqdm
-
 from text.cleaners import english_cleaners
+from tqdm import tqdm
 
 
 @click.command()
