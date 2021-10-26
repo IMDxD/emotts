@@ -168,7 +168,7 @@ class Attention(nn.Module):
     ) -> torch.Tensor:
         # Calc gaussian weight for Gaussian upsampling attention
         duration_cumsum = durations.cumsum(dim=1).float()
-        max_duration = duration_cumsum[:, -1, :].max()
+        max_duration = torch.ceil(duration_cumsum[:, -1, :].max())
         c = duration_cumsum - 0.5 * durations
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(self.device)
 
