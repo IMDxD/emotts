@@ -1,4 +1,5 @@
 inflect
 nltk
+librosa
 textgridtools
 unidecode

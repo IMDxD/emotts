@@ -2,21 +2,58 @@
 from pathlib import Path
 
 import click
-from torch import save as torch_save
-from torchaudio import load as torchaudio_load
-from torchaudio.transforms import MelSpectrogram
+from librosa.filters import mel as librosa_mel
+import torch
+import torchaudio
 from tqdm import tqdm
 
 
-# Based on https://github.com/Illumaria/made-emotts-2021/blob/non-attentive-tacotron/default_params.py
-F_MIN = 55
-F_MAX = 7600
+# Using the same parameters as in HiFiGAN
+F_MIN = 0
+F_MAX = 8000
 HOP_SIZE = 256
-N_FFT = 1024
-N_MELS = 80  # required by HiFi-GAN
-NORMALIZED = True
-SAMPLE_RATE = 22050
 WIN_SIZE = 1024
+N_FFT = 1024
+N_MELS = 80
+SAMPLE_RATE = 22050
+
+
+mel_basis = {}
+hann_window = {}
+
+
+def spectral_normalize_torch(magnitudes: torch.Tensor) -> torch.Tensor:
+    output = torch.log(torch.clamp(magnitudes, min=1e-5))
+    return output
+
+
+def mel_spectrogram(y: torch.Tensor,
+                    n_fft: int = N_FFT, num_mels: int = N_MELS,
+                    sample_rate: int= SAMPLE_RATE, hop_size: int = HOP_SIZE,
+                    win_size: int = WIN_SIZE, fmin: int = F_MIN, fmax: int = F_MAX,
+                    center: bool = False) -> torch.Tensor:
+
+    global mel_basis, hann_window
+
+    if fmax not in mel_basis:
+        mel = librosa_mel(sample_rate, n_fft, num_mels, fmin, fmax)
+        mel_basis[f"{fmax}_{y.device}"] = torch.from_numpy(mel).float().to(y.device)
+        hann_window[f"{y.device}"] = torch.hann_window(win_size).to(y.device)
+
+    y = torch.nn.functional.pad(y.unsqueeze(1),
+                                (int((n_fft-hop_size)/2), int((n_fft-hop_size)/2)),
+                                mode='reflect')
+
+    spec = torch.stft(y.squeeze(1), n_fft, hop_length=hop_size,
+                      win_length=win_size, window=hann_window[str(y.device)],
+                      center=center, pad_mode='reflect',
+                      normalized=False, onesided=True)
+
+    spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-9)
+    spec = torch.matmul(mel_basis[f"{fmax}_{y.device}"], spec)
+    spec = spectral_normalize_torch(spec)
+
+    return spec
 
 
 @click.command()
@@ -33,32 +70,17 @@ def main(input_dir: str, output_dir: str):
     print(f'Number of audio files found: {len(filepath_list)}')
     print('Transforming audio to mel...')
 
-    # TODO: determine transformation parameters
-    transformer = MelSpectrogram(
-        sample_rate=SAMPLE_RATE,
-        n_fft=N_FFT,
-        win_length=WIN_SIZE,
-        hop_length=HOP_SIZE,
-        f_min=F_MIN,
-        f_max=F_MAX,
-        n_mels=N_MELS,
-        normalized=NORMALIZED,
-        # norm = 'slaney',
-    )
-
     for file in tqdm(filepath_list):
-        # new_dir = processed_path / file.parent.name
-        # new_dir.mkdir(exist_ok=True)
         new_path = processed_path / file.stem
 
-        wave_tensor, _ = torchaudio_load(file)
+        wave_tensor, _ = torchaudio.load(file)
 
-        new_tensor = transformer(wave_tensor)  # [n_channels x n_mels x time]
-        # torch_save(new_tensor, (new_dir / file.stem).with_suffix('.pkl'))
-        torch_save(new_tensor, new_path.with_suffix('.pkl'))
+        mels_tensor = mel_spectrogram(wave_tensor)  # [n_channels x n_mels x time]
+        torch.save(mels_tensor, new_path.with_suffix('.pkl'))
 
     print('Finished successfully.')
     print(f'Processed files are located at {output_dir}')
+
 
 if __name__ == '__main__':
     main()
