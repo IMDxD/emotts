@@ -110,7 +110,14 @@ class VctkDataset(Dataset):
             input_sample['mels'] = mels
 
             pad_size = mels.shape[-1] - sum(input_sample['durations'])
-            assert pad_size >= 0, f'Expected {mels.shape[-1]} mel frames, got {sum(input_sample["durations"])}'
+            # assert pad_size >= 0, f'Expected {mels.shape[-1]} mel frames, got {sum(input_sample["durations"])}'
+            # TODO: fix problem when pad_size < 0
+            if pad_size < 0:
+                print(f"Removing {-pad_size} frames from input sample duration.")
+                input_sample['durations'][0] -= pad_size / 2
+                input_sample['durations'][-1] -= pad_size / 2
+                assert input_sample['durations'][0] >= 0
+                assert input_sample['durations'][-1] >= 0
             if pad_size > 0:
                 input_sample['phonemes'].append(PAUSE_TOKEN)
                 input_sample['durations'].append(pad_size)
@@ -145,13 +152,13 @@ class VctkCollate:
         # Right zero-pad all one-hot text sequences to max input length
         input_lengths, ids_sorted_decreasing = torch.sort(
             torch.LongTensor([len(x[0]) for x in batch]),
-            dim=0, descending=True)
+            dim=0, descending=True
+        )
         max_input_len = input_lengths[0]
 
-        text_padded = torch.LongTensor(len(batch), max_input_len)
-        text_padded.zero_()
-        for i in range(len(ids_sorted_decreasing)):
-            text = batch[ids_sorted_decreasing[i]][0]
+        text_padded = torch.zeros((len(batch), max_input_len), dtype=torch.long)
+        for i, ids in enumerate(ids_sorted_decreasing):
+            text = batch[ids][0]
             text_padded[i, :text.size(0)] = text
 
         # Right zero-pad mel-spec
