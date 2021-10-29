@@ -23,6 +23,7 @@ python src/preprocessing/03_resampling.py --input-dir data/processed/01_no_pause
 
 
 # 3. Audio to Mel
+conda install -c conda-forge librosa
 python src/preprocessing/04_wav_to_mel.py --input-dir data/processed/02_resampled --output-dir data/processed/03_mels
 
 
