@@ -1,73 +1,74 @@
 ## Usage
 
-### Audio
+### Data
 
 ```bash
 conda create -n emotts python=3.8 pip git click tqdm
 conda activate emotts
 
+conda install -y -c conda-forge gdown librosa pysoundfile openblas openfst pynini ngram baumwelch
+conda install llvmlite
+conda install -y -c pytorch-lts pytorch torchaudio cudatoolkit=10.2  # CUDA 10.2
+# conda install -y -c pytorch-lts pytorch torchaudio cpuonly  # CPU
 
-# 0. Selecting only one mic per speaker
+
+# Download dataset
+gdown --id 1vpnvduieFdJSICTNqIqakcOdhn-i_2cU --output vctk.zip
+
+unzip -q vctk.zip txt/* wav48_silence_trimmed/*
+mkdir -p data/zip
+mv vctk.zip data/zip
+mkdir -p data/raw/text
+mv txt/* data/raw/text
+mkdir -p data/raw/audio
+mv wav48_silence_trimmed/* data/raw/audio
+rm -rf txt wav48_silence_trimmed
+
+
+# 1. Selecting only one mic per speaker
 python src/preprocessing/01_preprocessing.py --input-dir data/raw/audio --output-dir data/processed/audio_single_mic --audio-ext flac
 
 
-# 1. Pausation cutting with VAD
-conda install -y -c conda-forge pysoundfile
-conda install -y -c pytorch-lts pytorch torchaudio cudatoolkit=10.2  # CUDA 10.2
-# conda install -y -c pytorch-lts pytorch torchaudio cpuonly  # CPU
+# 2. Pausation cutting with VAD
 python src/preprocessing/02_pausation_cutting.py --input-dir data/processed/audio_single_mic --output-dir data/processed/no_pause --target-sr 48000
 
 
-# 2. Resampling
+# 3. Resampling
 python src/preprocessing/03_resampling.py --input-dir data/processed/no_pause --output-dir data/processed/resampled --resample-rate 22050
 
 
-# 3. Audio to Mel
-conda install -c conda-forge librosa
-conda install llvmlite
+# 4. Audio to Mel
 python src/preprocessing/04_wav_to_mel.py --input-dir data/processed/resampled --output-dir data/processed/mels
 
+# 5. Text normalization
+python src/preprocessing/05_text_normalization.py --input-dir data/raw/text --output-dir data/processed/mfa_inputs
 
-conda install -y -c conda-forge openblas openfst pynini ngram baumwelch
 
-
-# 5. Alignment with MFA
+# 6. Alignment with MFA
 pip install montreal-forced-aligner  # install requirements
 pip install git+https://github.com/MontrealCorpusTools/Montreal-Forced-Aligner.git  # install latest updates
 
 mfa thirdparty download
-
-# install sox
-# sudo apt install -q -y sox
-
-# convert to 16k audio clips
-# cd data
-# mkdir audio/wav
-# echo "normalize audio clips to sample rate of 16k"
-# find ./audio/raw -name "*.flac" -type f -execdir sox --norm=-3 {} -r 16k -c 1 `pwd`/audio/wav/{} \;
-# echo "Number of clips" $(ls ./audio/wav/ | wc -l)
 
 # download a pretrained english acoustic model, and english lexicon
 mkdir models
 wget -q --show-progress https://github.com/MontrealCorpusTools/mfa-models/raw/main/acoustic/english.zip -P models
 wget -q --show-progress http://www.openslr.org/resources/11/librispeech-lexicon.txt -P models
 
-cd ..
 conda env config vars set LD_LIBRARY_PATH=$CONDA_PREFIX/lib  # link to libopenblas
 conda deactivate
 conda activate emotts
+
+# 6.1. Preprocessing
 python src/preprocessing/06_mfa_preprocessing.py --input-dir data/processed/resampled --output-dir data/processed/mfa_inputs
 
 # FINALLY, align phonemes and speech
 mfa align -t ./temp --clean -j 4 data/processed/mfa_inputs models/librispeech-lexicon.txt models/english.zip data/processed/mfa_outputs
+rm -rf temp
 
-python src/preprocessing/07_mfa_postprocessing.py --input-dir data/processed/mfa_outputs
+# 7. Postprocessing
+# python src/preprocessing/07_mfa_postprocessing.py --input-dir data/processed/mfa_outputs
 python src/preprocessing/07_mfa_postprocessing.py --input-dir data/processed/mels
-```
-### Text
-
-```bash
-python src/preprocessing/05_text_normalization.py --input-dir data/raw/text --output-dir data/processed/mfa_inputs
 ```
 
 MODEL_INPUT = (

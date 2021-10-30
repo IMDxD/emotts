@@ -11,10 +11,11 @@ from shutil import move
               help='Directory to move audio to.')
 def main(input_dir: str, output_dir: str):
     input_dir = Path(input_dir)
+    output_dir = Path(output_dir)
 
     for dir_path in input_dir.iterdir():
         for file in dir_path.iterdir():
-            move(str(file), output_dir)
+            move(str(file), output_dir / dir_path.name)
         dir_path.rmdir()
 
 

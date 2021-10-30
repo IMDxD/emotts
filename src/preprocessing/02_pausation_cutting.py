@@ -37,16 +37,21 @@ def main(input_dir: str, output_dir: str, target_sr: int) -> None:
     print(f'Number of audio files found: {len(filepath_list)}')
     print('Performing pausation cutting...')
 
+    log_path = processed_path / "pausation_cutting.log"
     for file in tqdm(filepath_list):
         wave_tensor = read_audio(file, target_sr=target_sr)
         speech_timestamps = get_speech_ts_adaptive(wave_tensor, model)
         speaker_dir = processed_path / file.parent.name
         speaker_dir.mkdir(exist_ok=True)
-        save_audio(
-            speaker_dir / file.name,
-            collect_chunks(speech_timestamps, wave_tensor),
-            target_sr,
-        )
+        try:
+            save_audio(
+                speaker_dir / file.name,
+                collect_chunks(speech_timestamps, wave_tensor),
+                target_sr,
+            )
+        except RuntimeError:
+            with open(log_path, "a") as fout:
+                fout.write(str(file) + "\n")
 
     print('Pausation cutting finished.')
     print(f'Trimmed files are located at {output_dir}')

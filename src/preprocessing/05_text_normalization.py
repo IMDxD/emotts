@@ -25,10 +25,10 @@ def main(input_dir: str, output_dir: str):
     print('Normalizing texts...')
 
     for file in tqdm(filepath_list):
-        # new_dir = processed_path / file.parent.name
-        # new_dir.mkdir(exist_ok=True)
-        # new_file = new_dir / file.name
-        new_file = processed_path / file.name
+        new_dir = processed_path / file.parent.name
+        new_dir.mkdir(exist_ok=True)
+        new_file = new_dir / file.name
+        # new_file = processed_path / file.name
 
         with open(file, 'r') as fin, open(new_file, 'w') as fout:
             content = fin.read()
