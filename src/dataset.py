@@ -3,6 +3,7 @@ from pathlib import Path
 import tgt
 import torch
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from src.preprocessing.text.cmudict import valid_symbols
 
@@ -84,7 +85,7 @@ class VctkDataset(Dataset):
         print(f'Found {len(self._dataset)} samples.')
 
     def _build_dataset(self):
-        for sample in self._samples:
+        for sample in tqdm(self._samples):
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
             text_grid = tgt.read_textgrid(tg_path)
 
@@ -113,13 +114,11 @@ class VctkDataset(Dataset):
             # assert pad_size >= 0, f'Expected {mels.shape[-1]} mel frames, got {sum(input_sample["durations"])}'
             # TODO: fix problem when pad_size < 0
             if pad_size < 0:
-                print(f"Removing {-pad_size} frames from input sample duration.")
-                input_sample['durations'][0] -= pad_size / 2
-                input_sample['durations'][-1] -= pad_size / 2
-                assert input_sample['durations'][0] >= 0
+                # print(f"Removing {-pad_size} frames from input sample duration.")
+                input_sample['durations'][-1] -= pad_size
                 assert input_sample['durations'][-1] >= 0
             if pad_size > 0:
-                input_sample['phonemes'].append(PAUSE_TOKEN)
+                input_sample['phonemes'].append(PHONEME_TO_IDX[PAUSE_TOKEN])
                 input_sample['durations'].append(pad_size)
 
             self._dataset.append(input_sample)
@@ -127,7 +126,8 @@ class VctkDataset(Dataset):
         # In DataLoader, we want to put in batch samples
         # with close num_phonemes values ([i:i + batch_size]),
         # so we sort dataset here and never shuffle it afterwards:
-        self._dataset.sort(key=lambda x: x['num_phonemes'])
+        # self._dataset.sort(key=lambda x: x['num_phonemes'])
+        self._dataset.sort(key=lambda x: len(x['phonemes']))
 
     def __len__(self):
         return len(self._dataset)
@@ -140,30 +140,33 @@ class VctkCollate:
     """
     Zero-pads model inputs and targets based on number of frames per setep
     """
-    def __init__(self, n_frames_per_step):
+    def __init__(self, n_frames_per_step: int = 1):
         self.n_frames_per_step = n_frames_per_step
 
     def __call__(self, batch):
         """Collate's training batch from normalized text and mel-spectrogram
         PARAMS
         ------
-        batch: [text_normalized, mel_normalized]
+        batch: [{}, {}, ...]
         """
         # Right zero-pad all one-hot text sequences to max input length
         input_lengths, ids_sorted_decreasing = torch.sort(
-            torch.LongTensor([len(x[0]) for x in batch]),
-            dim=0, descending=True
+            torch.LongTensor([len(x["phonemes"]) for x in batch]),
+            dim=0, descending=True,
         )
         max_input_len = input_lengths[0]
 
         text_padded = torch.zeros((len(batch), max_input_len), dtype=torch.long)
-        for i, ids in enumerate(ids_sorted_decreasing):
-            text = batch[ids][0]
-            text_padded[i, :text.size(0)] = text
+        durations_padded = torch.zeros((len(batch), max_input_len), dtype=torch.long)
+        for i, idx in enumerate(ids_sorted_decreasing):
+            text = batch[idx]["phonemes"]
+            text_padded[i, :len(text)] = torch.as_tensor(text)
+            durations = batch[idx]["durations"]
+            durations_padded[i, :len(durations)] = torch.as_tensor(durations)
 
         # Right zero-pad mel-spec
-        num_mels = batch[0][1].size(0)
-        max_target_len = max([x[1].size(1) for x in batch])
+        num_mels = batch[0]["mels"].squeeze(0).size(0)
+        max_target_len = max([x["mels"].squeeze(0).size(1) for x in batch])
         if max_target_len % self.n_frames_per_step != 0:
             max_target_len += self.n_frames_per_step - max_target_len % self.n_frames_per_step
             assert max_target_len % self.n_frames_per_step == 0
@@ -174,11 +177,10 @@ class VctkCollate:
         gate_padded = torch.FloatTensor(len(batch), max_target_len)
         gate_padded.zero_()
         output_lengths = torch.LongTensor(len(batch))
-        for i in range(len(ids_sorted_decreasing)):
-            mel = batch[ids_sorted_decreasing[i]][1]
+        for i, idx in enumerate(ids_sorted_decreasing):
+            mel = batch[idx]["mels"].squeeze(0)
             mel_padded[i, :, :mel.size(1)] = mel
-            gate_padded[i, mel.size(1)-1:] = 1
+            gate_padded[i, mel.size(1) - 1:] = 1
             output_lengths[i] = mel.size(1)
 
-        return text_padded, input_lengths, mel_padded, gate_padded, \
-            output_lengths
+        return text_padded, input_lengths, mel_padded, gate_padded, output_lengths
