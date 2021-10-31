@@ -63,6 +63,7 @@ class VctkDataset(Dataset):
         self._mels_dir = Path(mels_dir)
         self._text_ext = text_ext
         self._mels_ext = mels_ext
+        self.speaker_to_idx = {}
 
         # Check that input dirs exist:
         if not self._text_dir.is_dir():
@@ -85,6 +86,7 @@ class VctkDataset(Dataset):
         print(f'Found {len(self._dataset)} samples.')
 
     def _build_dataset(self):
+        speaker_counter = 0
         for sample in tqdm(self._samples):
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
             text_grid = tgt.read_textgrid(tg_path)
@@ -96,7 +98,10 @@ class VctkDataset(Dataset):
 
             input_sample = {}
             input_sample['num_phonemes'] = len(phones_tier.intervals)
-            input_sample['speaker_id'] = sample.parent.name
+            if sample.parent.name not in self.speaker_to_idx:
+                self.speaker_to_idx[sample.parent.name] = speaker_counter
+                speaker_counter += 1
+            input_sample['speaker_id'] = self.speaker_to_idx[sample.parent.name]
 
             if LEXICON_OOV_TOKEN in [x.text for x in phones_tier.get_copy_with_gaps_filled()]:
                 continue
@@ -156,6 +161,8 @@ class VctkCollate:
         )
         max_input_len = input_lengths[0]
 
+        input_speaker_ids = torch.LongTensor([batch[i]["speaker_id"] for i in ids_sorted_decreasing])
+
         text_padded = torch.zeros((len(batch), max_input_len), dtype=torch.long)
         durations_padded = torch.zeros((len(batch), max_input_len), dtype=torch.long)
         for i, idx in enumerate(ids_sorted_decreasing):
@@ -174,13 +181,8 @@ class VctkCollate:
         # include mel padded and gate padded
         mel_padded = torch.FloatTensor(len(batch), num_mels, max_target_len)
         mel_padded.zero_()
-        gate_padded = torch.FloatTensor(len(batch), max_target_len)
-        gate_padded.zero_()
-        output_lengths = torch.LongTensor(len(batch))
         for i, idx in enumerate(ids_sorted_decreasing):
             mel = batch[idx]["mels"].squeeze(0)
             mel_padded[i, :, :mel.size(1)] = mel
-            gate_padded[i, mel.size(1) - 1:] = 1
-            output_lengths[i] = mel.size(1)
 
-        return text_padded, input_lengths, mel_padded, gate_padded, output_lengths
+        return text_padded, input_lengths, input_speaker_ids, durations_padded, mel_padded
