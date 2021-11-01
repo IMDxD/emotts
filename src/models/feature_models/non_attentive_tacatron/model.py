@@ -199,6 +199,17 @@ class Attention(nn.Module):
         embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
         return durations, embeddings_per_duration
 
+    def inference(self, embeddings: torch.Tensor, input_lengths: torch.Tensor) -> torch.Tensor:
+
+        durations = self.duration_predictor(embeddings, input_lengths)
+        ranges = self.range_predictor(embeddings, durations, input_lengths)
+
+        scores = self.calc_scores(durations, ranges)
+
+        embeddings_per_duration = torch.matmul(scores.transpose(1, 2), embeddings)
+        embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
+        return embeddings_per_duration
+
 
 class Encoder(nn.Module):
     def __init__(self, phonem_embedding_dim: int, config: EncoderConfig):
@@ -325,6 +336,29 @@ class Decoder(nn.Module):
         mel_tensor_outputs: torch.Tensor = torch.cat(mel_outputs, dim=1)
         return mel_tensor_outputs
 
+    def inference(self, memory: torch.Tensor) -> torch.Tensor:
+
+        previous_frame = torch.zeros(memory.shape[0], self.n_mel_channels)
+
+        mel_outputs = []
+        decoder_state = None
+
+        for i in range(memory.shape[1]):
+            previous_frame = self.prenet(previous_frame)
+            decoder_input: torch.Tensor = torch.cat(
+                (previous_frame, memory[:, i, :]), dim=-1
+            )
+            out, decoder_state = self.decoder_rnn(
+                decoder_input.unsqueeze(1), decoder_state
+            )
+            out = torch.cat((out, memory[:, i, :].unsqueeze(1)), dim=-1)
+            mel_out = self.linear_projection(out)
+            mel_outputs.append(mel_out)
+            previous_frame = mel_out.squeeze(1)
+
+        mel_tensor_outputs: torch.Tensor = torch.cat(mel_outputs, dim=1)
+        return mel_tensor_outputs
+
 
 class NonAttentiveTacatron(nn.Module):
     def __init__(
@@ -373,11 +407,11 @@ class NonAttentiveTacatron(nn.Module):
 
     def forward(
         self,
-        inputs: Tuple[
+        batch: Tuple[
             torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
         ],
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        text_inputs, text_lengths, speaker_ids, y_durations, y_mels = inputs
+        text_inputs, text_lengths, speaker_ids, y_durations, y_mels = batch
 
         phonem_emb = self.phonem_embedding(text_inputs).transpose(1, 2)
         speaker_emb = self.speaker_embedding(speaker_ids).unsqueeze(1)
@@ -400,3 +434,21 @@ class NonAttentiveTacatron(nn.Module):
         mel_outputs[mask] = 0
 
         return durations, mel_outputs_postnet, mel_outputs
+
+    def inference(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> torch.Tensor:
+
+        text_inputs, text_lengths, speaker_ids = batch
+        phonem_emb = self.phonem_embedding(text_inputs).transpose(1, 2)
+        speaker_emb = self.speaker_embedding(speaker_ids).unsqueeze(1)
+
+        phonem_emb = self.encoder(phonem_emb, text_lengths)
+
+        speaker_emb = torch.repeat_interleave(speaker_emb, phonem_emb.shape[1], dim=1)
+        embeddings = torch.cat((phonem_emb, speaker_emb), dim=-1)
+
+        attented_embeddings = self.attention.inference(embeddings, text_lengths)
+        mel_outputs = self.decoder.inference(attented_embeddings)
+        mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
+        mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
+
+        return mel_outputs_postnet
