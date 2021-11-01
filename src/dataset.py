@@ -17,22 +17,16 @@ PHONEME_TO_IDX = {
 }
 
 class VctkDataset(Dataset):
-    """Create VCTK Dataset
+    """Create VCTK Dataset from preprocessed and aligned texts and audio converted to mel-spectrograms.
 
     Args:
-        root (str): Root directory where the dataset's top level directory is found.
-        mic_id (str): Microphone ID. Either ``"mic1"`` or ``"mic2"``. (default: ``"mic2"``)
-        download (bool, optional):
-            Whether to download the dataset if it is not found at root path. (default: ``False``).
-        url (str, optional): The URL to download the dataset from.
-            (default: ``"https://datashare.is.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip"``)
-        audio_ext (str, optional): Custom audio extension if dataset is converted to non-default audio format.
+        text_dir (str): Directory where time-aligned phonemes are stored in .TextGrid format.
+        mels_dir (str): Directory where mel spectrograms are stored in .pkl format.
+        text_ext (str, optional): Text files extension.
+        mels_ext (str, optional): Mel spectrogram tensor files extension.
+        phoneme_to_idx (dict[str, int], optional): Dictionary like {<phoneme:str>: <id:int>}.
 
     Note:
-        * All the speeches from speaker ``p315`` will be skipped due to the lack of the corresponding text files.
-        * All the speeches from ``p280`` will be skipped for ``mic_id="mic2"`` due to the lack of the audio files.
-        * Some of the speeches from speaker ``p362`` will be skipped due to the lack of  the audio files.
-        * See Also: https://datashare.is.ed.ac.uk/handle/10283/3443
         * Make sure to put the files as the following structure:
             text
             ├── p225
@@ -58,12 +52,14 @@ class VctkDataset(Dataset):
         mels_dir: str,
         text_ext: str = ".TextGrid",
         mels_ext: str = ".pkl",
+        phoneme_to_idx: dict[str, int] = PHONEME_TO_IDX,
     ):
         self._text_dir = Path(text_dir)
         self._mels_dir = Path(mels_dir)
         self._text_ext = text_ext
         self._mels_ext = mels_ext
         self.speaker_to_idx = {}
+        self.phoneme_to_idx = phoneme_to_idx
 
         # Check that input dirs exist:
         if not self._text_dir.is_dir():
