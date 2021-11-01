@@ -6,8 +6,13 @@ from torch import nn
 from torch.nn import functional as f
 
 from .config import (
-    DecoderConfig, DurationConfig, EncoderConfig, GaussianUpsampleConfig,
-    ModelConfig, PostNetConfig, RangeConfig,
+    DecoderParams,
+    DurationParams,
+    EncoderParams,
+    GaussianUpsampleParams,
+    ModelParams,
+    PostNetParams,
+    RangeParams,
 )
 from .layers import ConvNorm, LinearWithActivation, PositionalEncoding
 from .utils import get_mask_from_lengths, norm_emb_layer
@@ -34,7 +39,7 @@ class Prenet(nn.Module):
 
 
 class Postnet(nn.Module):
-    def __init__(self, n_mel_channels: int, config: PostNetConfig):
+    def __init__(self, n_mel_channels: int, config: PostNetParams):
         super().__init__()
         self.dropout = config.dropout
         convolutions: List[nn.Module] = []
@@ -89,7 +94,7 @@ class Postnet(nn.Module):
 
 
 class DurationPredictor(nn.Module):
-    def __init__(self, embedding_dim: int, config: DurationConfig):
+    def __init__(self, embedding_dim: int, config: DurationParams):
         super().__init__()
 
         self.lstm = nn.LSTM(
@@ -115,7 +120,7 @@ class DurationPredictor(nn.Module):
 
 
 class RangePredictor(nn.Module):
-    def __init__(self, embedding_dim: int, config: RangeConfig):
+    def __init__(self, embedding_dim: int, config: RangeParams):
         super().__init__()
 
         self.lstm = nn.LSTM(
@@ -146,7 +151,7 @@ class RangePredictor(nn.Module):
 
 class Attention(nn.Module):
     def __init__(
-        self, embedding_dim: int, config: GaussianUpsampleConfig, device: torch.device
+        self, embedding_dim: int, config: GaussianUpsampleParams, device: torch.device
     ):
         super().__init__()
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
@@ -199,7 +204,9 @@ class Attention(nn.Module):
         embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
         return durations, embeddings_per_duration
 
-    def inference(self, embeddings: torch.Tensor, input_lengths: torch.Tensor) -> torch.Tensor:
+    def inference(
+        self, embeddings: torch.Tensor, input_lengths: torch.Tensor
+    ) -> torch.Tensor:
 
         durations = self.duration_predictor(embeddings, input_lengths)
         ranges = self.range_predictor(embeddings, durations, input_lengths)
@@ -212,7 +219,7 @@ class Attention(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, phonem_embedding_dim: int, config: EncoderConfig):
+    def __init__(self, phonem_embedding_dim: int, config: EncoderParams):
         super().__init__()
 
         convolutions: List[nn.Module] = [
@@ -282,7 +289,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(
-        self, n_mel_channels: int, attention_out_dim: int, config: DecoderConfig
+        self, n_mel_channels: int, attention_out_dim: int, config: DecoderParams
     ):
         super().__init__()
         self.n_mel_channels = n_mel_channels
@@ -360,13 +367,14 @@ class Decoder(nn.Module):
         return mel_tensor_outputs
 
 
-class NonAttentiveTacatron(nn.Module):
+class NonAttentiveTacotron(nn.Module):
     def __init__(
         self,
         n_phonems: int,
         n_speakers: int,
+        n_mel_channels: int,
         device: torch.device,
-        config: ModelConfig,
+        config: ModelParams,
     ):
         super().__init__()
         self.device = torch.device(device)
@@ -396,14 +404,15 @@ class NonAttentiveTacatron(nn.Module):
             torch.device(device),
         )
         self.decoder = Decoder(
-            config.n_mel_channels,
+            n_mel_channels,
             full_embedding_dim + config.attention_config.positional_dim,
             config.decoder_config,
         )
         self.postnet = Postnet(
-            config.n_mel_channels,
+            n_mel_channels,
             config.postnet_config,
         )
+        self.to(self.device)
 
     def forward(
         self,
@@ -435,7 +444,9 @@ class NonAttentiveTacatron(nn.Module):
 
         return durations, mel_outputs_postnet, mel_outputs
 
-    def inference(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> torch.Tensor:
+    def inference(
+        self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ) -> torch.Tensor:
 
         text_inputs, text_lengths, speaker_ids = batch
         phonem_emb = self.phonem_embedding(text_inputs).transpose(1, 2)

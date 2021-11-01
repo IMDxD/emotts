@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from src.models.feature_models.non_attentive_tacatron.layers import (
+from src.models.feature_models.layers import (
     ConvNorm, Idomp, LinearWithActivation, PositionalEncoding,
 )
 
