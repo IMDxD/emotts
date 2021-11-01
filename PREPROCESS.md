@@ -1,5 +1,12 @@
 ## Usage
 
+### Docker
+
+```bash
+docker build --rm --tag emotts ./test
+docker run --rm -it -v $(pwd):/emotts/cur_dir emotts
+```
+
 ### Data
 
 ```bash
