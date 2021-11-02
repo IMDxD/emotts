@@ -1,21 +1,16 @@
+import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 import tgt
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from src.preprocessing.text.cmudict import valid_symbols
 from .config import VCTKDatasetParams
 
 NUMBER = Union[int, float]
-PAUSE_TOKEN = "<SIL>"
-LEXICON_OOV_TOKEN = "spn"
-PHONEME_TO_IDX = {
-    phoneme: idx for idx, phoneme in enumerate([PAUSE_TOKEN] + valid_symbols)
-}
 
 
 @dataclass
@@ -29,8 +24,18 @@ class VCTKSample:
 
 
 class VctkDataset(Dataset):
+    def __init__(self, data: List[VCTKSample]):
+        self._dataset = data
 
-    PHONES_TIER = "phones"
+    def __len__(self):
+        return len(self._dataset)
+
+    def __getitem__(self, idx):
+        return self._dataset[idx]
+
+
+class VCTKFactory:
+
     """Create VCTK Dataset
 
     Note:
@@ -57,44 +62,46 @@ class VctkDataset(Dataset):
                 └──...
     """
 
-    def __init__(
-        self,
-        sample_rate: int,
-        hop_size: int,
-        config: VCTKDatasetParams
-    ):
-        self.sample_rate = sample_rate
-        self.hop_size = hop_size
-        self._text_dir = Path(config.text_dir)
+    PAUSE_TOKEN = "<SIL>"
+    PAD_TOKEN = "<PAD>"
+    LEXICON_OOV_TOKEN = "spn"
+    PHONES_TIER = "phones"
+
+    def __init__(self, sample_rate: int, hop_size: int, config: VCTKDatasetParams):
+
         self._mels_dir = Path(config.mels_dir)
+        self._text_dir = Path(config.text_dir)
         self._text_ext = config.text_ext
         self._mels_ext = config.mels_ext
-        self.speaker_to_idx: Dict[str, int] = {}
+        self.sample_rate = sample_rate
+        self.hop_size = hop_size
+        self.phoneme_to_id: Dict[str, int] = {self.PAD_TOKEN: 0, self.PAUSE_TOKEN: 1}
+        self.speaker_to_id: Dict[str, int] = {}
+        self._dataset = self._build_dataset()
 
-        # Check that input dirs exist:
-        if not self._text_dir.is_dir():
-            raise FileNotFoundError(f'Text data not found at {self._text_dir}.')
-        if not self._mels_dir.is_dir():
-            raise FileNotFoundError(f'Mels data not found at {self._mels_dir}.')
-
-        # Extracting speaker IDs from the folder structure
-        texts = set(
-            Path(x.parent.name) / x.stem
-            for x in self._text_dir.rglob(f'*{self._text_ext}')
-        )
-        mels = set(
-            Path(x.parent.name) / x.stem
-            for x in self._mels_dir.rglob(f'*{self._mels_ext}')
-        )
-
-        self._dataset = []
-        self._build_dataset(list(texts & mels))
+    @staticmethod
+    def add_to_mapping(mapping: Dict[str, int], token: str, index: int) -> int:
+        if token not in mapping:
+            mapping[token] = index
+            index += 1
+        return index
 
     def seconds_to_frame(self, seconds: float) -> float:
         return seconds * self.sample_rate / self.hop_size
 
-    def _build_dataset(self, samples):
-        speaker_counter = 0
+    def _build_dataset(self) -> List[VCTKSample]:
+        speakers_counter = 0
+        phonemes_counter = 2
+        dataset = []
+        texts_set = set(
+            Path(x.parent.name) / x.stem
+            for x in self._text_dir.rglob(f'*{self._text_ext}')
+        )
+        mels_set = set(
+            Path(x.parent.name) / x.stem
+            for x in self._mels_dir.rglob(f'*{self._mels_ext}')
+        )
+        samples = list(mels_set & texts_set)
         for sample in tqdm(samples):
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
             text_grid = tgt.read_textgrid(tg_path)
@@ -105,20 +112,22 @@ class VctkDataset(Dataset):
             phones_tier = text_grid.get_tier_by_name(self.PHONES_TIER)
 
             num_phonemes = len(phones_tier.intervals)
-            if sample.parent.name not in self.speaker_to_idx:
-                self.speaker_to_idx[sample.parent.name] = speaker_counter
-                speaker_counter += 1
-            speaker_id = self.speaker_to_idx[sample.parent.name]
+            speakers_counter = self.add_to_mapping(
+                self.speaker_to_id, sample.parent.name, speakers_counter
+            )
+            speaker_id = self.speaker_to_id[sample.parent.name]
+            phonemes = [x.text for x in phones_tier.get_copy_with_gaps_filled()]
 
-            if LEXICON_OOV_TOKEN in [
-                x.text for x in phones_tier.get_copy_with_gaps_filled()
-            ]:
+            if self.LEXICON_OOV_TOKEN in phonemes:
                 continue
 
-            phonemes = [
-                PHONEME_TO_IDX[x.text] if x.text else PHONEME_TO_IDX[PAUSE_TOKEN]
-                for x in phones_tier.get_copy_with_gaps_filled()
-            ]
+            phoneme_ids = []
+            for phoneme in phonemes:
+                phonemes_counter = self.add_to_mapping(
+                    self.phoneme_to_id, phoneme, phonemes_counter
+                )
+                phoneme_ids.append(self.phoneme_to_id[phoneme])
+
             durations = [
                 self.seconds_to_frame(x.duration())
                 for x in phones_tier.get_copy_with_gaps_filled()
@@ -132,32 +141,34 @@ class VctkDataset(Dataset):
             # assert pad_size >= 0, f'Expected {mels.shape[-1]} mel frames, got {sum(input_sample["durations"])}'
             # TODO: fix problem when pad_size < 0
             if pad_size < 0:
-                # print(f"Removing {-pad_size} frames from input sample duration.")
                 durations[-1] -= pad_size
                 assert durations[-1] >= 0
             if pad_size > 0:
-                phonemes.append(PHONEME_TO_IDX[PAUSE_TOKEN])
+                phoneme_ids.append(self.phoneme_to_id[self.PAUSE_TOKEN])
                 durations.append(pad_size)
 
-            self._dataset.append(VCTKSample(
-                phonemes=phonemes,
-                num_phonemes=num_phonemes,
-                speaker_id=speaker_id,
-                durations=durations,
-                mels=mels
-            ))
+            dataset.append(
+                VCTKSample(
+                    phonemes=phoneme_ids,
+                    num_phonemes=num_phonemes,
+                    speaker_id=speaker_id,
+                    durations=durations,
+                    mels=mels,
+                )
+            )
+        return dataset
 
-        # In DataLoader, we want to put in batch samples
-        # with close num_phonemes values ([i:i + batch_size]),
-        # so we sort dataset here and never shuffle it afterwards:
-        # self._dataset.sort(key=lambda x: x['num_phonemes'])
-        self._dataset.sort(key=lambda x: len(x['phonemes']))
-
-    def __len__(self):
-        return len(self._dataset)
-
-    def __getitem__(self, idx):
-        return self._dataset[idx]
+    def split_train_valid(self, test_fraction: float) -> Tuple[VctkDataset, VctkDataset]:
+        test_size = int(len(self._dataset) * test_fraction)
+        test_indexes = set(random.choices(range(len(self._dataset)), k=test_size))
+        train_data = []
+        test_data = []
+        for i in range(len(self._dataset)):
+            if i in test_indexes:
+                test_data.append(self._dataset[i])
+            else:
+                train_data.append(self._dataset[i])
+        return VctkDataset(train_data), VctkDataset(test_data)
 
 
 class VctkCollate:
