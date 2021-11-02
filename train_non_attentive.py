@@ -179,8 +179,6 @@ def train(config: TrainParams):
         duration_weight=config.loss.duration_weight,
     )
 
-    iteration = 0
-    epoch_offset = 0
     if os.path.isfile(checkpoint_path / MODEL_NAME):
         model, optimizer, scheduler = load_checkpoint(
             checkpoint_path=checkpoint_path,
@@ -193,9 +191,9 @@ def train(config: TrainParams):
     writer = SummaryWriter(log_dir=log_dir)
     device = torch.device(config.device)
 
-    for epoch in range(epoch_offset, config.epochs):
-        for i, batch in enumerate(train_loader):
-            global_step = epoch * len(train_loader) + iteration
+    for epoch in range(config.epochs):
+        for i, batch in enumerate(train_loader, start=1):
+            global_step = epoch * len(train_loader) + i
             batch = batch_to_device(batch, device)
             optimizer.zero_grad()
             durations, mel_outputs_postnet, mel_outputs = model(batch)
