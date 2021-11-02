@@ -12,6 +12,7 @@ batch_size: 16
 grad_clip_thresh: 1.0
 log_steps: 1000
 epochs: 2500
+test_size: 0.2
 device: cuda
 loss:
   mels_weight: 1.0
@@ -30,9 +31,6 @@ scheduler:
 train_data:
   text_dir: data/train/mfa_inputs
   mels_dir: data/train/mels
-valid_data:
-  text_dir: data/valid/mfa_inputs
-  mels_dir: data/valid/mels
 model:
   encoder_config:
     n_convolutions: 3

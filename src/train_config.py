@@ -30,8 +30,8 @@ class LossParams:
 
 @dataclass
 class TrainParams:
-    train_data: VCTKDatasetParams
-    valid_data: VCTKDatasetParams
+    data: VCTKDatasetParams
+    test_size: float
     model: ModelParams
     optimizer: OptimizerParams
     scheduler: SchedulerParams

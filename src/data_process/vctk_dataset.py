@@ -1,4 +1,6 @@
+import json
 import random
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
@@ -9,6 +11,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from .config import VCTKDatasetParams
+
 
 NUMBER = Union[int, float]
 
@@ -63,9 +66,12 @@ class VCTKFactory:
     """
 
     PAUSE_TOKEN = "<SIL>"
+    MFA_PAUSE_TOKEN = ''
     PAD_TOKEN = "<PAD>"
     LEXICON_OOV_TOKEN = "spn"
     PHONES_TIER = "phones"
+    SPEAKER_JSON_NAME = "speakers.json"
+    PHONEMES_JSON_NAME = "speakers.json"
 
     def __init__(self, sample_rate: int, hop_size: int, config: VCTKDatasetParams):
 
@@ -77,7 +83,7 @@ class VCTKFactory:
         self.hop_size = hop_size
         self.phoneme_to_id: Dict[str, int] = {self.PAD_TOKEN: 0, self.PAUSE_TOKEN: 1}
         self.speaker_to_id: Dict[str, int] = {}
-        self._dataset = self._build_dataset()
+        self._dataset: List[VCTKSample] = self._build_dataset()
 
     @staticmethod
     def add_to_mapping(mapping: Dict[str, int], token: str, index: int) -> int:
@@ -92,7 +98,7 @@ class VCTKFactory:
     def _build_dataset(self) -> List[VCTKSample]:
         speakers_counter = 0
         phonemes_counter = 2
-        dataset = []
+        dataset: List[VCTKSample] = []
         texts_set = set(
             Path(x.parent.name) / x.stem
             for x in self._text_dir.rglob(f'*{self._text_ext}')
@@ -111,18 +117,21 @@ class VCTKFactory:
 
             phones_tier = text_grid.get_tier_by_name(self.PHONES_TIER)
 
-            num_phonemes = len(phones_tier.intervals)
-            speakers_counter = self.add_to_mapping(
-                self.speaker_to_id, sample.parent.name, speakers_counter
-            )
-            speaker_id = self.speaker_to_id[sample.parent.name]
             phonemes = [x.text for x in phones_tier.get_copy_with_gaps_filled()]
 
             if self.LEXICON_OOV_TOKEN in phonemes:
                 continue
 
+            num_phonemes = len(phones_tier.intervals)
+            speakers_counter = self.add_to_mapping(
+                self.speaker_to_id, sample.parent.name, speakers_counter
+            )
+            speaker_id = self.speaker_to_id[sample.parent.name]
+
             phoneme_ids = []
             for phoneme in phonemes:
+                if phoneme == self.MFA_PAUSE_TOKEN:
+                    phoneme = self.PAUSE_TOKEN
                 phonemes_counter = self.add_to_mapping(
                     self.phoneme_to_id, phoneme, phonemes_counter
                 )
@@ -159,16 +168,31 @@ class VCTKFactory:
         return dataset
 
     def split_train_valid(self, test_fraction: float) -> Tuple[VctkDataset, VctkDataset]:
-        test_size = int(len(self._dataset) * test_fraction)
-        test_indexes = set(random.choices(range(len(self._dataset)), k=test_size))
+        speakers_to_data_id: Dict[int, List[int]] = defaultdict(list)
+
+        for i, sample in enumerate(self._dataset):
+            speakers_to_data_id[sample.speaker_id].append(i)
+        test_ids: List[int] = []
+        for ids in speakers_to_data_id.values():
+            test_size = int(len(ids) * test_fraction)
+            if test_size > 0:
+                test_indexes = random.choices(ids, k=test_size)
+                test_ids.extend(test_indexes)
+
         train_data = []
         test_data = []
         for i in range(len(self._dataset)):
-            if i in test_indexes:
+            if i in test_ids:
                 test_data.append(self._dataset[i])
             else:
                 train_data.append(self._dataset[i])
         return VctkDataset(train_data), VctkDataset(test_data)
+
+    def save_mapping(self, path: Path):
+        with open(path / self.SPEAKER_JSON_NAME, "w") as f:
+            json.dump(self.speaker_to_id, f)
+        with open(path / self.PHONEMES_JSON_NAME, "w") as f:
+            json.dump(self.phoneme_to_id, f)
 
 
 class VctkCollate:
