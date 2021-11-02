@@ -9,7 +9,7 @@ n_mels: 80
 checkpoint_name: non_attentive_tacotron_default
 seed: 42
 batch_size: 16
-grad_clip_thresh: 3.0
+grad_clip_thresh: 1.0
 log_steps: 1000
 epochs: 2500
 device: cuda
