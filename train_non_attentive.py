@@ -111,7 +111,7 @@ def batch_to_device(batch: VCTKBatch, device: torch.device) -> VCTKBatch:
         num_phonemes=batch.num_phonemes,
         speaker_ids=batch.speaker_ids.to(device),
         durations=batch.durations.to(device),
-        mels=batch.mels.to(device)
+        mels=batch.mels.to(device),
     )
     return batch_on_device
 
@@ -129,17 +129,16 @@ def validate(
 
         val_loss = 0.0
         for i, batch in enumerate(val_loader):
+            batch = batch_to_device(batch, model.device)
             durations, mel_outputs_postnet, mel_outputs = model(batch)
             loss = criterion(
-                mel_outputs, mel_outputs_postnet, durations, batch[3], batch[4]
+                mel_outputs, mel_outputs_postnet, durations, batch.durations, batch.mels
             )
             reduced_val_loss = loss.item()
             val_loss += reduced_val_loss
 
         val_loss = val_loss / (i + 1)
-        writer.add_scalar(
-            "Loss/valid", scalar_value=val_loss, global_step=global_step
-        )
+        writer.add_scalar("Loss/valid", scalar_value=val_loss, global_step=global_step)
 
     model.train()
 
@@ -156,7 +155,7 @@ def train(config: TrainParams):
     train_loader, val_loader, phonemes_count, speaker_count = prepare_dataloaders(
         checkpoint_path, config
     )
-    model = load_model(config, 71, 109)
+    model = load_model(config, phonemes_count, speaker_count)
 
     optimizer_config = config.optimizer
     optimizer = Adam(
@@ -211,9 +210,7 @@ def train(config: TrainParams):
 
             loss.backward()
 
-            torch.nn.utils.clip_grad_norm_(
-                model.parameters(), config.grad_clip_thresh
-            )
+            torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip_thresh)
 
             optimizer.step()
             if config.scheduler.start_decay <= i + 1 <= config.scheduler.last_epoch:
