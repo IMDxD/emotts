@@ -1,9 +1,9 @@
 import argparse
 import json
 import os
-from dataclasses import asdict
+import time
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Tuple
 
 import torch
 from torch.optim import Adam
@@ -141,7 +141,7 @@ def validate(
         writer.add_scalar(
             "Loss/valid", scalar_value=val_loss, global_step=global_step
         )
-
+    print("Validation loss {}: {:9f} ".format(global_step, val_loss))
     model.train()
 
 
@@ -195,6 +195,7 @@ def train(config: TrainParams):
     writer = SummaryWriter(log_dir=log_dir)
     device = torch.device(config.device)
 
+    start = time.perf_counter()
     for epoch in range(epoch_offset, config.epochs):
         for i, batch in enumerate(train_loader):
             global_step = epoch * len(train_loader) + iteration + 1
@@ -210,7 +211,7 @@ def train(config: TrainParams):
                 batch.mels,
             )
 
-            loss.backward()
+            grad_norm = loss.backward()
 
             torch.nn.utils.clip_grad_norm_(
                 model.parameters(), config.grad_clip_thresh
@@ -221,6 +222,12 @@ def train(config: TrainParams):
                 scheduler.step()
 
             if global_step % config.log_steps == 0:
+                duration = time.perf_counter() - start
+                print(
+                    "Train loss {} {:.6f} Grad Norm {:.6f} {:.2f}s/it".format(
+                        iteration, loss.item(), grad_norm, duration
+                    )
+                )
                 writer.add_scalar("Loss/train", loss, global_step=global_step)
 
             if global_step % config.iters_per_checkpoint == 0:
