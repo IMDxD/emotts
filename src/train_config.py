@@ -45,7 +45,6 @@ class TrainParams:
     seed: int = field(default=42)
     sample_rate: int = field(default=22050)
     grad_clip_thresh: float = field(default=1.0)
-    n_phonemes: int = field(default=86)
     hop_size: int = field(default=256)
     f_min: int = field(default=0)
     f_max: int = field(default=8000)

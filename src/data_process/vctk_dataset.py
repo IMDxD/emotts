@@ -29,6 +29,7 @@ class VCTKSample:
 class VctkDataset(Dataset):
     def __init__(self, data: List[VCTKSample]):
         self._dataset = data
+        self._dataset.sort(key=lambda x: len(x.phonemes))
 
     def __len__(self):
         return len(self._dataset)
@@ -71,9 +72,16 @@ class VCTKFactory:
     LEXICON_OOV_TOKEN = "spn"
     PHONES_TIER = "phones"
     SPEAKER_JSON_NAME = "speakers.json"
-    PHONEMES_JSON_NAME = "speakers.json"
+    PHONEMES_JSON_NAME = "phonemes.json"
 
-    def __init__(self, sample_rate: int, hop_size: int, config: VCTKDatasetParams):
+    def __init__(
+        self,
+        sample_rate: int,
+        hop_size: int,
+        config: VCTKDatasetParams,
+        phonemes_to_id: Dict[str, int] = None,
+        speakers_to_id: Dict[str, int] = None,
+    ):
 
         self._mels_dir = Path(config.mels_dir)
         self._text_dir = Path(config.text_dir)
@@ -81,8 +89,17 @@ class VCTKFactory:
         self._mels_ext = config.mels_ext
         self.sample_rate = sample_rate
         self.hop_size = hop_size
-        self.phoneme_to_id: Dict[str, int] = {self.PAD_TOKEN: 0, self.PAUSE_TOKEN: 1}
-        self.speaker_to_id: Dict[str, int] = {}
+        if phonemes_to_id:
+            self.phoneme_to_id = phonemes_to_id
+        else:
+            self.phoneme_to_id: Dict[str, int] = {
+                self.PAD_TOKEN: 0,
+                self.PAUSE_TOKEN: 1,
+            }
+        if speakers_to_id:
+            self.speaker_to_id = speakers_to_id
+        else:
+            self.speaker_to_id: Dict[str, int] = {}
         self._dataset: List[VCTKSample] = self._build_dataset()
 
     @staticmethod
@@ -144,9 +161,8 @@ class VCTKFactory:
 
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
             mels: torch.Tensor = torch.load(mels_path)
-            mels = mels
 
-            pad_size = mels.shape[-1] - sum(durations)
+            pad_size = mels.shape[-1] - int(sum(durations))
             # assert pad_size >= 0, f'Expected {mels.shape[-1]} mel frames, got {sum(input_sample["durations"])}'
             # TODO: fix problem when pad_size < 0
             if pad_size < 0:
@@ -167,7 +183,9 @@ class VCTKFactory:
             )
         return dataset
 
-    def split_train_valid(self, test_fraction: float) -> Tuple[VctkDataset, VctkDataset]:
+    def split_train_valid(
+        self, test_fraction: float
+    ) -> Tuple[VctkDataset, VctkDataset]:
         speakers_to_data_id: Dict[int, List[int]] = defaultdict(list)
 
         for i, sample in enumerate(self._dataset):
@@ -210,6 +228,7 @@ class VctkCollate:
         batch: [{}, {}, ...]
         """
         # Right zero-pad all one-hot text sequences to max input length
+        batch_size = len(batch)
         input_lengths, ids_sorted_decreasing = torch.sort(
             torch.LongTensor([len(x.phonemes) for x in batch]),
             dim=0,
@@ -221,13 +240,13 @@ class VctkCollate:
             [batch[i].speaker_id for i in ids_sorted_decreasing]
         )
 
-        text_padded = torch.zeros((len(batch), max_input_len), dtype=torch.long)
-        durations_padded = torch.zeros((len(batch), max_input_len), dtype=torch.long)
+        text_padded = torch.zeros((batch_size, max_input_len), dtype=torch.long)
+        durations_padded = torch.zeros((batch_size, max_input_len), dtype=torch.float)
         for i, idx in enumerate(ids_sorted_decreasing):
             text = batch[idx].phonemes
-            text_padded[i, : len(text)] = torch.as_tensor(text)
+            text_padded[i, : len(text)] = torch.LongTensor(text)
             durations = batch[idx].durations
-            durations_padded[i, : len(durations)] = torch.as_tensor(durations)
+            durations_padded[i, : len(durations)] = torch.FloatTensor(durations)
 
         # Right zero-pad mel-spec
         num_mels = batch[0].mels.squeeze(0).size(0)
@@ -239,12 +258,11 @@ class VctkCollate:
             assert max_target_len % self.n_frames_per_step == 0
 
         # include mel padded and gate padded
-        mel_padded = torch.FloatTensor(len(batch), num_mels, max_target_len)
-        mel_padded.zero_()
+        mel_padded = torch.zeros((batch_size, num_mels, max_target_len), dtype=torch.float)
         for i, idx in enumerate(ids_sorted_decreasing):
             mel = batch[idx].mels.squeeze(0)
             mel_padded[i, :, : mel.size(1)] = mel
-
+        mel_padded = mel_padded.permute(0, 2, 1)
         return (
             text_padded,
             input_lengths,

@@ -1,3 +1,3 @@
-from .vctk_dataset import VctkDataset, VctkCollate
+from .vctk_dataset import VctkCollate, VCTKFactory
 
-__all__ = ["VctkDataset", "VctkCollate"]
+__all__ = ["VctkCollate", "VCTKFactory"]

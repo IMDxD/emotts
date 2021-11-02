@@ -1,19 +1,18 @@
 sample_rate: 22050
-n_phonemes: 86
 hop_size: 256
 f_min: 0
 f_max: 8000
 win_size: 1024
 n_fft: 1024
 n_mels: 80
-checkpoint_name: non_attentive_tacotron_default
+checkpoint_name: non_attentive_tacotron_vctk_default
 seed: 42
 batch_size: 16
 grad_clip_thresh: 1.0
 log_steps: 1000
 epochs: 2500
 test_size: 0.2
-device: cuda
+device: "cuda:1"
 loss:
   mels_weight: 1.0
   duration_weight: 2.0
@@ -28,9 +27,9 @@ scheduler:
   decay_steps: 50000
   decay_rate: 0.5
   last_epoch: 400000
-train_data:
-  text_dir: data/train/mfa_inputs
-  mels_dir: data/train/mels
+data:
+  text_dir: data/vctk_sample/mfa_outputs
+  mels_dir: data/vctk_sample/mels
 model:
   encoder_config:
     n_convolutions: 3

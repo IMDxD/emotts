@@ -173,7 +173,7 @@ class Attention(nn.Module):
     ) -> torch.Tensor:
         # Calc gaussian weight for Gaussian upsampling attention
         duration_cumsum = durations.cumsum(dim=1).float()
-        max_duration = torch.ceil(duration_cumsum[:, -1, :].max())
+        max_duration = duration_cumsum[:, -1, :].max().long()
         c = duration_cumsum - 0.5 * durations
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(self.device)
 
@@ -437,7 +437,7 @@ class NonAttentiveTacotron(nn.Module):
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
         mask = get_mask_from_lengths(
-            y_durations.cumsum(dim=1)[:, -1], device=self.device
+            y_durations.cumsum(dim=1)[:, -1].long(), device=self.device
         )
         mel_outputs_postnet[mask] = 0
         mel_outputs[mask] = 0

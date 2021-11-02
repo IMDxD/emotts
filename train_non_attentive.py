@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+import json
 from pathlib import Path
 from typing import Tuple
 
@@ -10,52 +11,67 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
 from src.constants import CHECKPOINT_DIR
-from src.data_process import VctkCollate, VctkDataset
+from src.data_process import VctkCollate, VCTKFactory
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
 from src.train_config import TrainParams, load_config
 
+MODEL_NAME = "model.pth"
 
-def prepare_dataloaders(config: TrainParams) -> Tuple[DataLoader, DataLoader]:
+
+def prepare_dataloaders(
+    checkpoint: Path, config: TrainParams
+) -> Tuple[DataLoader, DataLoader, int, int]:
     # Get data, data loaders and collate function ready
-    trainset = VctkDataset(
+    phonemes_file = checkpoint / VCTKFactory.PHONEMES_JSON_NAME
+    speakers_file = checkpoint / VCTKFactory.SPEAKER_JSON_NAME
+    if os.path.isfile(phonemes_file):
+        with open(phonemes_file, "r") as f:
+            phonemes_to_id = json.load(f)
+    else:
+        phonemes_to_id = None
+    if os.path.isfile(speakers_file):
+        with open(speakers_file, "r") as f:
+            speakers_to_id = json.load(f)
+    else:
+        speakers_to_id = None
+    factory = VCTKFactory(
         sample_rate=config.sample_rate,
         hop_size=config.hop_size,
-        config=config.train_data,
+        config=config.data,
+        phonemes_to_id=phonemes_to_id,
+        speakers_to_id=speakers_to_id
     )
-    valset = VctkDataset(
-        sample_rate=config.sample_rate,
-        hop_size=config.hop_size,
-        config=config.valid_data,
-    )
+    factory.save_mapping(checkpoint)
+    trainset, valset = factory.split_train_valid(config.test_size)
     collate_fn = VctkCollate()
 
     train_loader = DataLoader(
         trainset,
-        num_workers=1,
         shuffle=False,
-        sampler=None,
         batch_size=config.batch_size,
-        pin_memory=False,
-        drop_last=True,
         collate_fn=collate_fn,
     )
     val_loader = DataLoader(
         valset,
-        sampler=None,
-        num_workers=1,
         shuffle=False,
         batch_size=config.batch_size,
-        pin_memory=False,
         collate_fn=collate_fn,
     )
 
-    return train_loader, val_loader
+    return (
+        train_loader,
+        val_loader,
+        len(factory.phoneme_to_id),
+        len(factory.speaker_to_id),
+    )
 
 
-def load_model(config: TrainParams, n_speakers: int) -> NonAttentiveTacotron:
+def load_model(
+    config: TrainParams, n_phonemes: int, n_speakers: int
+) -> NonAttentiveTacotron:
     model = NonAttentiveTacotron(
         n_mel_channels=config.n_mels,
-        n_phonems=config.n_phonemes,
+        n_phonems=n_phonemes,
         n_speakers=n_speakers,
         device=torch.device(config.device),
         config=config.model,
@@ -114,23 +130,16 @@ def validate(
 
 
 def train(config: TrainParams):
-    """Training and validation logging results to tensorboard and stdout
-    Params
-    ------
-    output_directory (string): directory to save checkpoints
-    log_directory (string) directory to save tensorboard logs
-    checkpoint_path(string): checkpoint path
-    n_gpus (int): number of gpus
-    rank (int): rank of current gpu
-    hparams (object): comma separated list of "name=value" pairs.
-    """
 
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed(config.seed)
     checkpoint_path = CHECKPOINT_DIR / config.checkpoint_name
+    checkpoint_path.mkdir(parents=True, exist_ok=True)
 
-    train_loader, val_loader = prepare_dataloaders(config)
-    model = load_model(config, len(train_loader.dataset.speaker_to_idx))
+    train_loader, val_loader, phonemes_count, speaker_count = prepare_dataloaders(
+        checkpoint_path, config
+    )
+    model = load_model(config, 71, 109)
 
     optimizer_config = config.optimizer
     optimizer = Adam(
@@ -145,16 +154,18 @@ def train(config: TrainParams):
         optimizer=optimizer,
         step_size=config.scheduler.decay_steps,
         gamma=config.scheduler.decay_rate,
-        last_epoch=config.scheduler.last_epoch,
     )
 
     criterion = NonAttentiveTacotronLoss(
-        mels_weight=config.loss.mels_weight, duration_weight=config.loss.duration_weight
+        sample_rate=config.sample_rate,
+        hop_size=config.hop_size,
+        mels_weight=config.loss.mels_weight,
+        duration_weight=config.loss.duration_weight,
     )
 
     iteration = 0
     epoch_offset = 0
-    if os.path.isfile(checkpoint_path):
+    if os.path.isfile(checkpoint_path / MODEL_NAME):
         model, optimizer, scheduler = load_checkpoint(
             checkpoint_path, model, optimizer, scheduler
         )
@@ -169,7 +180,7 @@ def train(config: TrainParams):
             durations, mel_outputs_postnet, mel_outputs = model(batch)
 
             loss = criterion(
-                mel_outputs, mel_outputs_postnet, durations, batch[3], batch[4]
+                mel_outputs, mel_outputs_postnet, durations.squeeze(2), batch[3], batch[4]
             )
             reduced_loss = loss.item()
             loss.backward()
@@ -179,6 +190,8 @@ def train(config: TrainParams):
             )
 
             optimizer.step()
+            if config.scheduler.start_decay <= i + 1 <= config.scheduler.last_epoch:
+                scheduler.step()
 
             if (i + 1) % config.log_steps == 0:
                 duration = time.perf_counter() - start
@@ -190,7 +203,9 @@ def train(config: TrainParams):
 
             if (i + 1) % config.iters_per_checkpoint == 0:
                 validate(model, criterion, val_loader, iteration)
-                save_checkpoint(checkpoint_path, model, optimizer, scheduler)
+                save_checkpoint(
+                    checkpoint_path / MODEL_NAME, model, optimizer, scheduler
+                )
 
 
 def main():
