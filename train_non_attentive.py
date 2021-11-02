@@ -1,9 +1,9 @@
 import argparse
-import os
-import time
 import json
+import os
+from dataclasses import asdict
 from pathlib import Path
-from typing import Tuple
+from typing import Dict, Tuple
 
 import torch
 from torch.optim import Adam
@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from src.constants import CHECKPOINT_DIR, LOG_DIR
-from src.data_process import VctkCollate, VCTKFactory
+from src.data_process import VCTKBatch, VctkCollate, VCTKFactory
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
 from src.train_config import TrainParams, load_config
 
@@ -106,6 +106,17 @@ def save_checkpoint(
     )
 
 
+def batch_to_device(batch: VCTKBatch, device: torch.device) -> VCTKBatch:
+    batch_on_device = VCTKBatch(
+        phonemes=batch.phonemes.to(device),
+        num_phonemes=batch.num_phonemes,
+        speaker_ids=batch.speaker_ids.to(device),
+        durations=batch.durations.to(device),
+        mels=batch.mels.to(device)
+    )
+    return batch_on_device
+
+
 def validate(
     model: NonAttentiveTacotron,
     criterion: NonAttentiveTacotronLoss,
@@ -182,11 +193,12 @@ def train(config: TrainParams):
 
     model.train()
     writer = SummaryWriter(log_dir=log_dir)
+    device = torch.device(config.device)
 
     for epoch in range(epoch_offset, config.epochs):
         for i, batch in enumerate(train_loader):
             global_step = epoch * len(train_loader) + iteration + 1
-
+            batch = batch_to_device(batch, device)
             optimizer.zero_grad()
             durations, mel_outputs_postnet, mel_outputs = model(batch)
 
@@ -194,8 +206,8 @@ def train(config: TrainParams):
                 mel_outputs,
                 mel_outputs_postnet,
                 durations.squeeze(2),
-                batch[3],
-                batch[4],
+                batch.durations,
+                batch.mels,
             )
 
             loss.backward()

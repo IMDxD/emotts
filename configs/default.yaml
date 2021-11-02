@@ -12,7 +12,7 @@ grad_clip_thresh: 1.0
 log_steps: 1000
 epochs: 2500
 test_size: 0.2
-device: "cuda:1"
+device: cuda
 loss:
   mels_weight: 1.0
   duration_weight: 2.0
@@ -28,8 +28,8 @@ scheduler:
   decay_rate: 0.5
   last_epoch: 400000
 data:
-  text_dir: data/vctk_sample/mfa_outputs
-  mels_dir: data/vctk_sample/mels
+  text_dir: data/vctk/mfa_outputs
+  mels_dir: data/vctk/mels
 model:
   encoder_config:
     n_convolutions: 3

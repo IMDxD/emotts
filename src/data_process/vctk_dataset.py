@@ -26,6 +26,16 @@ class VCTKSample:
     mels: torch.Tensor
 
 
+@dataclass
+class VCTKBatch:
+
+    phonemes: torch.Tensor
+    num_phonemes: torch.Tensor
+    speaker_ids: torch.Tensor
+    durations: torch.Tensor
+    mels: torch.Tensor
+
+
 class VctkDataset(Dataset):
     def __init__(self, data: List[VCTKSample]):
         self._dataset = data
@@ -263,10 +273,10 @@ class VctkCollate:
             mel = batch[idx].mels.squeeze(0)
             mel_padded[i, :, : mel.size(1)] = mel
         mel_padded = mel_padded.permute(0, 2, 1)
-        return (
-            text_padded,
-            input_lengths,
-            input_speaker_ids,
-            durations_padded,
-            mel_padded,
+        return VCTKBatch(
+            phonemes=text_padded,
+            num_phonemes=input_lengths,
+            speaker_ids=input_speaker_ids,
+            durations=durations_padded,
+            mels=mel_padded,
         )

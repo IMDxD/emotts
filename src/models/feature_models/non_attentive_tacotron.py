@@ -16,6 +16,7 @@ from .config import (
 )
 from .layers import ConvNorm, LinearWithActivation, PositionalEncoding
 from .utils import get_mask_from_lengths, norm_emb_layer
+from src.data_process import VCTKBatch
 
 
 class Prenet(nn.Module):
@@ -165,6 +166,7 @@ class Attention(nn.Module):
         self.range_predictor = RangePredictor(embedding_dim, config.range_config)
         self.positional_encoder = PositionalEncoding(
             config.positional_dim,
+            device,
             dropout=config.positional_dropout,
         )
 
@@ -289,13 +291,14 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(
-        self, n_mel_channels: int, attention_out_dim: int, config: DecoderParams
+        self, n_mel_channels: int, attention_out_dim: int, config: DecoderParams, device: torch.device
     ):
         super().__init__()
         self.n_mel_channels = n_mel_channels
         self.decoder_rnn_dim = config.decoder_rnn_dim
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
         self.p_decoder_dropout = config.dropout
+        self.device = device
 
         self.prenet = Prenet(
             n_mel_channels,
@@ -317,7 +320,7 @@ class Decoder(nn.Module):
 
     def forward(self, memory: torch.Tensor, y_mels: torch.Tensor) -> torch.Tensor:
 
-        previous_frame = torch.zeros(memory.shape[0], 1, self.n_mel_channels)
+        previous_frame = torch.zeros(memory.shape[0], 1, self.n_mel_channels).to(self.device)
         y_mels = torch.cat((previous_frame, y_mels[:, :-1, :]), dim=1)
         previous_frame = previous_frame[:, 0, :]
 
@@ -407,6 +410,7 @@ class NonAttentiveTacotron(nn.Module):
             n_mel_channels,
             full_embedding_dim + config.attention_config.positional_dim,
             config.decoder_config,
+            device=device
         )
         self.postnet = Postnet(
             n_mel_channels,
@@ -415,29 +419,25 @@ class NonAttentiveTacotron(nn.Module):
         self.to(self.device)
 
     def forward(
-        self,
-        batch: Tuple[
-            torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
-        ],
+        self, batch: VCTKBatch
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        text_inputs, text_lengths, speaker_ids, y_durations, y_mels = batch
 
-        phonem_emb = self.phonem_embedding(text_inputs).transpose(1, 2)
-        speaker_emb = self.speaker_embedding(speaker_ids).unsqueeze(1)
+        phonem_emb = self.phonem_embedding(batch.phonemes).transpose(1, 2)
+        speaker_emb = self.speaker_embedding(batch.speaker_ids).unsqueeze(1)
 
-        phonem_emb = self.encoder(phonem_emb, text_lengths)
+        phonem_emb = self.encoder(phonem_emb, batch.num_phonemes)
 
         speaker_emb = torch.repeat_interleave(speaker_emb, phonem_emb.shape[1], dim=1)
         embeddings = torch.cat((phonem_emb, speaker_emb), dim=-1)
 
         durations, attented_embeddings = self.attention(
-            embeddings, text_lengths, y_durations
+            embeddings, batch.num_phonemes, batch.durations
         )
-        mel_outputs = self.decoder(attented_embeddings, y_mels)
+        mel_outputs = self.decoder(attented_embeddings, batch.mels)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
         mask = get_mask_from_lengths(
-            y_durations.cumsum(dim=1)[:, -1].long(), device=self.device
+            batch.durations.cumsum(dim=1)[:, -1].long(), device=self.device
         )
         mel_outputs_postnet[mask] = 0
         mel_outputs[mask] = 0
