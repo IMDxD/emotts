@@ -9,8 +9,9 @@ import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
-from src.constants import CHECKPOINT_DIR
+from src.constants import CHECKPOINT_DIR, LOG_DIR
 from src.data_process import VctkCollate, VCTKFactory
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
 from src.train_config import TrainParams, load_config
@@ -39,7 +40,7 @@ def prepare_dataloaders(
         hop_size=config.hop_size,
         config=config.data,
         phonemes_to_id=phonemes_to_id,
-        speakers_to_id=speakers_to_id
+        speakers_to_id=speakers_to_id,
     )
     factory.save_mapping(checkpoint)
     trainset, valset = factory.split_train_valid(config.test_size)
@@ -109,7 +110,8 @@ def validate(
     model: NonAttentiveTacotron,
     criterion: NonAttentiveTacotronLoss,
     val_loader: DataLoader,
-    iteration: int,
+    global_step: int,
+    writer: SummaryWriter,
 ) -> None:
 
     model.eval()
@@ -123,10 +125,13 @@ def validate(
             )
             reduced_val_loss = loss.item()
             val_loss += reduced_val_loss
+
         val_loss = val_loss / (i + 1)
+        writer.add_scalar(
+            "Loss/valid", scalar_value=val_loss, global_step=global_step
+        )
 
     model.train()
-    print("Validation loss {}: {:9f}  ".format(iteration, val_loss))
 
 
 def train(config: TrainParams):
@@ -135,6 +140,8 @@ def train(config: TrainParams):
     torch.cuda.manual_seed(config.seed)
     checkpoint_path = CHECKPOINT_DIR / config.checkpoint_name
     checkpoint_path.mkdir(parents=True, exist_ok=True)
+    log_dir = LOG_DIR / config.checkpoint_name
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     train_loader, val_loader, phonemes_count, speaker_count = prepare_dataloaders(
         checkpoint_path, config
@@ -167,25 +174,33 @@ def train(config: TrainParams):
     epoch_offset = 0
     if os.path.isfile(checkpoint_path / MODEL_NAME):
         model, optimizer, scheduler = load_checkpoint(
-            checkpoint_path, model, optimizer, scheduler
+            checkpoint_path=checkpoint_path,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
         )
 
     model.train()
+    writer = SummaryWriter(log_dir=log_dir)
 
     for epoch in range(epoch_offset, config.epochs):
         for i, batch in enumerate(train_loader):
-            start = time.perf_counter()
+            global_step = epoch * len(train_loader) + iteration + 1
 
             optimizer.zero_grad()
             durations, mel_outputs_postnet, mel_outputs = model(batch)
 
             loss = criterion(
-                mel_outputs, mel_outputs_postnet, durations.squeeze(2), batch[3], batch[4]
+                mel_outputs,
+                mel_outputs_postnet,
+                durations.squeeze(2),
+                batch[3],
+                batch[4],
             )
-            reduced_loss = loss.item()
+
             loss.backward()
 
-            grad_norm = torch.nn.utils.clip_grad_norm_(
+            torch.nn.utils.clip_grad_norm_(
                 model.parameters(), config.grad_clip_thresh
             )
 
@@ -193,19 +208,24 @@ def train(config: TrainParams):
             if config.scheduler.start_decay <= i + 1 <= config.scheduler.last_epoch:
                 scheduler.step()
 
-            if (i + 1) % config.log_steps == 0:
-                duration = time.perf_counter() - start
-                print(
-                    "Train loss {} {:.6f} Grad Norm {:.6f} {:.2f}s/it".format(
-                        iteration, reduced_loss, grad_norm, duration
-                    )
-                )
+            if global_step % config.log_steps == 0:
+                writer.add_scalar("Loss/train", loss, global_step=global_step)
 
-            if (i + 1) % config.iters_per_checkpoint == 0:
-                validate(model, criterion, val_loader, iteration)
-                save_checkpoint(
-                    checkpoint_path / MODEL_NAME, model, optimizer, scheduler
+            if global_step % config.iters_per_checkpoint == 0:
+                validate(
+                    model=model,
+                    criterion=criterion,
+                    val_loader=val_loader,
+                    global_step=global_step,
+                    writer=writer,
                 )
+                save_checkpoint(
+                    filepath=checkpoint_path / MODEL_NAME,
+                    model=model,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                )
+    writer.close()
 
 
 def main():

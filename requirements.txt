@@ -5,6 +5,7 @@ librosa==0.8.1
 numpy==1.20.3
 pyyaml==6.0
 scipy==1.7.1
+tensorboard==2.7.0
 tgt==1.4.4
 torch==1.9.1
 torchaudio==0.9.1
