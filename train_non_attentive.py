@@ -203,7 +203,7 @@ def train(config: TrainParams):
             loss = criterion(
                 mel_outputs,
                 mel_outputs_postnet,
-                durations.squeeze(2),
+                durations,
                 batch.durations,
                 batch.mels,
             )

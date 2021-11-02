@@ -204,7 +204,7 @@ class Attention(nn.Module):
 
         embeddings_per_duration = torch.matmul(scores.transpose(1, 2), embeddings)
         embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
-        return durations, embeddings_per_duration
+        return durations.squeeze(2), embeddings_per_duration
 
     def inference(
         self, embeddings: torch.Tensor, input_lengths: torch.Tensor
