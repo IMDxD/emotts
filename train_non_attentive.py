@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-import time
 from pathlib import Path
 from typing import Tuple
 
@@ -141,7 +140,7 @@ def validate(
         writer.add_scalar(
             "Loss/valid", scalar_value=val_loss, global_step=global_step
         )
-    print("Validation loss {}: {:9f} ".format(global_step, val_loss))
+
     model.train()
 
 
@@ -195,10 +194,9 @@ def train(config: TrainParams):
     writer = SummaryWriter(log_dir=log_dir)
     device = torch.device(config.device)
 
-    start = time.perf_counter()
     for epoch in range(epoch_offset, config.epochs):
         for i, batch in enumerate(train_loader):
-            global_step = epoch * len(train_loader) + iteration + 1
+            global_step = epoch * len(train_loader) + iteration
             batch = batch_to_device(batch, device)
             optimizer.zero_grad()
             durations, mel_outputs_postnet, mel_outputs = model(batch)
@@ -211,7 +209,7 @@ def train(config: TrainParams):
                 batch.mels,
             )
 
-            grad_norm = loss.backward()
+            loss.backward()
 
             torch.nn.utils.clip_grad_norm_(
                 model.parameters(), config.grad_clip_thresh
@@ -222,12 +220,6 @@ def train(config: TrainParams):
                 scheduler.step()
 
             if global_step % config.log_steps == 0:
-                duration = time.perf_counter() - start
-                print(
-                    "Train loss {} {:.6f} Grad Norm {:.6f} {:.2f}s/it".format(
-                        iteration, loss.item(), grad_norm, duration
-                    )
-                )
                 writer.add_scalar("Loss/train", loss, global_step=global_step)
 
             if global_step % config.iters_per_checkpoint == 0:
