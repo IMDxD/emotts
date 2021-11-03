@@ -247,7 +247,7 @@ def train(config: TrainParams):
                     "Loss/train/durations", loss_durations, global_step=global_step
                 )
 
-            if global_step % config.iters_per_checkpoint != 0:
+            if global_step % config.iters_per_checkpoint == 0:
                 validate(
                     model=model,
                     criterion=criterion,
