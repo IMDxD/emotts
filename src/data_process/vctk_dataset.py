@@ -45,7 +45,7 @@ class VctkDataset(Dataset):
     def __len__(self):
         return len(self._dataset)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> VCTKSample:
         return self._dataset[idx]
 
 
@@ -150,7 +150,6 @@ class VCTKFactory:
             if self.LEXICON_OOV_TOKEN in phonemes:
                 continue
 
-            num_phonemes = len(phones_tier.intervals)
             speakers_counter = self.add_to_mapping(
                 self.speaker_to_id, sample.parent.name, speakers_counter
             )
@@ -187,7 +186,7 @@ class VCTKFactory:
             dataset.append(
                 VCTKSample(
                     phonemes=phoneme_ids,
-                    num_phonemes=num_phonemes,
+                    num_phonemes=len(phoneme_ids),
                     speaker_id=speaker_id,
                     durations=durations,
                     mels=mels,

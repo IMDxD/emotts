@@ -1,6 +1,7 @@
 import yaml
 from src.data_process.config import VCTKDatasetParams
 from src.models.feature_models.config import ModelParams
+from src.models.hifi_gan import HIFIParams
 from marshmallow_dataclass import class_schema
 from dataclasses import dataclass, field
 
@@ -38,6 +39,7 @@ class TrainParams:
     loss: LossParams
     device: str
     checkpoint_name: str
+    hifi: HIFIParams
     iters_per_checkpoint: int = field(default=10000)
     log_steps: int = field(default=1000)
     epochs: int = field(default=2500)

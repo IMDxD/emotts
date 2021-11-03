@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Tuple
 
+import numpy as np
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
@@ -11,11 +12,15 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from src.constants import CHECKPOINT_DIR, LOG_DIR
-from src.data_process import VCTKBatch, VctkCollate, VCTKFactory
+from src.data_process import VCTKBatch, VctkCollate, VCTKFactory, VctkDataset
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
 from src.train_config import TrainParams, load_config
+from src.models.hifi_gan import load_model as load_hifi
+from src.data_process.constanst import MELS_MEAN, MELS_STD
+from src.models.hifi_gan import inference
 
 MODEL_NAME = "model.pth"
+SAMPLE_SIZE = 10
 
 
 def prepare_dataloaders(
@@ -152,12 +157,48 @@ def validate(
         val_loss_prenet = val_loss_prenet / (i + 1)
         val_loss_postnet = val_loss_postnet / (i + 1)
         val_loss_durations = val_loss_durations / (i + 1)
-        writer.add_scalar("Loss/valid/total", scalar_value=val_loss, global_step=global_step)
-        writer.add_scalar("Loss/valid/prenet", scalar_value=val_loss_prenet, global_step=global_step)
-        writer.add_scalar("Loss/valid/postnet", scalar_value=val_loss_postnet, global_step=global_step)
-        writer.add_scalar("Loss/valid/durations", scalar_value=val_loss_durations, global_step=global_step)
+        writer.add_scalar(
+            "Loss/valid/total", scalar_value=val_loss, global_step=global_step
+        )
+        writer.add_scalar(
+            "Loss/valid/prenet", scalar_value=val_loss_prenet, global_step=global_step
+        )
+        writer.add_scalar(
+            "Loss/valid/postnet", scalar_value=val_loss_postnet, global_step=global_step
+        )
+        writer.add_scalar(
+            "Loss/valid/durations",
+            scalar_value=val_loss_durations,
+            global_step=global_step,
+        )
 
     model.train()
+
+
+def generate_samples(
+    model: NonAttentiveTacotron,
+    sample_rate: int,
+    global_step: int,
+    generator,
+    val_data: VctkDataset,
+    device: torch.device,
+    writer: SummaryWriter,
+):
+    idx = np.random.choice(np.arange(len(val_data)), SAMPLE_SIZE, replace=False)
+    for i in idx:
+        sample = val_data[i]
+        batch = (
+            torch.LongTensor([sample.phonemes]).to(device),
+            torch.LongTensor([sample.num_phonemes]),
+            torch.LongTensor([sample.speaker_id]).to(device),
+        )
+        output = model.inference(batch)
+        output = output.permute(0, 2, 1).squeeze(0)
+        output = output * MELS_STD.to(device) + MELS_MEAN.to(device)
+        audio = inference(generator, output, device)
+        writer.add_audio(
+            "Audio/Val", audio, sample_rate=sample_rate * 2, global_step=global_step
+        )
 
 
 def train(config: TrainParams):
@@ -169,10 +210,13 @@ def train(config: TrainParams):
     log_dir = LOG_DIR / config.checkpoint_name
     log_dir.mkdir(parents=True, exist_ok=True)
 
+    device = torch.device(config.device)
+
     train_loader, val_loader, phonemes_count, speaker_count = prepare_dataloaders(
         checkpoint_path, config
     )
     model = load_model(config, phonemes_count, speaker_count)
+    generator = load_hifi(config.hifi, device)
 
     optimizer_config = config.optimizer
     optimizer = Adam(
@@ -203,7 +247,7 @@ def train(config: TrainParams):
 
     model.train()
     writer = SummaryWriter(log_dir=log_dir)
-    device = torch.device(config.device)
+
     mels_weight = config.loss.mels_weight
     duration_weight = config.loss.duration_weight
 
@@ -247,7 +291,7 @@ def train(config: TrainParams):
                     "Loss/train/durations", loss_durations, global_step=global_step
                 )
 
-            if global_step % config.iters_per_checkpoint == 0:
+            if global_step % config.iters_per_checkpoint != 0:
                 validate(
                     model=model,
                     criterion=criterion,
@@ -255,6 +299,15 @@ def train(config: TrainParams):
                     mels_weight=mels_weight,
                     duration_weight=duration_weight,
                     global_step=global_step,
+                    writer=writer,
+                )
+                generate_samples(
+                    model=model,
+                    generator=generator,
+                    sample_rate=config.sample_rate,
+                    val_data=val_loader.dataset,
+                    global_step=global_step,
+                    device=device,
                     writer=writer,
                 )
                 save_checkpoint(

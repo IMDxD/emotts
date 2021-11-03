@@ -1,15 +1,17 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import glob
-import os
-import numpy as np
 import argparse
+import glob
 import json
+import os
+
+import numpy as np
 import torch
 from scipy.io.wavfile import write
-from env import AttrDict
-from meldataset import MAX_WAV_VALUE
-from models import Generator
+
+from .env import AttrDict
+from .meldataset import MAX_WAV_VALUE
+from .models import Generator
 
 h = None
 device = None
@@ -52,7 +54,9 @@ def inference(a):
             audio = audio * MAX_WAV_VALUE
             audio = audio.cpu().numpy().astype('int16')
 
-            output_file = os.path.join(a.output_dir, os.path.splitext(filname)[0] + '_generated_e2e.wav')
+            output_file = os.path.join(
+                a.output_dir, os.path.splitext(filname)[0] + '_generated_e2e.wav'
+            )
             write(output_file, h.sampling_rate, audio)
             print(output_file)
 
@@ -87,4 +91,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
