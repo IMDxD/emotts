@@ -11,6 +11,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from .config import VCTKDatasetParams
+from .constanst import MELS_MEAN, MELS_STD
 
 
 NUMBER = Union[int, float]
@@ -268,10 +269,13 @@ class VctkCollate:
             assert max_target_len % self.n_frames_per_step == 0
 
         # include mel padded and gate padded
-        mel_padded = torch.zeros((batch_size, num_mels, max_target_len), dtype=torch.float)
+        mel_padded = torch.zeros(
+            (batch_size, num_mels, max_target_len), dtype=torch.float
+        )
         for i, idx in enumerate(ids_sorted_decreasing):
             mel = batch[idx].mels.squeeze(0)
             mel_padded[i, :, : mel.size(1)] = mel
+        mel_padded = (mel_padded - MELS_MEAN) / MELS_STD
         mel_padded = mel_padded.permute(0, 2, 1)
         return VCTKBatch(
             phonemes=text_padded,
