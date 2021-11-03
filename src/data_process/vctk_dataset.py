@@ -172,6 +172,7 @@ class VCTKFactory:
 
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
             mels: torch.Tensor = torch.load(mels_path)
+            mels = (mels - MELS_MEAN) / MELS_STD
 
             pad_size = mels.shape[-1] - int(sum(durations))
             # assert pad_size >= 0, f'Expected {mels.shape[-1]} mel frames, got {sum(input_sample["durations"])}'
@@ -273,7 +274,7 @@ class VctkCollate:
             (batch_size, num_mels, max_target_len), dtype=torch.float
         )
         for i, idx in enumerate(ids_sorted_decreasing):
-            mel = (batch[idx].mels.squeeze(0) - MELS_MEAN) / MELS_STD
+            mel = batch[idx].mels.squeeze(0)
             mel_padded[i, :, : mel.size(1)] = mel
         mel_padded = mel_padded.permute(0, 2, 1)
         return VCTKBatch(

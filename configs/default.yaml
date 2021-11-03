@@ -9,7 +9,8 @@ checkpoint_name: non_attentive_tacotron_vctk_default
 seed: 42
 batch_size: 16
 grad_clip_thresh: 1.0
-log_steps: 100
+log_steps: 1000
+iters_per_checkpoint: 30000
 epochs: 2500
 test_size: 0.2
 device: cuda

@@ -83,7 +83,7 @@ MELS_MEAN = torch.FloatTensor(
         -8.1033,
         -8.1241,
     ]
-).view(1, -1, 1)
+).view(-1, 1)
 MELS_STD = torch.FloatTensor(
     [
         0.9299,
@@ -167,4 +167,4 @@ MELS_STD = torch.FloatTensor(
         1.7246,
         1.7272,
     ]
-).view(1, -1, 1)
+).view(-1, 1)

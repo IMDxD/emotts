@@ -120,6 +120,8 @@ def validate(
     model: NonAttentiveTacotron,
     criterion: NonAttentiveTacotronLoss,
     val_loader: DataLoader,
+    mels_weight: float,
+    duration_weight: float,
     global_step: int,
     writer: SummaryWriter,
 ) -> None:
@@ -128,17 +130,32 @@ def validate(
     with torch.no_grad():
 
         val_loss = 0.0
+        val_loss_prenet = 0.0
+        val_loss_postnet = 0.0
+        val_loss_durations = 0.0
         for i, batch in enumerate(val_loader):
             batch = batch_to_device(batch, model.device)
             durations, mel_outputs_postnet, mel_outputs = model(batch)
-            loss = criterion(
+            loss_prenet, loss_postnet, loss_durations = criterion(
                 mel_outputs, mel_outputs_postnet, durations, batch.durations, batch.mels
             )
-            reduced_val_loss = loss.item()
-            val_loss += reduced_val_loss
+            loss = (
+                mels_weight * (loss_prenet + loss_postnet)
+                + duration_weight * loss_durations
+            )
+            val_loss += loss.item()
+            val_loss_prenet += loss_prenet.item()
+            val_loss_postnet += loss_postnet.item()
+            val_loss_durations += loss_durations.item()
 
         val_loss = val_loss / (i + 1)
-        writer.add_scalar("Loss/valid", scalar_value=val_loss, global_step=global_step)
+        val_loss_prenet = val_loss_prenet / (i + 1)
+        val_loss_postnet = val_loss_postnet / (i + 1)
+        val_loss_durations = val_loss_durations / (i + 1)
+        writer.add_scalar("Loss/valid/total", scalar_value=val_loss, global_step=global_step)
+        writer.add_scalar("Loss/valid/prenet", scalar_value=val_loss_prenet, global_step=global_step)
+        writer.add_scalar("Loss/valid/postnet", scalar_value=val_loss_postnet, global_step=global_step)
+        writer.add_scalar("Loss/valid/durations", scalar_value=val_loss_durations, global_step=global_step)
 
     model.train()
 
@@ -173,10 +190,7 @@ def train(config: TrainParams):
     )
 
     criterion = NonAttentiveTacotronLoss(
-        sample_rate=config.sample_rate,
-        hop_size=config.hop_size,
-        mels_weight=config.loss.mels_weight,
-        duration_weight=config.loss.duration_weight,
+        sample_rate=config.sample_rate, hop_size=config.hop_size
     )
 
     if os.path.isfile(checkpoint_path / MODEL_NAME):
@@ -190,6 +204,8 @@ def train(config: TrainParams):
     model.train()
     writer = SummaryWriter(log_dir=log_dir)
     device = torch.device(config.device)
+    mels_weight = config.loss.mels_weight
+    duration_weight = config.loss.duration_weight
 
     for epoch in range(config.epochs):
         for i, batch in enumerate(train_loader, start=1):
@@ -198,12 +214,17 @@ def train(config: TrainParams):
             optimizer.zero_grad()
             durations, mel_outputs_postnet, mel_outputs = model(batch)
 
-            loss = criterion(
+            loss_prenet, loss_postnet, loss_durations = criterion(
                 mel_outputs,
                 mel_outputs_postnet,
                 durations,
                 batch.durations,
                 batch.mels,
+            )
+
+            loss = (
+                mels_weight * (loss_prenet + loss_postnet)
+                + duration_weight * loss_durations
             )
 
             loss.backward()
@@ -215,13 +236,24 @@ def train(config: TrainParams):
                 scheduler.step()
 
             if global_step % config.log_steps == 0:
-                writer.add_scalar("Loss/train", loss, global_step=global_step)
+                writer.add_scalar("Loss/train/total", loss, global_step=global_step)
+                writer.add_scalar(
+                    "Loss/train/prenet", loss_prenet, global_step=global_step
+                )
+                writer.add_scalar(
+                    "Loss/train/postnet", loss_postnet, global_step=global_step
+                )
+                writer.add_scalar(
+                    "Loss/train/durations", loss_durations, global_step=global_step
+                )
 
-            if global_step % config.iters_per_checkpoint == 0:
+            if global_step % config.iters_per_checkpoint != 0:
                 validate(
                     model=model,
                     criterion=criterion,
                     val_loader=val_loader,
+                    mels_weight=mels_weight,
+                    duration_weight=duration_weight,
                     global_step=global_step,
                     writer=writer,
                 )
