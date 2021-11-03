@@ -273,9 +273,8 @@ class VctkCollate:
             (batch_size, num_mels, max_target_len), dtype=torch.float
         )
         for i, idx in enumerate(ids_sorted_decreasing):
-            mel = batch[idx].mels.squeeze(0)
+            mel = (batch[idx].mels.squeeze(0) - MELS_MEAN) / MELS_STD
             mel_padded[i, :, : mel.size(1)] = mel
-        mel_padded = (mel_padded - MELS_MEAN) / MELS_STD
         mel_padded = mel_padded.permute(0, 2, 1)
         return VCTKBatch(
             phonemes=text_padded,
