@@ -33,8 +33,8 @@ scheduler:
   decay_rate: 0.5
   last_epoch: 400000
 data:
-  text_dir: data/vctk_sample/mfa_outputs
-  mels_dir: data/vctk_sample/mels
+  text_dir: data/vctk/mfa_outputs
+  mels_dir: data/vctk/mels
 model:
   encoder_config:
     n_convolutions: 3
