@@ -6,6 +6,10 @@ win_size: 1024
 n_fft: 1024
 n_mels: 80
 checkpoint_name: non_attentive_tacotron_vctk_default
+hifi:
+  dir_path: hifi
+  model_name: generator_v1
+  config_name: config.json
 seed: 42
 batch_size: 16
 grad_clip_thresh: 1.0

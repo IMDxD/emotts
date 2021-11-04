@@ -348,7 +348,7 @@ class Decoder(nn.Module):
 
     def inference(self, memory: torch.Tensor) -> torch.Tensor:
 
-        previous_frame = torch.zeros(memory.shape[0], self.n_mel_channels)
+        previous_frame = torch.zeros(memory.shape[0], self.n_mel_channels).to(self.device)
 
         mel_outputs = []
         decoder_state = None
