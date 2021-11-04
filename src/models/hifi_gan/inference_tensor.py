@@ -18,13 +18,13 @@ def load_model(config: HIFIParams, device: torch.device) -> Generator:
     generator = Generator(config).to(device)
     state_dict = torch.load(model_path, map_location=device)
     generator.load_state_dict(state_dict['generator'])
+    generator.remove_weight_norm()
+    generator.eval()
     return generator
 
 
 def inference(generator: Generator, tensor: torch.Tensor, device: torch.device) -> torch.Tensor:
 
-    generator.eval()
-    generator.remove_weight_norm()
     with torch.no_grad():
         x = tensor.unsqueeze(0).to(device)
         y_g_hat = generator(x)
