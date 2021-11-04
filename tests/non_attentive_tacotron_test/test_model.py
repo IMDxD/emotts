@@ -2,24 +2,24 @@ from unittest.mock import patch
 
 import torch
 
-from src.models.feature_models.non_attentive_tacatron.config import (
-    DecoderConfig, DurationConfig, EncoderConfig, GaussianUpsampleConfig,
-    ModelConfig, PostNetConfig, RangeConfig,
+from src.models.feature_models.config import (
+    DecoderParams, DurationParams, EncoderParams, GaussianUpsampleParams,
+    ModelParams, PostNetParams, RangeParams,
 )
-from src.models.feature_models.non_attentive_tacatron.model import (
-    Attention, Decoder, DurationPredictor, Encoder, NonAttentiveTacatron,
+from src.models.feature_models.non_attentive_tacotron import (
+    Attention, Decoder, DurationPredictor, Encoder, NonAttentiveTacotron,
     Postnet, Prenet, RangePredictor,
 )
 
-DECODER_CONFIG = DecoderConfig()
-DURATION_CONFIG = DurationConfig()
-RANGE_CONFIG = RangeConfig()
-ENCODER_CONFIG = EncoderConfig()
-ATTENTION_CONFIG = GaussianUpsampleConfig(
+DECODER_CONFIG = DecoderParams()
+DURATION_CONFIG = DurationParams()
+RANGE_CONFIG = RangeParams()
+ENCODER_CONFIG = EncoderParams()
+ATTENTION_CONFIG = GaussianUpsampleParams(
     duration_config=DURATION_CONFIG, range_config=RANGE_CONFIG
 )
-POSTNET_CONFIG = PostNetConfig()
-MODEL_CONFIG = ModelConfig(
+POSTNET_CONFIG = PostNetParams()
+MODEL_CONFIG = ModelParams(
     encoder_config=ENCODER_CONFIG,
     attention_config=ATTENTION_CONFIG,
     decoder_config=DECODER_CONFIG,
@@ -27,6 +27,7 @@ MODEL_CONFIG = ModelConfig(
 )
 N_PHONEMES = 100
 N_SPEAKER = 4
+N_MELS_DIM = 80
 EMBEDDING_DIM = MODEL_CONFIG.phonem_embedding_dim + MODEL_CONFIG.speaker_embedding_dim
 INPUT_PHONEMES = torch.randint(N_PHONEMES, size=(16, 50), dtype=torch.long)
 INPUT_SPEAKERS = torch.randint(N_SPEAKER, size=(16,), dtype=torch.long)
@@ -41,7 +42,7 @@ for i, l in enumerate(INPUT_LENGTH):
     INPUT_DURATIONS[i, l:] = 0
 DURATIONS_MAX = INPUT_DURATIONS.cumsum(dim=1).max(dim=1).values
 INPUT_MELS = torch.randn(
-    16, DURATIONS_MAX.max(), MODEL_CONFIG.n_mel_channels, dtype=torch.float
+    16, DURATIONS_MAX.max(), N_MELS_DIM, dtype=torch.float
 )
 for i, l in enumerate(DURATIONS_MAX):
     INPUT_MELS[i, l:, :] = 0
@@ -66,7 +67,7 @@ MODEL_INFERENCE_INPUT = (
 
 def test_encoder_layer():
     expected_shape = (16, 50, MODEL_CONFIG.phonem_embedding_dim)
-    layer = Encoder(ModelConfig.phonem_embedding_dim, config=ENCODER_CONFIG)
+    layer = Encoder(ModelParams.phonem_embedding_dim, config=ENCODER_CONFIG)
     out = layer(PHONEM_EMB.transpose(1, 2), INPUT_LENGTH)
     assert (
         out.shape == expected_shape
@@ -136,7 +137,7 @@ def test_attention_layer_forward():
 
 
 @patch(
-    "src.models.feature_models.non_attentive_tacatron.model.DurationPredictor.forward"
+    "src.models.feature_models.non_attentive_tacotron.DurationPredictor.forward"
 )
 def test_attention_layer_inference(mock_duration):
     mock_duration.return_value = INPUT_DURATIONS.unsqueeze(2)
@@ -158,7 +159,7 @@ def test_prenet_layer():
     expected_shape = (16, 1, DECODER_CONFIG.prenet_layers[-1])
 
     layer = Prenet(
-        MODEL_CONFIG.n_mel_channels,
+        N_MELS_DIM,
         DECODER_CONFIG.prenet_layers,
         dropout=DECODER_CONFIG.prenet_dropout,
     )
@@ -169,10 +170,10 @@ def test_prenet_layer():
 
 
 def test_decoder_layer_forward():
-    expected_shape = (16, DURATIONS_MAX.max(), MODEL_CONFIG.n_mel_channels)
+    expected_shape = (16, DURATIONS_MAX.max(), N_MELS_DIM)
 
     layer = Decoder(
-        MODEL_CONFIG.n_mel_channels,
+        N_MELS_DIM,
         ATTENTION_OUT_DIM,
         config=DECODER_CONFIG,
     )
@@ -183,10 +184,10 @@ def test_decoder_layer_forward():
 
 
 def test_decoder_layer_inference():
-    expected_shape = (16, DURATIONS_MAX.max(), MODEL_CONFIG.n_mel_channels)
+    expected_shape = (16, DURATIONS_MAX.max(), N_MELS_DIM)
 
     layer = Decoder(
-        MODEL_CONFIG.n_mel_channels,
+        N_MELS_DIM,
         ATTENTION_OUT_DIM,
         config=DECODER_CONFIG,
     )
@@ -200,7 +201,7 @@ def test_postnet_layer():
     expected_shape = INPUT_MELS.transpose(1, 2).shape
 
     layer = Postnet(
-        MODEL_CONFIG.n_mel_channels,
+        N_MELS_DIM,
         config=POSTNET_CONFIG,
     )
     out = layer(INPUT_MELS.transpose(1, 2))
@@ -213,8 +214,8 @@ def test_model_forward():
     expected_mel_shape = INPUT_MELS.shape
     expected_duration_shape = (16, 50, 1)
 
-    model = NonAttentiveTacatron(
-        N_PHONEMES, N_SPEAKER, device=torch.device("cpu"), config=MODEL_CONFIG
+    model = NonAttentiveTacotron(
+        N_PHONEMES, N_SPEAKER, N_MELS_DIM, device=torch.device("cpu"), config=MODEL_CONFIG
     )
     durations, mel_fixed, mel_predicted = model(MODEL_INPUT)
     assert (
@@ -242,14 +243,14 @@ def test_model_forward():
 
 
 @patch(
-    "src.models.feature_models.non_attentive_tacatron.model.DurationPredictor.forward"
+    "src.models.feature_models.non_attentive_tacotron.DurationPredictor.forward"
 )
 def test_model_inference(mock_duration):
     mock_duration.return_value = INPUT_DURATIONS.unsqueeze(2)
     expected_mel_shape = INPUT_MELS.shape
 
-    model = NonAttentiveTacatron(
-        N_PHONEMES, N_SPEAKER, device=torch.device("cpu"), config=MODEL_CONFIG
+    model = NonAttentiveTacotron(
+        N_PHONEMES, N_SPEAKER, N_MELS_DIM, device=torch.device("cpu"), config=MODEL_CONFIG
     )
     mel_predicted = model.inference(MODEL_INFERENCE_INPUT)
     assert (
