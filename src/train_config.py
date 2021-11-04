@@ -1,9 +1,11 @@
+from dataclasses import dataclass, field
+
 import yaml
+from marshmallow_dataclass import class_schema
+
 from src.data_process.config import VCTKDatasetParams
 from src.models.feature_models.config import ModelParams
 from src.models.hifi_gan import HIFIParams
-from marshmallow_dataclass import class_schema
-from dataclasses import dataclass, field
 
 
 @dataclass

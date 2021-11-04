@@ -12,12 +12,11 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from src.constants import CHECKPOINT_DIR, LOG_DIR
-from src.data_process import VCTKBatch, VctkCollate, VCTKFactory, VctkDataset
-from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
-from src.train_config import TrainParams, load_config
-from src.models.hifi_gan import load_model as load_hifi
+from src.data_process import VCTKBatch, VctkCollate, VctkDataset, VCTKFactory
 from src.data_process.constanst import MELS_MEAN, MELS_STD
-from src.models.hifi_gan import inference
+from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
+from src.models.hifi_gan import inference, load_model as load_hifi
+from src.train_config import TrainParams, load_config
 
 MODEL_NAME = "model.pth"
 SAMPLE_SIZE = 10

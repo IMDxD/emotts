@@ -1,8 +1,4 @@
-#/usr/bin/env python
-import sys
-
-print(sys.path)
-
+#!/usr/bin/env python
 from pathlib import Path
 
 import click
@@ -37,6 +33,7 @@ def main(input_dir: str, output_dir: str):
 
     print('Finished successfully.')
     print(f'Processed files are located at {output_dir}')
+
 
 if __name__ == '__main__':
     main()

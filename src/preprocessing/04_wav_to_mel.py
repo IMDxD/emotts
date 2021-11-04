@@ -1,4 +1,4 @@
-#/usr/bin/env python
+#!/usr/bin/env python
 from pathlib import Path
 
 import click
@@ -24,7 +24,7 @@ def spectral_normalize_torch(magnitudes: torch.Tensor) -> torch.Tensor:
 
 def mel_spectrogram(y: torch.Tensor,
                     n_fft: int = N_FFT, num_mels: int = N_MELS,
-                    sample_rate: int= SAMPLE_RATE, hop_size: int = HOP_SIZE,
+                    sample_rate: int = SAMPLE_RATE, hop_size: int = HOP_SIZE,
                     win_size: int = WIN_SIZE, fmin: int = F_MIN, fmax: int = F_MAX,
                     center: bool = False) -> torch.Tensor:
 

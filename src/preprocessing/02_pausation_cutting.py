@@ -1,4 +1,4 @@
-#/usr/bin/env python
+#!/usr/bin/env python
 from pathlib import Path
 
 import click
@@ -22,12 +22,12 @@ def main(input_dir: str, output_dir: str, target_sr: int) -> None:
     )
 
     (_,  # get_speech_ts
-    get_speech_ts_adaptive,
-    save_audio,
-    read_audio,
-    _,  # state_generator
-    _,  # single_audio_stream
-    collect_chunks) = utils
+     get_speech_ts_adaptive,
+     save_audio,
+     read_audio,
+     _,  # state_generator
+     _,  # single_audio_stream
+     collect_chunks) = utils
 
     path = Path(input_dir)
     processed_path = Path(output_dir)
@@ -55,6 +55,7 @@ def main(input_dir: str, output_dir: str, target_sr: int) -> None:
 
     print('Pausation cutting finished.')
     print(f'Trimmed files are located at {output_dir}')
+
 
 if __name__ == '__main__':
     main()
