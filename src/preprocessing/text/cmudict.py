@@ -1,6 +1,7 @@
 """ from https://github.com/keithito/tacotron """
 
 import re
+from typing import Dict, List, Optional, TextIO, Union
 
 valid_symbols = [
     'AA', 'AA0', 'AA1', 'AA2', 'AE', 'AE0', 'AE1', 'AE2', 'AH', 'AH0', 'AH1', 'AH2',
@@ -18,7 +19,7 @@ _valid_symbol_set = set(valid_symbols)
 class CMUDict:
     """Thin wrapper around CMUDict data. http://www.speech.cs.cmu.edu/cgi-bin/cmudict"""
 
-    def __init__(self, file_or_path, keep_ambiguous=True):
+    def __init__(self, file_or_path: Union[str, TextIO], keep_ambiguous: bool = True):
         if isinstance(file_or_path, str):
             with open(file_or_path, encoding="latin-1") as f:
                 entries = _parse_cmudict(f)
@@ -28,10 +29,10 @@ class CMUDict:
             entries = {word: pron for word, pron in entries.items() if len(pron) == 1}
         self._entries = entries
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._entries)
 
-    def lookup(self, word):
+    def lookup(self, word: str) -> Optional[List[str]]:
         """Returns list of ARPAbet pronunciations of the given word."""
         return self._entries.get(word.upper())
 
@@ -39,10 +40,10 @@ class CMUDict:
 _alt_re = re.compile(r"\([0-9]+\)")
 
 
-def _parse_cmudict(file):
-    cmudict = {}
+def _parse_cmudict(file: TextIO) -> Dict[str, List[str]]:
+    cmudict: Dict[str, List[str]] = {}
     for line in file:
-        if len(line) and (line[0] >= "A" and line[0] <= "Z" or line[0] == "'"):
+        if len(line) and ("A" <= line[0] <= "Z" or line[0] == "'"):
             parts = line.split("  ")
             word = re.sub(_alt_re, "", parts[0])
             pronunciation = _get_pronunciation(parts[1])
@@ -54,7 +55,7 @@ def _parse_cmudict(file):
     return cmudict
 
 
-def _get_pronunciation(s):
+def _get_pronunciation(s: str) -> Union[None, str]:
     parts = s.strip().split(" ")
     for part in parts:
         if part not in _valid_symbol_set:

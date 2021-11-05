@@ -1,5 +1,5 @@
 from .hifi_config import HIFIParams
-from .inference_tensor import load_model, inference
+from .inference_tensor import inference, load_model
+from .models import Generator
 
-
-__all__ = ["HIFIParams", "inference", "load_model"]
+__all__ = ["Generator", "HIFIParams", "inference", "load_model"]

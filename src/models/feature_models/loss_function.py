@@ -1,5 +1,8 @@
-from torch import nn
+from typing import Tuple
+
+import torch
 import torch.nn.functional as F
+from torch import nn
 
 
 class NonAttentiveTacotronLoss(nn.Module):
@@ -13,8 +16,9 @@ class NonAttentiveTacotronLoss(nn.Module):
         self.hop_size = hop_size
 
     def forward(
-        self, prenet_mels, postnet_mels, model_durations, target_durations, target_mels
-    ):
+        self, prenet_mels: torch.Tensor, postnet_mels: torch.Tensor, model_durations: torch.Tensor,
+            target_durations: torch.Tensor, target_mels: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         target_mels.requires_grad = False
         target_durations.requires_grad = False
 

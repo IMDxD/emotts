@@ -33,22 +33,22 @@ rm -rf txt wav48_silence_trimmed
 
 
 # 1. Selecting only one mic per speaker
-python src/preprocessing/01_preprocessing.py --input-dir data/raw/audio --output-dir data/processed/audio_single_mic --audio-ext flac
+python src/preprocessing/preprocessing.py --input-dir data/raw/audio --output-dir data/processed/audio_single_mic --audio-ext flac
 
 
 # 2. Pausation cutting with VAD
-python src/preprocessing/02_pausation_cutting.py --input-dir data/processed/audio_single_mic --output-dir data/processed/no_pause --target-sr 48000
+python src/preprocessing/pausation_cutting.py --input-dir data/processed/audio_single_mic --output-dir data/processed/no_pause --target-sr 48000
 
 
 # 3. Resampling
-python src/preprocessing/03_resampling.py --input-dir data/processed/no_pause --output-dir data/processed/resampled --resample-rate 22050
+python src/preprocessing/resampling.py --input-dir data/processed/no_pause --output-dir data/processed/resampled --resample-rate 22050
 
 
 # 4. Audio to Mel
-python src/preprocessing/04_wav_to_mel.py --input-dir data/processed/resampled --output-dir data/processed/mels
+python src/preprocessing/wav_to_mel.py --input-dir data/processed/resampled --output-dir data/processed/mels
 
 # 5. Text normalization
-python src/preprocessing/05_text_normalization.py --input-dir data/raw/text --output-dir data/processed/mfa_inputs
+python src/preprocessing/text_normalization.py --input-dir data/raw/text --output-dir data/processed/mfa_inputs
 
 
 # 6. Alignment with MFA
@@ -67,15 +67,15 @@ conda deactivate
 conda activate emotts
 
 # 6.1. Preprocessing
-python src/preprocessing/06_mfa_preprocessing.py --input-dir data/processed/resampled --output-dir data/processed/mfa_inputs
+python src/preprocessing/mfa_preprocessing.py --input-dir data/processed/resampled --output-dir data/processed/mfa_inputs
 
 # FINALLY, align phonemes and speech
 mfa align -t ./temp --clean -j 4 data/processed/mfa_inputs models/librispeech-lexicon.txt models/english.zip data/processed/mfa_outputs
 rm -rf temp
 
 # 7. Postprocessing
-# python src/preprocessing/07_mfa_postprocessing.py --input-dir data/processed/mfa_outputs
-python src/preprocessing/07_mfa_postprocessing.py --input-dir data/processed/mels
+# python src/preprocessing/mfa_postprocessing.py --input-dir data/processed/mfa_outputs
+python src/preprocessing/mfa_postprocessing.py --input-dir data/processed/mels
 ```
 
 MODEL_INPUT = (

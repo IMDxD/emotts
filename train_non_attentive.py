@@ -8,16 +8,15 @@ import numpy as np
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from src.constants import CHECKPOINT_DIR, LOG_DIR
-from src.data_process import VCTKBatch, VctkCollate, VCTKFactory, VctkDataset
-from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
-from src.train_config import TrainParams, load_config
-from src.models.hifi_gan import load_model as load_hifi
+from src.data_process import VCTKBatch, VctkCollate, VCTKFactory
 from src.data_process.constanst import MELS_MEAN, MELS_STD
-from src.models.hifi_gan import inference
+from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
+from src.models.hifi_gan import Generator, inference, load_model as load_hifi
+from src.train_config import TrainParams, load_config
 
 MODEL_NAME = "model.pth"
 SAMPLE_SIZE = 10
@@ -25,7 +24,7 @@ SAMPLE_SIZE = 10
 
 def prepare_dataloaders(
     checkpoint: Path, config: TrainParams
-) -> Tuple[DataLoader, DataLoader, int, int]:
+) -> Tuple[DataLoader[VCTKBatch], DataLoader[VCTKBatch], int, int]:
     # Get data, data loaders and collate function ready
     phonemes_file = checkpoint / VCTKFactory.PHONEMES_JSON_NAME
     speakers_file = checkpoint / VCTKFactory.SPEAKER_JSON_NAME
@@ -89,7 +88,7 @@ def load_checkpoint(
     model: NonAttentiveTacotron,
     optimizer: Adam,
     scheduler: StepLR,
-) -> [NonAttentiveTacotron, Adam, StepLR]:
+) -> Tuple[NonAttentiveTacotron, Adam, StepLR]:
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
     model.load_state_dict(checkpoint_dict['state_dict'])
     optimizer.load_state_dict(checkpoint_dict['optimizer'])
@@ -99,7 +98,7 @@ def load_checkpoint(
 
 def save_checkpoint(
     filepath: Path, model: NonAttentiveTacotron, optimizer: Adam, scheduler: StepLR
-):
+) -> None:
     torch.save(
         {
             'state_dict': model.state_dict(),
@@ -124,7 +123,7 @@ def batch_to_device(batch: VCTKBatch, device: torch.device) -> VCTKBatch:
 def validate(
     model: NonAttentiveTacotron,
     criterion: NonAttentiveTacotronLoss,
-    val_loader: DataLoader,
+    val_loader: DataLoader[VCTKBatch],
     mels_weight: float,
     duration_weight: float,
     global_step: int,
@@ -179,11 +178,11 @@ def generate_samples(
     model: NonAttentiveTacotron,
     sample_rate: int,
     global_step: int,
-    generator,
-    val_data: VctkDataset,
+    generator: Generator,
+    val_data: Dataset[VCTKBatch],
     device: torch.device,
     writer: SummaryWriter,
-):
+) -> None:
     idx = np.random.choice(np.arange(len(val_data)), SAMPLE_SIZE, replace=False)
     for i in idx:
         sample = val_data[i]
@@ -201,8 +200,7 @@ def generate_samples(
         )
 
 
-def train(config: TrainParams):
-
+def train(config: TrainParams) -> None:
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed(config.seed)
     checkpoint_path = CHECKPOINT_DIR / config.checkpoint_name
@@ -319,7 +317,7 @@ def train(config: TrainParams):
     writer.close()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--config', type=str, required=True, help='configuration file path'
