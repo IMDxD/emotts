@@ -1,10 +1,10 @@
-#/usr/bin/env python
+#!/usr/bin/env python
 from pathlib import Path
 
 import click
-from torchaudio import info as torchaudio_info
-from torchaudio import load as torchaudio_load
-from torchaudio import save as torchaudio_save
+from torchaudio import (
+    info as torchaudio_info, load as torchaudio_load, save as torchaudio_save,
+)
 from torchaudio.transforms import Resample
 from tqdm import tqdm
 
@@ -45,6 +45,7 @@ def main(input_dir: str, output_dir: str, resample_rate: int):
 
     print('Finished successfully.')
     print(f'Processed files are located at {output_dir}')
+
 
 if __name__ == '__main__':
     main()

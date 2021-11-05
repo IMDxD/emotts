@@ -1,27 +1,33 @@
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+import argparse
 import itertools
+import json
 import os
 import time
-import argparse
-import json
+import warnings
+
 import torch
-import torch.nn.functional as F
-from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import DistributedSampler, DataLoader
 import torch.multiprocessing as mp
+import torch.nn.functional as F
+from env import AttrDict, build_env
+from meldataset import MelDataset, get_dataset_filelist, mel_spectrogram
 from torch.distributed import init_process_group
 from torch.nn.parallel import DistributedDataParallel
-from env import AttrDict, build_env
-from meldataset import MelDataset, mel_spectrogram, get_dataset_filelist
-from models import Generator, MultiPeriodDiscriminator, MultiScaleDiscriminator, feature_loss, generator_loss,\
-    discriminator_loss
-from utils import plot_spectrogram, scan_checkpoint, load_checkpoint, save_checkpoint
+from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.tensorboard import SummaryWriter
+from utils import (
+    load_checkpoint, plot_spectrogram, save_checkpoint, scan_checkpoint,
+)
+
+from models import (
+    Generator, MultiPeriodDiscriminator, MultiScaleDiscriminator,
+    discriminator_loss, feature_loss, generator_loss,
+)
 
 torch.backends.cudnn.benchmark = True
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
-def train(rank, a, h):
+def train(rank, a, h):  # noqa: C901
     if h.num_gpus > 1:
         init_process_group(backend=h.dist_config['dist_backend'], init_method=h.dist_config['dist_url'],
                            world_size=h.dist_config['world_size'] * h.num_gpus, rank=rank)
@@ -105,7 +111,7 @@ def train(rank, a, h):
     for epoch in range(max(0, last_epoch), a.training_epochs):
         if rank == 0:
             start = time.time()
-            print("Epoch: {}".format(epoch+1))
+            print("Epoch: {}".format(epoch + 1))
 
         if h.num_gpus > 1:
             train_sampler.set_epoch(epoch)
@@ -120,7 +126,8 @@ def train(rank, a, h):
             y = y.unsqueeze(1)
 
             y_g_hat = generator(x)
-            y_g_hat_mel = mel_spectrogram(y_g_hat.squeeze(1), h.n_fft, h.num_mels, h.sampling_rate, h.hop_size, h.win_size,
+            y_g_hat_mel = mel_spectrogram(y_g_hat.squeeze(1), h.n_fft, h.num_mels, h.sampling_rate, h.hop_size,
+                                          h.win_size,
                                           h.fmin, h.fmax_for_loss)
 
             optim_d.zero_grad()
@@ -170,11 +177,11 @@ def train(rank, a, h):
                     save_checkpoint(checkpoint_path,
                                     {'generator': (generator.module if h.num_gpus > 1 else generator).state_dict()})
                     checkpoint_path = "{}/do_{:08d}".format(a.checkpoint_path, steps)
-                    save_checkpoint(checkpoint_path, 
+                    save_checkpoint(checkpoint_path,
                                     {'mpd': (mpd.module if h.num_gpus > 1
-                                                         else mpd).state_dict(),
+                                             else mpd).state_dict(),
                                      'msd': (msd.module if h.num_gpus > 1
-                                                         else msd).state_dict(),
+                                             else msd).state_dict(),
                                      'optim_g': optim_g.state_dict(), 'optim_d': optim_d.state_dict(), 'steps': steps,
                                      'epoch': epoch})
 
@@ -210,7 +217,7 @@ def train(rank, a, h):
                                 sw.add_figure('generated/y_hat_spec_{}'.format(j),
                                               plot_spectrogram(y_hat_spec.squeeze(0).cpu().numpy()), steps)
 
-                        val_err = val_err_tot / (j+1)
+                        val_err = val_err_tot / (j + 1)
                         sw.add_scalar("validation/mel_spec_error", val_err, steps)
 
                     generator.train()
@@ -219,7 +226,7 @@ def train(rank, a, h):
 
         scheduler_g.step()
         scheduler_d.step()
-        
+
         if rank == 0:
             print('Time taken for epoch {} is {} sec\n'.format(epoch + 1, int(time.time() - start)))
 

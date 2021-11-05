@@ -1,7 +1,8 @@
 """Flatten MFA files by speakers"""
-import click
 from pathlib import Path
 from shutil import move
+
+import click
 from tqdm import tqdm
 
 

@@ -13,7 +13,6 @@ from tqdm import tqdm
 from .config import VCTKDatasetParams
 from .constanst import MELS_MEAN, MELS_STD
 
-
 NUMBER = Union[int, float]
 
 

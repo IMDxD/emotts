@@ -1,14 +1,18 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (
+    absolute_import, division, print_function, unicode_literals,
+)
 
-import glob
-import os
 import argparse
+import glob
 import json
+import os
+
 import numpy as np
 import torch
-from scipy.io.wavfile import write
 from env import AttrDict
-from meldataset import mel_spectrogram, MAX_WAV_VALUE, load_wav
+from meldataset import MAX_WAV_VALUE, load_wav, mel_spectrogram
+from scipy.io.wavfile import write
+
 from models import Generator
 
 h = None
@@ -96,4 +100,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

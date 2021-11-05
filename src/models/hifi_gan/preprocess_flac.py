@@ -1,12 +1,12 @@
 from os import listdir
 from os.path import isfile, join
 from pathlib import PurePath
+
+import click
 import numpy as np
 from pydub import AudioSegment
 from scipy.io.wavfile import read, write
 from scipy.signal import resample
-
-import click
 
 
 def downsample(file_path: str, new_sample_rate: int, output_dir: str):
@@ -43,4 +43,3 @@ def main(input_dir: str, output_dir: str, sample_rate: int):
 
 if __name__ == "__main__":
     main()
-

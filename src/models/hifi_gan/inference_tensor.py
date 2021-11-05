@@ -2,11 +2,12 @@ import json
 
 import torch
 
+from src.constants import MODEL_DIR
+
 from .env import AttrDict
+from .hifi_config import HIFIParams
 from .meldataset import MAX_WAV_VALUE
 from .models import Generator
-from .hifi_config import HIFIParams
-from src.constants import MODEL_DIR
 
 
 def load_model(config: HIFIParams, device: torch.device) -> Generator:

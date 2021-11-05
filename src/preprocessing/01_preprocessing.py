@@ -1,4 +1,4 @@
-#/usr/bin/env python
+#!/usr/bin/env python
 import shutil
 from pathlib import Path
 
@@ -34,8 +34,9 @@ def main(input_dir: str, output_dir: str, audio_ext: str):
             if not new_path.exists():
                 shutil.copy(file, new_path)
 
-    print(f'Resulting number of files in {output_dir}: ' \
+    print(f'Resulting number of files in {output_dir}: '
           f'{len(list(output_dir.rglob(f"*.{audio_ext}")))}.')
+
 
 if __name__ == '__main__':
     main()

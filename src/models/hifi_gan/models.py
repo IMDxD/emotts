@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
-from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
+from torch.nn import AvgPool1d, Conv1d, Conv2d, ConvTranspose1d
+from torch.nn.utils import remove_weight_norm, spectral_norm, weight_norm
 
-from .utils import init_weights, get_padding
+from .utils import get_padding, init_weights
 
 LRELU_SLOPE = 0.1
 
@@ -43,10 +43,10 @@ class ResBlock1(torch.nn.Module):
         return x
 
     def remove_weight_norm(self):
-        for l in self.convs1:
-            remove_weight_norm(l)
-        for l in self.convs2:
-            remove_weight_norm(l)
+        for layer in self.convs1:
+            remove_weight_norm(layer)
+        for layer in self.convs2:
+            remove_weight_norm(layer)
 
 
 class ResBlock2(torch.nn.Module):
@@ -69,8 +69,8 @@ class ResBlock2(torch.nn.Module):
         return x
 
     def remove_weight_norm(self):
-        for l in self.convs:
-            remove_weight_norm(l)
+        for layer in self.convs:
+            remove_weight_norm(layer)
 
 
 class Generator(torch.nn.Module):
@@ -85,12 +85,13 @@ class Generator(torch.nn.Module):
         self.ups = nn.ModuleList()
         for i, (u, k) in enumerate(zip(h.upsample_rates, h.upsample_kernel_sizes)):
             self.ups.append(weight_norm(
-                ConvTranspose1d(h.upsample_initial_channel//(2**i), h.upsample_initial_channel//(2**(i+1)),
-                                k, u, padding=(k-u)//2)))
+                ConvTranspose1d(h.upsample_initial_channel // (2 ** i),
+                                h.upsample_initial_channel // (2 ** (i + 1)),
+                                k, u, padding=(k - u) // 2)))
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
-            ch = h.upsample_initial_channel//(2**(i+1))
+            ch = h.upsample_initial_channel // (2 ** (i + 1))
             for j, (k, d) in enumerate(zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)):
                 self.resblocks.append(resblock(h, ch, k, d))
 
@@ -106,9 +107,9 @@ class Generator(torch.nn.Module):
             xs = None
             for j in range(self.num_kernels):
                 if xs is None:
-                    xs = self.resblocks[i*self.num_kernels+j](x)
+                    xs = self.resblocks[i * self.num_kernels + j](x)
                 else:
-                    xs += self.resblocks[i*self.num_kernels+j](x)
+                    xs += self.resblocks[i * self.num_kernels + j](x)
             x = xs / self.num_kernels
         x = F.leaky_relu(x)
         x = self.conv_post(x)
@@ -118,10 +119,10 @@ class Generator(torch.nn.Module):
 
     def remove_weight_norm(self):
         print('Removing weight norm...')
-        for l in self.ups:
-            remove_weight_norm(l)
-        for l in self.resblocks:
-            l.remove_weight_norm()
+        for layer in self.ups:
+            remove_weight_norm(layer)
+        for layer in self.resblocks:
+            layer.remove_weight_norm()
         remove_weight_norm(self.conv_pre)
         remove_weight_norm(self.conv_post)
 
@@ -130,7 +131,7 @@ class DiscriminatorP(torch.nn.Module):
     def __init__(self, period, kernel_size=5, stride=3, use_spectral_norm=False):
         super(DiscriminatorP, self).__init__()
         self.period = period
-        norm_f = weight_norm if use_spectral_norm == False else spectral_norm
+        norm_f = weight_norm if not use_spectral_norm else spectral_norm
         self.convs = nn.ModuleList([
             norm_f(Conv2d(1, 32, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
             norm_f(Conv2d(32, 128, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
@@ -145,14 +146,14 @@ class DiscriminatorP(torch.nn.Module):
 
         # 1d to 2d
         b, c, t = x.shape
-        if t % self.period != 0: # pad first
+        if t % self.period != 0:  # pad first
             n_pad = self.period - (t % self.period)
             x = F.pad(x, (0, n_pad), "reflect")
             t = t + n_pad
         x = x.view(b, c, t // self.period, self.period)
 
-        for l in self.convs:
-            x = l(x)
+        for layer in self.convs:
+            x = layer(x)
             x = F.leaky_relu(x, LRELU_SLOPE)
             fmap.append(x)
         x = self.conv_post(x)
@@ -192,7 +193,7 @@ class MultiPeriodDiscriminator(torch.nn.Module):
 class DiscriminatorS(torch.nn.Module):
     def __init__(self, use_spectral_norm=False):
         super(DiscriminatorS, self).__init__()
-        norm_f = weight_norm if use_spectral_norm == False else spectral_norm
+        norm_f = weight_norm if not use_spectral_norm else spectral_norm
         self.convs = nn.ModuleList([
             norm_f(Conv1d(1, 128, 15, 1, padding=7)),
             norm_f(Conv1d(128, 128, 41, 2, groups=4, padding=20)),
@@ -206,8 +207,8 @@ class DiscriminatorS(torch.nn.Module):
 
     def forward(self, x):
         fmap = []
-        for l in self.convs:
-            x = l(x)
+        for layer in self.convs:
+            x = layer(x)
             x = F.leaky_relu(x, LRELU_SLOPE)
             fmap.append(x)
         x = self.conv_post(x)
@@ -237,8 +238,8 @@ class MultiScaleDiscriminator(torch.nn.Module):
         fmap_gs = []
         for i, d in enumerate(self.discriminators):
             if i != 0:
-                y = self.meanpools[i-1](y)
-                y_hat = self.meanpools[i-1](y_hat)
+                y = self.meanpools[i - 1](y)
+                y_hat = self.meanpools[i - 1](y_hat)
             y_d_r, fmap_r = d(y)
             y_d_g, fmap_g = d(y_hat)
             y_d_rs.append(y_d_r)
@@ -255,7 +256,7 @@ def feature_loss(fmap_r, fmap_g):
         for rl, gl in zip(dr, dg):
             loss += torch.mean(torch.abs(rl - gl))
 
-    return loss*2
+    return loss * 2
 
 
 def discriminator_loss(disc_real_outputs, disc_generated_outputs):
@@ -263,8 +264,8 @@ def discriminator_loss(disc_real_outputs, disc_generated_outputs):
     r_losses = []
     g_losses = []
     for dr, dg in zip(disc_real_outputs, disc_generated_outputs):
-        r_loss = torch.mean((1-dr)**2)
-        g_loss = torch.mean(dg**2)
+        r_loss = torch.mean((1 - dr) ** 2)
+        g_loss = torch.mean(dg ** 2)
         loss += (r_loss + g_loss)
         r_losses.append(r_loss.item())
         g_losses.append(g_loss.item())
@@ -276,9 +277,8 @@ def generator_loss(disc_outputs):
     loss = 0
     gen_losses = []
     for dg in disc_outputs:
-        l = torch.mean((1-dg)**2)
-        gen_losses.append(l)
-        loss += l
+        cur_loss = torch.mean((1 - dg) ** 2)
+        gen_losses.append(cur_loss)
+        loss += cur_loss
 
     return loss, gen_losses
-
