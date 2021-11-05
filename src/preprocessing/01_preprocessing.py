@@ -9,15 +9,13 @@ PATTERN = '_mic'
 
 
 @click.command()
-@click.option('--input-dir', type=str,
+@click.option('--input-dir', type=Path,
               help='Directory with audios to process.')
-@click.option('--output-dir', type=str, default='trimmed',
+@click.option('--output-dir', type=Path, default='trimmed',
               help='Directory for audios with pauses trimmed.')
 @click.option('--audio-ext', type=str, default='flac',
               help='Extension of audio files.')
-def main(input_dir: str, output_dir: str, audio_ext: str):
-    input_dir = Path(input_dir)
-    output_dir = Path(output_dir)
+def main(input_dir: Path, output_dir: Path, audio_ext: str) -> None:
     output_dir.mkdir(exist_ok=True, parents=True)
 
     filepath_list = list(input_dir.rglob(f'*.{audio_ext}'))

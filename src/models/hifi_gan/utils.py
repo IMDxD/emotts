@@ -1,5 +1,6 @@
 import glob
 import os
+from typing import Union
 
 import matplotlib
 import matplotlib.pylab as plt
@@ -21,37 +22,37 @@ def plot_spectrogram(spectrogram):
     return fig
 
 
-def init_weights(m, mean=0.0, std=0.01):
+def init_weights(m, mean: float = 0.0, std: float = 0.01) -> None:
     classname = m.__class__.__name__
     if classname.find("Conv") != -1:
         m.weight.data.normal_(mean, std)
 
 
-def apply_weight_norm(m):
+def apply_weight_norm(m) -> None:
     classname = m.__class__.__name__
     if classname.find("Conv") != -1:
         weight_norm(m)
 
 
-def get_padding(kernel_size, dilation=1):
+def get_padding(kernel_size: int, dilation: int = 1) -> int:
     return int((kernel_size * dilation - dilation) / 2)
 
 
-def load_checkpoint(filepath, device):
+def load_checkpoint(filepath: str, device):
     assert os.path.isfile(filepath)
-    print("Loading '{}'".format(filepath))
+    print(f"Loading '{filepath}'")
     checkpoint_dict = torch.load(filepath, map_location=device)
     print("Complete.")
     return checkpoint_dict
 
 
-def save_checkpoint(filepath, obj):
-    print("Saving checkpoint to {}".format(filepath))
+def save_checkpoint(filepath: str, obj) -> None:
+    print(f"Saving checkpoint to {filepath}")
     torch.save(obj, filepath)
     print("Complete.")
 
 
-def scan_checkpoint(cp_dir, prefix):
+def scan_checkpoint(cp_dir, prefix: str) -> Union[None, str]:
     pattern = os.path.join(cp_dir, prefix + '????????')
     cp_list = glob.glob(pattern)
     if len(cp_list) == 0:

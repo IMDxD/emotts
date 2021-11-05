@@ -52,21 +52,19 @@ def mel_spectrogram(y: torch.Tensor,
 
 
 @click.command()
-@click.option('--input-dir', type=str, required=True,
+@click.option('--input-dir', type=Path, required=True,
               help='Directory with audios to process.')
-@click.option('--output-dir', type=str, required=True,
+@click.option('--output-dir', type=Path, required=True,
               help='Directory for audios with pauses trimmed.')
-def main(input_dir: str, output_dir: str):
-    path = Path(input_dir)
-    processed_path = Path(output_dir)
-    processed_path.mkdir(exist_ok=True, parents=True)
+def main(input_dir: Path, output_dir: Path) -> None:
+    output_dir.mkdir(exist_ok=True, parents=True)
 
-    filepath_list = list(path.rglob('*.flac'))
+    filepath_list = list(input_dir.rglob('*.flac'))
     print(f'Number of audio files found: {len(filepath_list)}')
     print('Transforming audio to mel...')
 
     for file in tqdm(filepath_list):
-        new_path = processed_path / file.stem
+        new_path = output_dir / file.stem
 
         wave_tensor, _ = torchaudio.load(file)
 

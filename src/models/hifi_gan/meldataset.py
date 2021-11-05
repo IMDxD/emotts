@@ -1,6 +1,7 @@
 import math
 import os
 import random
+from typing import Iterable, TextIO, Tuple, Union
 
 import numpy as np
 import torch
@@ -12,12 +13,14 @@ from scipy.io.wavfile import read
 MAX_WAV_VALUE = 32768.0
 
 
-def load_wav(full_path):
+def load_wav(full_path: Union[str, TextIO]) -> Tuple[np.ndarray, int]:
     sampling_rate, data = read(full_path)
     return data, sampling_rate
 
 
-def dynamic_range_compression(x, c=1, clip_val=1e-5):
+def dynamic_range_compression(
+        x: Union[np.ndarray, Iterable, int, float], c: int = 1, clip_val: float = 1e-5
+) -> np.ndarray:
     return np.log(np.clip(x, a_min=clip_val, a_max=None) * c)
 
 

@@ -22,7 +22,7 @@ _whitespace_re = re.compile(r"\s+")
 
 # List of (regular expression, replacement) pairs for abbreviations:
 _abbreviations = [
-    (re.compile("\\b%s(?=[ ])" % x[0], re.IGNORECASE), x[1])
+    (re.compile(f"\\b{x[0]}(?=[ ])", re.IGNORECASE), x[1])
     for x in [
         ("mrs", "misess"),
         ("mr", "mister"),
@@ -46,36 +46,36 @@ _abbreviations = [
 ]
 
 
-def expand_abbreviations(text):
+def expand_abbreviations(text: str) -> str:
     for regex, replacement in _abbreviations:
         text = re.sub(regex, replacement, text)
     return text
 
 
-def expand_numbers(text):
+def expand_numbers(text: str) -> str:
     return normalize_numbers(text)
 
 
-def lowercase(text):
+def lowercase(text: str) -> str:
     return text.lower()
 
 
-def collapse_whitespace(text):
+def collapse_whitespace(text: str) -> str:
     return re.sub(_whitespace_re, " ", text)
 
 
-def convert_to_ascii(text):
+def convert_to_ascii(text: str) -> str:
     return unidecode(text)
 
 
-def basic_cleaners(text):
+def basic_cleaners(text: str) -> str:
     """Basic pipeline that lowercases and collapses whitespace without transliteration."""
     text = lowercase(text)
     text = collapse_whitespace(text)
     return text
 
 
-def transliteration_cleaners(text):
+def transliteration_cleaners(text: str) -> str:
     """Pipeline for non-English text that transliterates to ASCII."""
     text = convert_to_ascii(text)
     text = lowercase(text)
@@ -83,7 +83,7 @@ def transliteration_cleaners(text):
     return text
 
 
-def english_cleaners(text):
+def english_cleaners(text: str) -> str:
     """Pipeline for English text, including number and abbreviation expansion."""
     text = convert_to_ascii(text)
     text = lowercase(text)

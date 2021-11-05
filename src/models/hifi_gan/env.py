@@ -1,9 +1,10 @@
 import os
 import shutil
+from typing import Any, Dict, Tuple
 
 
-class AttrDict(dict):
-    def __init__(self, *args, **kwargs):
+class AttrDict(Dict[Any, Any]):
+    def __init__(self, *args: Tuple[Any, ...], **kwargs: Dict[str, Any]) -> None:
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
 

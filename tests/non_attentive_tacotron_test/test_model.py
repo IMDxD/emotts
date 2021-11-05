@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import torch
 
@@ -65,7 +65,7 @@ MODEL_INFERENCE_INPUT = (
 )
 
 
-def test_encoder_layer():
+def test_encoder_layer() -> None:
     expected_shape = (16, 50, MODEL_CONFIG.phonem_embedding_dim)
     layer = Encoder(ModelParams.phonem_embedding_dim, config=ENCODER_CONFIG)
     out = layer(PHONEM_EMB.transpose(1, 2), INPUT_LENGTH)
@@ -79,7 +79,7 @@ def test_encoder_layer():
         assert (out[idx, length - 1] != 0).any(), f"Wrong zero vector for id = {idx}"
 
 
-def test_duration_layer():
+def test_duration_layer() -> None:
     expected_shape = (16, 50, 1)
     layer = DurationPredictor(EMBEDDING_DIM, config=DURATION_CONFIG)
     zero_value = layer.projection.linear_layer.bias
@@ -98,7 +98,7 @@ def test_duration_layer():
         ).any(), f"Wrong zero vector for id = {idx}"
 
 
-def test_range_layer():
+def test_range_layer() -> None:
     expected_shape = (16, 50, 1)
     layer = RangePredictor(EMBEDDING_DIM, config=RANGE_CONFIG)
     zero_value = layer.projection.linear_layer.bias
@@ -117,7 +117,7 @@ def test_range_layer():
         ).any(), f"Wrong zero vector for id = {idx}"
 
 
-def test_attention_layer_forward():
+def test_attention_layer_forward() -> None:
     expected_shape_out = (
         16,
         DURATIONS_MAX.max().item(),
@@ -139,7 +139,7 @@ def test_attention_layer_forward():
 @patch(
     "src.models.feature_models.non_attentive_tacotron.DurationPredictor.forward"
 )
-def test_attention_layer_inference(mock_duration):
+def test_attention_layer_inference(mock_duration: MagicMock) -> None:
     mock_duration.return_value = INPUT_DURATIONS.unsqueeze(2)
     expected_shape_out = (
         16,
@@ -155,7 +155,7 @@ def test_attention_layer_inference(mock_duration):
     ), f"Wrong shape, expected {expected_shape_out}, got: {out.shape}"
 
 
-def test_prenet_layer():
+def test_prenet_layer() -> None:
     expected_shape = (16, 1, DECODER_CONFIG.prenet_layers[-1])
 
     layer = Prenet(
@@ -169,13 +169,14 @@ def test_prenet_layer():
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
 
 
-def test_decoder_layer_forward():
+def test_decoder_layer_forward() -> None:
     expected_shape = (16, DURATIONS_MAX.max(), N_MELS_DIM)
 
     layer = Decoder(
         N_MELS_DIM,
         ATTENTION_OUT_DIM,
         config=DECODER_CONFIG,
+        device=torch.device("cpu"),
     )
     out = layer(ATTENTION_OUT, INPUT_MELS)
     assert (
@@ -183,13 +184,14 @@ def test_decoder_layer_forward():
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
 
 
-def test_decoder_layer_inference():
+def test_decoder_layer_inference() -> None:
     expected_shape = (16, DURATIONS_MAX.max(), N_MELS_DIM)
 
     layer = Decoder(
         N_MELS_DIM,
         ATTENTION_OUT_DIM,
         config=DECODER_CONFIG,
+        device=torch.device("cpu"),
     )
     out = layer.inference(ATTENTION_OUT)
     assert (
@@ -197,7 +199,7 @@ def test_decoder_layer_inference():
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
 
 
-def test_postnet_layer():
+def test_postnet_layer() -> None:
     expected_shape = INPUT_MELS.transpose(1, 2).shape
 
     layer = Postnet(
@@ -210,7 +212,7 @@ def test_postnet_layer():
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
 
 
-def test_model_forward():
+def test_model_forward() -> None:
     expected_mel_shape = INPUT_MELS.shape
     expected_duration_shape = (16, 50, 1)
 
@@ -245,7 +247,7 @@ def test_model_forward():
 @patch(
     "src.models.feature_models.non_attentive_tacotron.DurationPredictor.forward"
 )
-def test_model_inference(mock_duration):
+def test_model_inference(mock_duration: MagicMock) -> None:
     mock_duration.return_value = INPUT_DURATIONS.unsqueeze(2)
     expected_mel_shape = INPUT_MELS.shape
 

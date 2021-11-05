@@ -36,12 +36,12 @@ class VCTKBatch:
     mels: torch.Tensor
 
 
-class VctkDataset(Dataset):
+class VctkDataset(Dataset[VCTKSample]):
     def __init__(self, data: List[VCTKSample]):
         self._dataset = data
         self._dataset.sort(key=lambda x: len(x.phonemes))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._dataset)
 
     def __getitem__(self, idx: int) -> VCTKSample:
@@ -100,16 +100,16 @@ class VCTKFactory:
         self.sample_rate = sample_rate
         self.hop_size = hop_size
         if phonemes_to_id:
-            self.phoneme_to_id = phonemes_to_id
+            self.phoneme_to_id: Dict[str, int] = phonemes_to_id
         else:
-            self.phoneme_to_id: Dict[str, int] = {
+            self.phoneme_to_id = {
                 self.PAD_TOKEN: 0,
                 self.PAUSE_TOKEN: 1,
             }
         if speakers_to_id:
-            self.speaker_to_id = speakers_to_id
+            self.speaker_to_id: Dict[str, int] = speakers_to_id
         else:
-            self.speaker_to_id: Dict[str, int] = {}
+            self.speaker_to_id = {}
         self._dataset: List[VCTKSample] = self._build_dataset()
 
     @staticmethod
@@ -216,7 +216,7 @@ class VCTKFactory:
                 train_data.append(self._dataset[i])
         return VctkDataset(train_data), VctkDataset(test_data)
 
-    def save_mapping(self, path: Path):
+    def save_mapping(self, path: Path) -> None:
         with open(path / self.SPEAKER_JSON_NAME, "w") as f:
             json.dump(self.speaker_to_id, f)
         with open(path / self.PHONEMES_JSON_NAME, "w") as f:
@@ -231,7 +231,7 @@ class VctkCollate:
     def __init__(self, n_frames_per_step: int = 1):
         self.n_frames_per_step = n_frames_per_step
 
-    def __call__(self, batch: List[VCTKSample]):
+    def __call__(self, batch: List[VCTKSample]) -> VCTKBatch:
         """Collate's training batch from normalized text and mel-spectrogram
         PARAMS
         ------
@@ -244,7 +244,7 @@ class VctkCollate:
             dim=0,
             descending=True,
         )
-        max_input_len = input_lengths[0]
+        max_input_len = int(input_lengths[0])
 
         input_speaker_ids = torch.LongTensor(
             [batch[i].speaker_id for i in ids_sorted_decreasing]
