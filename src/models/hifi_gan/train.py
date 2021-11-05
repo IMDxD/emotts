@@ -4,49 +4,52 @@ import json
 import os
 import time
 import warnings
+from typing import Optional, Union
 
 import torch
 import torch.multiprocessing as mp
 import torch.nn.functional as F
-from env import AttrDict, build_env
-from meldataset import MelDataset, get_dataset_filelist, mel_spectrogram
 from torch.distributed import init_process_group
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
-from utils import (
-    load_checkpoint, plot_spectrogram, save_checkpoint, scan_checkpoint,
-)
 
-from models import (
+from src.models.hifi_gan.env import AttrDict, build_env
+from src.models.hifi_gan.meldataset import (
+    MelDataset, get_dataset_filelist, mel_spectrogram,
+)
+from src.models.hifi_gan.models import (
     Generator, MultiPeriodDiscriminator, MultiScaleDiscriminator,
     discriminator_loss, feature_loss, generator_loss,
+)
+from src.models.hifi_gan.utils import (
+    load_checkpoint, plot_spectrogram, save_checkpoint, scan_checkpoint,
 )
 
 torch.backends.cudnn.benchmark = True
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
-def train(rank, a, h):  # noqa: C901
+def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noqa: C901
     if h.num_gpus > 1:
         init_process_group(backend=h.dist_config['dist_backend'], init_method=h.dist_config['dist_url'],
                            world_size=h.dist_config['world_size'] * h.num_gpus, rank=rank)
 
     torch.cuda.manual_seed(h.seed)
-    device = torch.device('cuda:{:d}'.format(rank))
+    device = torch.device(f"cuda:{rank:d}")
 
-    generator = Generator(h).to(device)
-    mpd = MultiPeriodDiscriminator().to(device)
-    msd = MultiScaleDiscriminator().to(device)
+    generator: Union[DistributedDataParallel, Generator] = Generator(h).to(device)
+    mpd: Union[DistributedDataParallel, MultiPeriodDiscriminator] = MultiPeriodDiscriminator().to(device)
+    msd: Union[DistributedDataParallel, MultiScaleDiscriminator] = MultiScaleDiscriminator().to(device)
 
     if rank == 0:
         print(generator)
-        os.makedirs(a.checkpoint_path, exist_ok=True)
-        print("checkpoints directory : ", a.checkpoint_path)
+        os.makedirs(arguments.checkpoint_path, exist_ok=True)
+        print("checkpoints directory : ", arguments.checkpoint_path)
 
-    if os.path.isdir(a.checkpoint_path):
-        cp_g = scan_checkpoint(a.checkpoint_path, 'g_')
-        cp_do = scan_checkpoint(a.checkpoint_path, 'do_')
+    if os.path.isdir(arguments.checkpoint_path):
+        cp_g = scan_checkpoint(arguments.checkpoint_path, 'g_')
+        cp_do = scan_checkpoint(arguments.checkpoint_path, 'do_')
 
     steps = 0
     if cp_g is None or cp_do is None:
@@ -66,9 +69,9 @@ def train(rank, a, h):  # noqa: C901
         mpd = DistributedDataParallel(mpd, device_ids=[rank]).to(device)
         msd = DistributedDataParallel(msd, device_ids=[rank]).to(device)
 
-    optim_g = torch.optim.AdamW(generator.parameters(), h.learning_rate, betas=[h.adam_b1, h.adam_b2])
+    optim_g = torch.optim.AdamW(generator.parameters(), h.learning_rate, betas=(h.adam_b1, h.adam_b2))
     optim_d = torch.optim.AdamW(itertools.chain(msd.parameters(), mpd.parameters()),
-                                h.learning_rate, betas=[h.adam_b1, h.adam_b2])
+                                h.learning_rate, betas=(h.adam_b1, h.adam_b2))
 
     if state_dict_do is not None:
         optim_g.load_state_dict(state_dict_do['optim_g'])
@@ -77,14 +80,25 @@ def train(rank, a, h):  # noqa: C901
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=h.lr_decay, last_epoch=last_epoch)
     scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=h.lr_decay, last_epoch=last_epoch)
 
-    training_filelist, validation_filelist = get_dataset_filelist(a)
+    training_filelist, validation_filelist = get_dataset_filelist(arguments)
 
-    trainset = MelDataset(training_filelist, h.segment_size, h.n_fft, h.num_mels,
-                          h.hop_size, h.win_size, h.sampling_rate, h.fmin, h.fmax, n_cache_reuse=0,
-                          shuffle=False if h.num_gpus > 1 else True, fmax_loss=h.fmax_for_loss, device=device,
-                          fine_tuning=a.fine_tuning, base_mels_path=a.input_mels_dir)
+    trainset = MelDataset(training_files=training_filelist,
+                          base_mels_path=arguments.input_mels_dir,
+                          segment_size=h.segment_size,
+                          n_fft=h.n_fft,
+                          num_mels=h.num_mels,
+                          hop_size=h.hop_size,
+                          win_size=h.win_size,
+                          sampling_rate=h.sampling_rate,
+                          fmin=h.fmin,
+                          fmax=h.fmax,
+                          fmax_loss=h.fmax_for_loss,
+                          n_cache_reuse=0,
+                          device=device,
+                          fine_tuning=arguments.fine_tuning,
+                          shuffle=False if h.num_gpus > 1 else True)
 
-    train_sampler = DistributedSampler(trainset) if h.num_gpus > 1 else None
+    train_sampler: Optional[DistributedSampler[int]] = DistributedSampler(trainset) if h.num_gpus > 1 else None
 
     train_loader = DataLoader(trainset, num_workers=h.num_workers, shuffle=False,
                               sampler=train_sampler,
@@ -93,28 +107,40 @@ def train(rank, a, h):  # noqa: C901
                               drop_last=True)
 
     if rank == 0:
-        validset = MelDataset(validation_filelist, h.segment_size, h.n_fft, h.num_mels,
-                              h.hop_size, h.win_size, h.sampling_rate, h.fmin, h.fmax, False, False, n_cache_reuse=0,
-                              fmax_loss=h.fmax_for_loss, device=device, fine_tuning=a.fine_tuning,
-                              base_mels_path=a.input_mels_dir)
+        validset = MelDataset(training_files=validation_filelist,
+                              base_mels_path=arguments.input_mels_dir,
+                              segment_size=h.segment_size,
+                              n_fft=h.n_fft,
+                              num_mels=h.num_mels,
+                              hop_size=h.hop_size,
+                              win_size=h.win_size,
+                              sampling_rate=h.sampling_rate,
+                              fmin=h.fmin,
+                              fmax=h.fmax,
+                              fmax_loss=h.fmax_for_loss,
+                              split=False,
+                              shuffle=False,
+                              fine_tuning=arguments.fine_tuning,
+                              n_cache_reuse=0,
+                              device=device)
         validation_loader = DataLoader(validset, num_workers=1, shuffle=False,
                                        sampler=None,
                                        batch_size=1,
                                        pin_memory=True,
                                        drop_last=True)
 
-        sw = SummaryWriter(os.path.join(a.checkpoint_path, 'logs'))
+        sw = SummaryWriter(os.path.join(arguments.checkpoint_path, 'logs'))
 
     generator.train()
     mpd.train()
     msd.train()
-    for epoch in range(max(0, last_epoch), a.training_epochs):
+    for epoch in range(max(0, last_epoch), arguments.training_epochs):
         if rank == 0:
             start = time.time()
             print("Epoch: {}".format(epoch + 1))
 
         if h.num_gpus > 1:
-            train_sampler.set_epoch(epoch)
+            train_sampler.set_epoch(epoch)  # type: ignore
 
         for i, batch in enumerate(train_loader):
             if rank == 0:
@@ -164,7 +190,7 @@ def train(rank, a, h):  # noqa: C901
 
             if rank == 0:
                 # STDOUT logging
-                if steps % a.stdout_interval == 0:
+                if steps % arguments.stdout_interval == 0:
                     with torch.no_grad():
                         mel_error = F.l1_loss(y_mel, y_g_hat_mel).item()
 
@@ -172,32 +198,34 @@ def train(rank, a, h):  # noqa: C901
                           format(steps, loss_gen_all, mel_error, time.time() - start_b))
 
                 # checkpointing
-                if steps % a.checkpoint_interval == 0 and steps != 0:
-                    checkpoint_path = "{}/g_{:08d}".format(a.checkpoint_path, steps)
+                if steps % arguments.checkpoint_interval == 0 and steps != 0:
+                    checkpoint_path = f"{arguments.checkpoint_path}/g_{steps:08d}"
+                    save_checkpoint(
+                        checkpoint_path,
+                        {'generator': (generator.module if h.num_gpus > 1 else generator).state_dict()}  # type: ignore
+                    )
+                    checkpoint_path = "{}/do_{:08d}".format(arguments.checkpoint_path, steps)
                     save_checkpoint(checkpoint_path,
-                                    {'generator': (generator.module if h.num_gpus > 1 else generator).state_dict()})
-                    checkpoint_path = "{}/do_{:08d}".format(a.checkpoint_path, steps)
-                    save_checkpoint(checkpoint_path,
-                                    {'mpd': (mpd.module if h.num_gpus > 1
-                                             else mpd).state_dict(),
-                                     'msd': (msd.module if h.num_gpus > 1
-                                             else msd).state_dict(),
-                                     'optim_g': optim_g.state_dict(), 'optim_d': optim_d.state_dict(), 'steps': steps,
+                                    {'mpd': (mpd.module if h.num_gpus > 1 else mpd).state_dict(),  # type: ignore
+                                     'msd': (msd.module if h.num_gpus > 1 else msd).state_dict(),  # type: ignore
+                                     'optim_g': optim_g.state_dict(),
+                                     'optim_d': optim_d.state_dict(),
+                                     'steps': steps,
                                      'epoch': epoch})
 
                 # Tensorboard summary logging
-                if steps % a.summary_interval == 0:
+                if steps % arguments.summary_interval == 0:
                     sw.add_scalar("training/gen_loss_total", loss_gen_all, steps)
                     sw.add_scalar("training/mel_spec_error", mel_error, steps)
 
                 # Validation
-                if steps % a.validation_interval == 0:  # and steps != 0:
+                if steps % arguments.validation_interval == 0:  # and steps != 0:
                     generator.eval()
                     torch.cuda.empty_cache()
-                    val_err_tot = 0
+                    val_err_tot = 0.0
                     with torch.no_grad():
-                        for j, batch in enumerate(validation_loader):
-                            x, y, _, y_mel = batch
+                        for j, batch_val in enumerate(validation_loader):
+                            x, y, _, y_mel = batch_val
                             y_g_hat = generator(x.to(device))
                             y_mel = torch.autograd.Variable(y_mel.to(device, non_blocking=True))
                             y_g_hat_mel = mel_spectrogram(y_g_hat.squeeze(1), h.n_fft, h.num_mels, h.sampling_rate,
@@ -231,7 +259,7 @@ def train(rank, a, h):  # noqa: C901
             print('Time taken for epoch {} is {} sec\n'.format(epoch + 1, int(time.time() - start)))
 
 
-def main():
+def main() -> None:
     print('Initializing Training Process..')
 
     parser = argparse.ArgumentParser()
@@ -256,7 +284,7 @@ def main():
         data = f.read()
 
     json_config = json.loads(data)
-    h = AttrDict(json_config)
+    h = AttrDict(**json_config)
     build_env(a.config, 'config.json', a.checkpoint_path)
 
     torch.manual_seed(h.seed)

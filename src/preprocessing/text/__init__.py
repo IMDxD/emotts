@@ -1,18 +1,19 @@
 """ from https://github.com/keithito/tacotron """
 import re
+from typing import Dict, List, Union
 
 from . import cleaners
 from .symbols import symbols
 
 # Mappings from symbol to numeric ID and vice versa:
-_symbol_to_id = {s: i for i, s in enumerate(symbols)}
-_id_to_symbol = {i: s for i, s in enumerate(symbols)}
+_symbol_to_id: Dict[str, int] = {s: i for i, s in enumerate(symbols)}
+_id_to_symbol: Dict[int, str] = {i: s for i, s in enumerate(symbols)}
 
 # Regular expression matching text enclosed in curly braces:
 _curly_re = re.compile(r"(.*?)\{(.+?)\}(.*)")
 
 
-def text_to_sequence(text, cleaner_names):
+def text_to_sequence(text: str, cleaner_names: List[str]) -> List[int]:
     """Converts a string of text to a sequence of IDs corresponding to the symbols in the text.
 
     The text can optionally have ARPAbet sequences enclosed in curly braces embedded
@@ -39,7 +40,7 @@ def text_to_sequence(text, cleaner_names):
     return sequence
 
 
-def sequence_to_text(sequence):
+def sequence_to_text(sequence: List[int]) -> str:
     """Converts a sequence of IDs back to a string"""
     result = ""
     for symbol_id in sequence:
@@ -52,22 +53,22 @@ def sequence_to_text(sequence):
     return result.replace("}{", " ")
 
 
-def _clean_text(text, cleaner_names):
+def _clean_text(text: str, cleaner_names: List[str]) -> str:
     for name in cleaner_names:
         cleaner = getattr(cleaners, name)
         if not cleaner:
-            raise Exception("Unknown cleaner: %s" % name)
+            raise Exception(f"Unknown cleaner: {name}")
         text = cleaner(text)
     return text
 
 
-def _symbols_to_sequence(symbols):
+def _symbols_to_sequence(symbols: Union[str, List[str]]) -> List[int]:
     return [_symbol_to_id[s] for s in symbols if _should_keep_symbol(s)]
 
 
-def _arpabet_to_sequence(text):
+def _arpabet_to_sequence(text: str) -> List[int]:
     return _symbols_to_sequence(["@" + s for s in text.split()])
 
 
-def _should_keep_symbol(s):
+def _should_keep_symbol(s: str) -> bool:
     return s in _symbol_to_id and s != "_" and s != "~"

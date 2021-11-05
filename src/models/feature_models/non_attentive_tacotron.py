@@ -6,13 +6,16 @@ from torch import nn
 from torch.nn import functional as f
 
 from src.data_process import VCTKBatch
-
-from .config import (
+from src.models.feature_models.config import (
     DecoderParams, DurationParams, EncoderParams, GaussianUpsampleParams,
     ModelParams, PostNetParams, RangeParams,
 )
-from .layers import ConvNorm, LinearWithActivation, PositionalEncoding
-from .utils import get_mask_from_lengths, norm_emb_layer
+from src.models.feature_models.layers import (
+    ConvNorm, LinearWithActivation, PositionalEncoding,
+)
+from src.models.feature_models.utils import (
+    get_mask_from_lengths, norm_emb_layer,
+)
 
 
 class Prenet(nn.Module):
@@ -39,21 +42,16 @@ class Postnet(nn.Module):
     def __init__(self, n_mel_channels: int, config: PostNetParams):
         super().__init__()
         self.dropout = config.dropout
-        convolutions: List[nn.Module] = []
-
-        convolutions.append(
-            ConvNorm(
-                n_mel_channels,
-                config.embedding_dim,
-                kernel_size=config.kernel_size,
-                stride=1,
-                padding=int((config.kernel_size - 1) / 2),
-                dilation=1,
-                dropout_rate=config.dropout,
-                w_init_gain="tanh",
-            )
-        )
-        convolutions.append(nn.Tanh())
+        convolutions: List[nn.Module] = [ConvNorm(
+            n_mel_channels,
+            config.embedding_dim,
+            kernel_size=config.kernel_size,
+            stride=1,
+            padding=int((config.kernel_size - 1) / 2),
+            dilation=1,
+            dropout_rate=config.dropout,
+            w_init_gain="tanh",
+        ), nn.Tanh()]
 
         for _ in range(config.n_convolutions - 2):
             convolutions.append(

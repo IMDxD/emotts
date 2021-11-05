@@ -7,14 +7,11 @@ from tqdm import tqdm
 
 
 @click.command()
-@click.option('--input-dir', type=str, required=True,
+@click.option('--input-dir', type=Path, required=True,
               help='Directory to move audio from.')
-@click.option('--output-dir', type=str, required=True,
+@click.option('--output-dir', type=Path, required=True,
               help='Directory to move audio to.')
-def main(input_dir: str, output_dir: str):
-    input_dir = Path(input_dir)
-    output_dir = Path(output_dir)
-
+def main(input_dir: Path, output_dir: Path) -> None:
     file_cnt = 0
     for dir_path in tqdm(input_dir.iterdir()):
         for file in dir_path.iterdir():

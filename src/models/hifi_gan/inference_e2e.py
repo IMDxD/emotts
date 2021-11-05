@@ -3,7 +3,6 @@ from __future__ import (
 )
 
 import argparse
-import glob
 import json
 import os
 
@@ -11,45 +10,27 @@ import numpy as np
 import torch
 from scipy.io.wavfile import write
 
-from .env import AttrDict
-from .meldataset import MAX_WAV_VALUE
-from .models import Generator
-
-h = None
-device = None
+from src.models.hifi_gan.env import AttrDict
+from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
+from src.models.hifi_gan.models import Generator
+from src.models.hifi_gan.utils import load_checkpoint
 
 
-def load_checkpoint(filepath, device):
-    assert os.path.isfile(filepath)
-    print("Loading '{}'".format(filepath))
-    checkpoint_dict = torch.load(filepath, map_location=device)
-    print("Complete.")
-    return checkpoint_dict
-
-
-def scan_checkpoint(cp_dir, prefix):
-    pattern = os.path.join(cp_dir, prefix + '*')
-    cp_list = glob.glob(pattern)
-    if len(cp_list) == 0:
-        return ''
-    return sorted(cp_list)[-1]
-
-
-def inference(a):
+def inference(arguments: argparse.Namespace, h: AttrDict, device: torch.device) -> None:
     generator = Generator(h).to(device)
 
-    state_dict_g = load_checkpoint(a.checkpoint_file, device)
+    state_dict_g = load_checkpoint(arguments.checkpoint_file, device)
     generator.load_state_dict(state_dict_g['generator'])
 
-    filelist = os.listdir(a.input_mels_dir)
+    filelist = os.listdir(arguments.input_mels_dir)
 
-    os.makedirs(a.output_dir, exist_ok=True)
+    os.makedirs(arguments.output_dir, exist_ok=True)
 
     generator.eval()
     generator.remove_weight_norm()
     with torch.no_grad():
-        for i, filname in enumerate(filelist):
-            x = np.load(os.path.join(a.input_mels_dir, filname))
+        for i, filename in enumerate(filelist):
+            x = np.load(os.path.join(arguments.input_mels_dir, filename))
             x = torch.FloatTensor(x).to(device)
             y_g_hat = generator(x)
             audio = y_g_hat.squeeze()
@@ -57,38 +38,36 @@ def inference(a):
             audio = audio.cpu().numpy().astype('int16')
 
             output_file = os.path.join(
-                a.output_dir, os.path.splitext(filname)[0] + '_generated_e2e.wav'
+                arguments.output_dir, os.path.splitext(filename)[0] + '_generated_e2e.wav'
             )
             write(output_file, h.sampling_rate, audio)
             print(output_file)
 
 
-def main():
+def main() -> None:
     print('Initializing Inference Process..')
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_mels_dir', default='test_mel_files')
     parser.add_argument('--output_dir', default='generated_files_from_mel')
     parser.add_argument('--checkpoint_file', required=True)
-    a = parser.parse_args()
+    arguments = parser.parse_args()
 
-    config_file = os.path.join(os.path.split(a.checkpoint_file)[0], 'config.json')
+    config_file = os.path.join(os.path.split(arguments.checkpoint_file)[0], 'config.json')
     with open(config_file) as f:
         data = f.read()
 
-    global h
     json_config = json.loads(data)
-    h = AttrDict(json_config)
+    h = AttrDict(**json_config)
 
     torch.manual_seed(h.seed)
-    global device
     if torch.cuda.is_available():
         torch.cuda.manual_seed(h.seed)
         device = torch.device('cuda')
     else:
         device = torch.device('cpu')
 
-    inference(a)
+    inference(arguments, h, device)
 
 
 if __name__ == '__main__':
