@@ -27,7 +27,7 @@ torch.backends.cudnn.benchmark = True
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
-def train(rank, a, h):
+def train(rank, a, h):  # noqa: C901
     if h.num_gpus > 1:
         init_process_group(backend=h.dist_config['dist_backend'], init_method=h.dist_config['dist_url'],
                            world_size=h.dist_config['world_size'] * h.num_gpus, rank=rank)
