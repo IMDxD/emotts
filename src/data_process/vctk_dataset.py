@@ -10,8 +10,8 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from .config import VCTKDatasetParams
-from .constanst import MELS_MEAN, MELS_STD
+from src.data_process.config import VCTKDatasetParams
+from src.data_process.constanst import MELS_MEAN, MELS_STD
 
 NUMBER = Union[int, float]
 

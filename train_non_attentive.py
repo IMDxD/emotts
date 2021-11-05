@@ -2,17 +2,17 @@ import argparse
 import json
 import os
 from pathlib import Path
-from typing import Any, Tuple
+from typing import Tuple
 
 import numpy as np
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from src.constants import CHECKPOINT_DIR, LOG_DIR
-from src.data_process import VCTKBatch, VctkCollate, VctkDataset, VCTKFactory
+from src.data_process import VCTKBatch, VctkCollate, VCTKFactory
 from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
 from src.models.hifi_gan import Generator, inference, load_model as load_hifi
@@ -179,7 +179,7 @@ def generate_samples(
     sample_rate: int,
     global_step: int,
     generator: Generator,
-    val_data: VctkDataset,
+    val_data: Dataset[VCTKBatch],
     device: torch.device,
     writer: SummaryWriter,
 ) -> None:

@@ -3,19 +3,18 @@ import json
 import torch
 
 from src.constants import MODEL_DIR
+from src.models.hifi_gan.env import AttrDict
+from src.models.hifi_gan.hifi_config import HIFIParams
+from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
+from src.models.hifi_gan.models import Generator
 
-from .env import AttrDict
-from .hifi_config import HIFIParams
-from .meldataset import MAX_WAV_VALUE
-from .models import Generator
 
-
-def load_model(config: HIFIParams, device: torch.device) -> Generator:
-    dir_path = MODEL_DIR / config.dir_path
-    config_path = dir_path / config.config_name
-    model_path = dir_path / config.model_name
+def load_model(hifi_config: HIFIParams, device: torch.device) -> Generator:
+    dir_path = MODEL_DIR / hifi_config.dir_path
+    config_path = dir_path / hifi_config.config_name
+    model_path = dir_path / hifi_config.model_name
     with open(config_path) as f:
-        config = AttrDict(json.load(f))
+        config = AttrDict(**json.load(f))
     generator = Generator(config).to(device)
     state_dict = torch.load(model_path, map_location=device)
     generator.load_state_dict(state_dict['generator'])
