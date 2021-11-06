@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from src.constants import CHECKPOINT_DIR, LOG_DIR
+from src.constants import CHECKPOINT_DIR, LOG_DIR, FEATURE_MODEL_FILENAME
 from src.data_process import VCTKBatch, VctkCollate, VctkDataset, VCTKFactory
 from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
@@ -20,7 +20,6 @@ from src.train_config import TrainParams, load_config
 
 class Trainer:
 
-    MODEL_FILENAME = "model.pth"
     OPTIMIZER_FILENAME = "optimizer.pth"
     SCHEDULER_FILENAME = "scheduler.pth"
     ITERATION_FILENAME = "iter.json"
@@ -97,7 +96,7 @@ class Trainer:
         return True
 
     def checkpoint_is_exist(self):
-        if not os.path.isfile(self.checkpoint_path / self.MODEL_FILENAME):
+        if not os.path.isfile(self.checkpoint_path / FEATURE_MODEL_FILENAME):
             return False
         if not os.path.isfile(self.checkpoint_path / self.OPTIMIZER_FILENAME):
             return False
@@ -125,7 +124,7 @@ class Trainer:
     def upload_checkpoints(self):
         if self.checkpoint_is_exist():
             feature_model: NonAttentiveTacotron = torch.load(
-                self.checkpoint_path / self.MODEL_FILENAME, map_location=self.device
+                self.checkpoint_path / FEATURE_MODEL_FILENAME, map_location=self.device
             )
             optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
                 self.checkpoint_path / self.OPTIMIZER_FILENAME, map_location=self.device
@@ -151,7 +150,7 @@ class Trainer:
                 self.EPOCH_NAME: epoch,
                 self.ITERATION_NAME: iteration
             }, f)
-        torch.save(self.feature_model, self.checkpoint_path / self.MODEL_FILENAME)
+        torch.save(self.feature_model, self.checkpoint_path / FEATURE_MODEL_FILENAME)
         torch.save(self.optimizer.state_dict(), self.checkpoint_path / self.OPTIMIZER_FILENAME)
         torch.save(self.scheduler, self.checkpoint_path / self.SCHEDULER_FILENAME)
 
