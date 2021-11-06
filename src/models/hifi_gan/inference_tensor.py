@@ -5,7 +5,6 @@ import torch
 from src.constants import MODEL_DIR
 from src.models.hifi_gan.env import AttrDict
 from src.models.hifi_gan.hifi_config import HIFIParams
-from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
 from src.models.hifi_gan.models import Generator
 
 
@@ -29,5 +28,4 @@ def inference(generator: Generator, tensor: torch.Tensor, device: torch.device) 
         x = tensor.unsqueeze(0).to(device)
         y_g_hat = generator(x)
         audio = y_g_hat.squeeze()
-        audio = audio * MAX_WAV_VALUE
-    return audio.type(torch.int16)
+    return audio
