@@ -1,6 +1,7 @@
 import pathlib
 import re
 import subprocess
+from typing import List, Tuple
 
 import torch
 from scipy.io.wavfile import write as wav_write
@@ -19,7 +20,7 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 G2P_OUTPUT_PATH = "predictions/to_g2p.txt"
 AUDIO_OUTPUT_PATH = "predictions/generated.wav"
 G2P_MODEL_PATH = "models/g2p/english_g2p.zip"
-TACOTRON_MODEL_PATH = "models/tacotron/model.pth"
+TACOTRON_MODEL_PATH = "models/tacotron/model_full.pth"
 HIFI_PARAMS = HIFIParams(
     dir_path="hifi", config_name="config.json", model_name="generator_v1"
 )
@@ -112,7 +113,7 @@ def text_to_file(user_query: str) -> None:
     text_path.unlink()
 
 
-def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> list[int]:
+def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> List[int]:
     with open(g2p_path, "r") as fin:
         phonemes_ids = []
         for line in fin:
@@ -124,8 +125,8 @@ def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> list[int]:
 
 
 def get_tacotron_batch(
-        phonemes_ids: list[int], speaker_id: int = 0, device: torch.device = DEVICE
-) -> tuple[torch.Tensor, torch.LongTensor, torch.Tensor]:
+        phonemes_ids: List[int], speaker_id: int = 0, device: torch.device = DEVICE
+) -> Tuple[torch.Tensor, torch.LongTensor, torch.Tensor]:
     text_lengths_tensor = torch.LongTensor([len(phonemes_ids)])
     phonemes_ids_tensor = torch.LongTensor(phonemes_ids).unsqueeze(0).to(device)
     speaker_ids_tensor = torch.LongTensor([speaker_id]).to(device)
