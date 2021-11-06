@@ -36,7 +36,7 @@ class VCTKBatch:
     mels: torch.Tensor
 
 
-class VctkDataset(Dataset[VCTKSample]):
+class VCTKDataset(Dataset[VCTKSample]):
     def __init__(self, data: List[VCTKSample]):
         self._dataset = data
         self._dataset.sort(key=lambda x: len(x.phonemes))
@@ -186,7 +186,7 @@ class VCTKFactory:
 
     def split_train_valid(
         self, test_fraction: float
-    ) -> Tuple[VctkDataset, VctkDataset]:
+    ) -> Tuple[VCTKDataset, VCTKDataset]:
         speakers_to_data_id: Dict[int, List[int]] = defaultdict(list)
 
         for i, sample in enumerate(self._dataset):
@@ -205,10 +205,10 @@ class VCTKFactory:
                 test_data.append(self._dataset[i])
             else:
                 train_data.append(self._dataset[i])
-        return VctkDataset(train_data), VctkDataset(test_data)
+        return VCTKDataset(train_data), VCTKDataset(test_data)
 
 
-class VctkCollate:
+class VCTKCollate:
     """
     Zero-pads model inputs and targets based on number of frames per setep
     """

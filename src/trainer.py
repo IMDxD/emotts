@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Dict, OrderedDict
+from typing import Dict, OrderedDict, Tuple
 
 import numpy as np
 import torch
@@ -10,8 +10,8 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from src.constants import CHECKPOINT_DIR, LOG_DIR, FEATURE_MODEL_FILENAME
-from src.data_process import VCTKBatch, VctkCollate, VctkDataset, VCTKFactory
+from src.constants import CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, LOG_DIR
+from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
 from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
 from src.models.hifi_gan import Generator, load_model as load_hifi
@@ -84,18 +84,18 @@ class Trainer:
         )
         return batch_on_device
 
-    def create_dirs(self):
+    def create_dirs(self) -> None:
         self.checkpoint_path.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-    def mapping_is_exist(self):
+    def mapping_is_exist(self) -> bool:
         if not os.path.isfile(self.checkpoint_path / self.SPEAKERS_FILENAME):
             return False
         if not os.path.isfile(self.checkpoint_path / self.PHONEMES_FILENAME):
             return False
         return True
 
-    def checkpoint_is_exist(self):
+    def checkpoint_is_exist(self) -> bool:  # noqa: CFQ004
         if not os.path.isfile(self.checkpoint_path / FEATURE_MODEL_FILENAME):
             return False
         if not os.path.isfile(self.checkpoint_path / self.OPTIMIZER_FILENAME):
@@ -114,14 +114,14 @@ class Trainer:
                     return False
         return True
 
-    def upload_mapping(self):
+    def upload_mapping(self) -> None:
         if self.mapping_is_exist():
             with open(self.checkpoint_path / self.SPEAKERS_FILENAME) as f:
-                self.speakers_to_id: Dict[str, int] = json.load(f)
+                self.speakers_to_id.update(json.load(f))
             with open(self.checkpoint_path / self.PHONEMES_FILENAME) as f:
-                self.phonemes_to_id: Dict[str, int] = json.load(f)
+                self.phonemes_to_id.update(json.load(f))
 
-    def upload_checkpoints(self):
+    def upload_checkpoints(self) -> None:
         if self.checkpoint_is_exist():
             feature_model: NonAttentiveTacotron = torch.load(
                 self.checkpoint_path / FEATURE_MODEL_FILENAME, map_location=self.device
@@ -154,7 +154,7 @@ class Trainer:
         torch.save(self.optimizer.state_dict(), self.checkpoint_path / self.OPTIMIZER_FILENAME)
         torch.save(self.scheduler, self.checkpoint_path / self.SCHEDULER_FILENAME)
 
-    def prepare_loaders(self):
+    def prepare_loaders(self) -> Tuple[DataLoader[VCTKBatch], DataLoader[VCTKBatch]]:
 
         factory = VCTKFactory(
             sample_rate=self.config.sample_rate,
@@ -166,7 +166,7 @@ class Trainer:
         self.phonemes_to_id = factory.phoneme_to_id
         self.speakers_to_id = factory.speaker_to_id
         trainset, valset = factory.split_train_valid(self.config.test_size)
-        collate_fn = VctkCollate()
+        collate_fn = VCTKCollate()
 
         train_loader = DataLoader(
             trainset,
@@ -181,7 +181,7 @@ class Trainer:
             collate_fn=collate_fn,
         )
 
-        return train_loader, val_loader
+        return train_loader, val_loader  # type: ignore
 
     def write_losses(
         self,
@@ -191,7 +191,7 @@ class Trainer:
         postnet_loss: float,
         durations_loss: float,
         global_step: int,
-    ):
+    ) -> None:
         self.writer.add_scalar(f"Loss/{tag}/total", total_loss, global_step=global_step)
         self.writer.add_scalar(
             f"Loss/{tag}/prenet", prenet_loss, global_step=global_step
@@ -210,7 +210,7 @@ class Trainer:
             audio = y_g_hat.squeeze()
         return audio
 
-    def train(self):
+    def train(self) -> None:
         torch.manual_seed(self.config.seed)
         torch.cuda.manual_seed(self.config.seed)
 
@@ -277,13 +277,13 @@ class Trainer:
             self.iteration_step = 1
         self.writer.close()
 
-    def validate(self, global_step: int):
+    def validate(self, global_step: int) -> None:
         with torch.no_grad():
             val_loss = 0.0
             val_loss_prenet = 0.0
             val_loss_postnet = 0.0
             val_loss_durations = 0.0
-            for i, batch in enumerate(self.valid_loader):
+            for batch in self.valid_loader:
                 batch = self.batch_to_device(batch, self.feature_model.device)
                 durations, mel_outputs_postnet, mel_outputs = self.feature_model(batch)
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
@@ -302,10 +302,10 @@ class Trainer:
                 val_loss_postnet += loss_postnet.item()
                 val_loss_durations += loss_durations.item()
 
-            val_loss = val_loss / (i + 1)
-            val_loss_prenet = val_loss_prenet / (i + 1)
-            val_loss_postnet = val_loss_postnet / (i + 1)
-            val_loss_durations = val_loss_durations / (i + 1)
+            val_loss = val_loss / len(self.valid_loader)
+            val_loss_prenet = val_loss_prenet / len(self.valid_loader)
+            val_loss_postnet = val_loss_postnet / len(self.valid_loader)
+            val_loss_durations = val_loss_durations / len(self.valid_loader)
             self.write_losses(
                 "valid",
                 val_loss,
@@ -319,7 +319,7 @@ class Trainer:
         self,
         global_step: int,
     ) -> None:
-        valid_dataset: VctkDataset = self.valid_loader.dataset
+        valid_dataset: VCTKDataset = self.valid_loader.dataset  # type: ignore
         idx: np.ndarray = np.random.choice(
             np.arange(len(valid_dataset)), self.SAMPLE_SIZE, replace=False
         )
