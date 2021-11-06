@@ -335,6 +335,6 @@ class Trainer:
             self.writer.add_audio(
                 f"Audio/Val/{i}",
                 audio,
-                sample_rate=self.config.sample_rate * 2,
+                sample_rate=self.config.sample_rate,
                 global_step=global_step,
             )
