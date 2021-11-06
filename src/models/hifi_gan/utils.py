@@ -11,7 +11,7 @@ matplotlib.use("Agg")
 
 
 def plot_spectrogram(
-        spectrogram: Union[np.ndarray[int, np.dtype[np.float32]], torch.Tensor]
+        spectrogram: Union[np.ndarray, torch.Tensor]
 ) -> matplotlib.figure.Figure:
     fig, ax = plt.subplots(figsize=(10, 2))
     im = ax.imshow(spectrogram, aspect="auto", origin="lower",

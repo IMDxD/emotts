@@ -12,7 +12,7 @@ from librosa.util import normalize
 from scipy.io.wavfile import read
 
 MAX_WAV_VALUE = 32768.0
-AudioData = np.ndarray[int, np.dtype[Union[np.uint8, np.int16, np.int32, np.float32]]]
+AudioData = np.ndarray
 
 
 def load_wav(full_path: Union[str, TextIO]) -> Tuple[AudioData, int]:
@@ -24,13 +24,13 @@ def dynamic_range_compression(
         x: Any,
         c: int = 1,
         clip_val: float = 1e-5,
-) -> np.ndarray[int, np.dtype[np.float32]]:
+) -> np.ndarray:
     return np.log(np.clip(x, a_min=clip_val, a_max=None) * c)
 
 
 def dynamic_range_decompression(
-        x: np.ndarray[int, np.dtype[np.float32]], c: int = 1
-) -> np.ndarray[int, np.dtype[np.float32]]:
+        x: np.ndarray, c: int = 1
+) -> np.ndarray:
     return np.exp(x) / c
 
 
