@@ -92,7 +92,7 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noq
                           sampling_rate=h.sampling_rate,
                           fmin=h.fmin,
                           fmax=h.fmax,
-                          fmax_loss=h.fmax_for_loss,
+                          fmax_loss=h.fmax_loss,
                           n_cache_reuse=0,
                           device=device,
                           fine_tuning=arguments.fine_tuning,
@@ -117,7 +117,7 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noq
                               sampling_rate=h.sampling_rate,
                               fmin=h.fmin,
                               fmax=h.fmax,
-                              fmax_loss=h.fmax_for_loss,
+                              fmax_loss=h.fmax_loss,
                               split=False,
                               shuffle=False,
                               fine_tuning=arguments.fine_tuning,
@@ -154,7 +154,7 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noq
             y_g_hat = generator(x)
             y_g_hat_mel = mel_spectrogram(y_g_hat.squeeze(1), h.n_fft, h.num_mels, h.sampling_rate, h.hop_size,
                                           h.win_size,
-                                          h.fmin, h.fmax_for_loss)
+                                          h.fmin, h.fmax_loss)
 
             optim_d.zero_grad()
 
@@ -230,7 +230,7 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noq
                             y_mel = torch.autograd.Variable(y_mel.to(device, non_blocking=True))
                             y_g_hat_mel = mel_spectrogram(y_g_hat.squeeze(1), h.n_fft, h.num_mels, h.sampling_rate,
                                                           h.hop_size, h.win_size,
-                                                          h.fmin, h.fmax_for_loss)
+                                                          h.fmin, h.fmax_loss)
                             val_err_tot += F.l1_loss(y_mel, y_g_hat_mel).item()
 
                             if j <= 4:
