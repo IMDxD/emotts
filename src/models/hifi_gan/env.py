@@ -17,6 +17,7 @@ class AttrDict:
     upsample_rates: List[int]
     upsample_kernel_sizes: List[int]
     upsample_initial_channel: int
+    resblock_initial_channel: int
     resblock_kernel_sizes: List[int]
     resblock_dilation_sizes: List[List[int]]
     segment_size: int
@@ -28,7 +29,7 @@ class AttrDict:
     sampling_rate: int
     fmin: int
     fmax: int
-    fmax_for_loss: Optional[int]
+    fmax_loss: Optional[int]
     num_workers: int
     dist_config: Dict[str, Any]
 

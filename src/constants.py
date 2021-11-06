@@ -1,4 +1,7 @@
 from pathlib import Path
+from typing import Union
+
+PATHLIKE = Union[str, Path]
 
 CHECKPOINT_DIR = Path("checkpoints")
 DATA_DIR = Path("checkpoints")

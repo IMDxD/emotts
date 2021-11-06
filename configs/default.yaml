@@ -20,7 +20,7 @@ test_size: 0.2
 device: cuda
 loss:
   mels_weight: 1.0
-  duration_weight: 2.0
+  duration_weight: 200.0
 optimizer:
   learning_rate: 0.001
   adam_beta1: 0.9
