@@ -6,16 +6,10 @@ import torch
 from scipy.io.wavfile import write as wav_write
 
 from src.data_process.constanst import MELS_MEAN, MELS_STD
-from src.models.feature_models.config import (
-    DecoderParams, DurationParams, EncoderParams, GaussianUpsampleParams,
-    ModelParams, PostNetParams, RangeParams,
-)
-from src.models.feature_models.non_attentive_tacotron import (
-    NonAttentiveTacotron,
-)
 from src.models.hifi_gan import load_model as load_hifi
 from src.models.hifi_gan.hifi_config import HIFIParams
 from src.models.hifi_gan.inference_tensor import inference as hifi_inference
+from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
 from src.preprocessing.text.cleaners import english_cleaners
 
 SAMPLING_RATE = 22050
@@ -106,7 +100,7 @@ PHONEMES_TO_IDS = {
 N_PHONEMES = len(PHONEMES_TO_IDS)
 
 
-def text_to_file(user_query: str):
+def text_to_file(user_query: str) -> None:
     text_path = pathlib.Path("tmp.txt")
     with open(text_path, "w") as fout:
         normalized_content = english_cleaners(user_query)
@@ -118,7 +112,7 @@ def text_to_file(user_query: str):
     text_path.unlink()
 
 
-def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> list:
+def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> list[int]:
     with open(g2p_path, "r") as fin:
         phonemes_ids = []
         for line in fin:
@@ -129,11 +123,13 @@ def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> list:
     return phonemes_ids
 
 
-def get_tacotron_batch(phonemes_ids: list, speaker_id: int = 0, device=DEVICE):
-    text_lengths = torch.LongTensor([len(phonemes_ids)])
-    phonemes_ids = torch.LongTensor(phonemes_ids).unsqueeze(0).to(device)
-    speaker_ids = torch.LongTensor([speaker_id]).to(device)
-    return phonemes_ids, text_lengths, speaker_ids
+def get_tacotron_batch(
+        phonemes_ids: list[int], speaker_id: int = 0, device: torch.device = DEVICE
+) -> tuple[torch.Tensor, torch.LongTensor, torch.Tensor]:
+    text_lengths_tensor = torch.LongTensor([len(phonemes_ids)])
+    phonemes_ids_tensor = torch.LongTensor(phonemes_ids).unsqueeze(0).to(device)
+    speaker_ids_tensor = torch.LongTensor([speaker_id]).to(device)
+    return phonemes_ids_tensor, text_lengths_tensor, speaker_ids_tensor
 
 
 def inference_text_to_speech(
@@ -146,13 +142,21 @@ def inference_text_to_speech(
     text_to_file(input_text)
     phoneme_ids = parse_g2p()
     batch = get_tacotron_batch(phoneme_ids, speaker_id, DEVICE)
+
     tacotron = torch.load(tacotron_model_path, map_location=DEVICE)
     tacotron.eval()
-    mels = tacotron.inference(batch)
-    mels = mels.permute(0, 2, 1).squeeze(0)
-    mels = mels * MELS_STD.to(DEVICE) + MELS_MEAN.to(DEVICE)
+    with torch.no_grad():
+        mels = tacotron.inference(batch)
+        mels = mels.permute(0, 2, 1).squeeze(0)
+        mels = mels * MELS_STD.to(DEVICE) + MELS_MEAN.to(DEVICE)
+
     generator = load_hifi(hifi_config, DEVICE)
-    audio = hifi_inference(generator, mels, DEVICE).detach().cpu().numpy()
+    generator.eval()
+    with torch.no_grad():
+        audio = hifi_inference(generator, mels, DEVICE)
+        audio = audio * MAX_WAV_VALUE
+        audio = audio.type(torch.int16).detach().cpu().numpy()
+
     wav_write(audio_output_path, SAMPLING_RATE, audio)
 
 
