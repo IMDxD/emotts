@@ -6,9 +6,9 @@ import tgt
 import torch
 
 from src.constants import (
-    FEATURE_MODEL_FILENAME, PHONEMES_FILENAME, SPEAKERS_FILENAME,
+   CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, PHONEMES_FILENAME, SPEAKERS_FILENAME,
 )
-from src.train_config import TrainParams
+from src.train_config import load_config
 from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models.feature_models import NonAttentiveTacotron
 
@@ -24,9 +24,10 @@ class Inferencer:
     TACOTRON_DIR = "feature_output"
 
     def __init__(
-        self, config: TrainParams
+        self, config_path: str
     ):
-        checkpoint_path = Path(config.checkpoint_name)
+        config = load_config(config_path)
+        checkpoint_path = CHECKPOINT_DIR / config.checkpoint_name
         dataset_path = Path(config.data.text_dir)
         with open(checkpoint_path / PHONEMES_FILENAME) as f:
             self.phonemes_to_idx: Dict[str, int] = json.load(f)
@@ -36,7 +37,7 @@ class Inferencer:
         self.feature_model: NonAttentiveTacotron = torch.load(
             checkpoint_path / FEATURE_MODEL_FILENAME, map_location=self.device
         )
-        self.text_pathes = dataset_path.rglob(f"*.{config.data.text_ext}")
+        self.text_pathes = dataset_path.rglob(f"*{config.data.text_ext}")
         self.feature_model_mels_path = checkpoint_path / self.TACOTRON_DIR
         self.feature_model_mels_path.mkdir(parents=True, exist_ok=True)
 
