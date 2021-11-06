@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import torch
 
+from src.data_process import VCTKBatch
 from src.models.feature_models.config import (
     DecoderParams, DurationParams, EncoderParams, GaussianUpsampleParams,
     ModelParams, PostNetParams, RangeParams,
@@ -51,12 +52,12 @@ DECODER_RNN_OUT = torch.randn(16, 1, DECODER_CONFIG.decoder_rnn_dim)
 ATTENTION_OUT = torch.randn((16, DURATIONS_MAX.max(), ATTENTION_OUT_DIM))
 for i, l in enumerate(DURATIONS_MAX):
     ATTENTION_OUT[i, l:, :] = 0
-MODEL_INPUT = (
-    INPUT_PHONEMES,
-    INPUT_LENGTH,
-    INPUT_SPEAKERS,
-    INPUT_DURATIONS,
-    INPUT_MELS,
+MODEL_INPUT = VCTKBatch(
+    phonemes=INPUT_PHONEMES,
+    num_phonemes=INPUT_LENGTH,
+    speaker_ids=INPUT_SPEAKERS,
+    durations=INPUT_DURATIONS,
+    mels=INPUT_MELS,
 )
 MODEL_INFERENCE_INPUT = (
     INPUT_PHONEMES,
@@ -123,7 +124,7 @@ def test_attention_layer_forward() -> None:
         DURATIONS_MAX.max().item(),
         EMBEDDING_DIM + ATTENTION_CONFIG.positional_dim,
     )
-    expected_shape_dur = (16, 50, 1)
+    expected_shape_dur = (16, 50)
     layer = Attention(
         EMBEDDING_DIM, config=ATTENTION_CONFIG, device=torch.device("cpu")
     )
@@ -214,7 +215,7 @@ def test_postnet_layer() -> None:
 
 def test_model_forward() -> None:
     expected_mel_shape = INPUT_MELS.shape
-    expected_duration_shape = (16, 50, 1)
+    expected_duration_shape = (16, 50)
 
     model = NonAttentiveTacotron(
         N_PHONEMES, N_SPEAKER, N_MELS_DIM, device=torch.device("cpu"), config=MODEL_CONFIG
