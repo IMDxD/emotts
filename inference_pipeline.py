@@ -20,7 +20,7 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 G2P_OUTPUT_PATH = "predictions/to_g2p.txt"
 AUDIO_OUTPUT_PATH = "predictions/generated.wav"
 G2P_MODEL_PATH = "models/g2p/english_g2p.zip"
-TACOTRON_MODEL_PATH = "models/tacotron/model_full.pth"
+TACOTRON_MODEL_PATH = "models/tacotron/feature_model.pth"
 HIFI_PARAMS = HIFIParams(
     dir_path="hifi", config_name="config.json", model_name="generator_v1"
 )
@@ -139,22 +139,24 @@ def inference_text_to_speech(
     audio_output_path: str,
     tacotron_model_path: str,
     hifi_config: HIFIParams,
+    device: torch.device = DEVICE,
 ) -> None:
     text_to_file(input_text)
     phoneme_ids = parse_g2p()
-    batch = get_tacotron_batch(phoneme_ids, speaker_id, DEVICE)
+    batch = get_tacotron_batch(phoneme_ids, speaker_id, device)
 
-    tacotron = torch.load(tacotron_model_path, map_location=DEVICE)
+    tacotron = torch.load(tacotron_model_path, map_location=device)
+    tacotron.to(device)
     tacotron.eval()
     with torch.no_grad():
         mels = tacotron.inference(batch)
         mels = mels.permute(0, 2, 1).squeeze(0)
-        mels = mels * MELS_STD.to(DEVICE) + MELS_MEAN.to(DEVICE)
+        mels = mels * MELS_STD.to(device) + MELS_MEAN.to(device)
 
-    generator = load_hifi(hifi_config, DEVICE)
+    generator = load_hifi(hifi_config, device)
     generator.eval()
     with torch.no_grad():
-        audio = hifi_inference(generator, mels, DEVICE)
+        audio = hifi_inference(generator, mels, device)
         audio = audio * MAX_WAV_VALUE
         audio = audio.type(torch.int16).detach().cpu().numpy()
 
@@ -168,4 +170,5 @@ if __name__ == "__main__":
         audio_output_path=AUDIO_OUTPUT_PATH,
         tacotron_model_path=TACOTRON_MODEL_PATH,
         hifi_config=HIFI_PARAMS,
+        device=DEVICE,
     )
