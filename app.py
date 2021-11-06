@@ -3,7 +3,7 @@ import streamlit as st
 
 from inference_pipeline import (
     AUDIO_OUTPUT_PATH, HIFI_PARAMS, SPEAKERS_TO_IDS, TACOTRON_MODEL_PATH,
-    inference_text_to_speech,
+    inference_text_to_speech, DEVICE
 )
 from src.web.streamlit_utils import (
     hide_hamburger_menu, st_empty_block, st_header_centered,
@@ -46,6 +46,7 @@ def layout_app() -> None:
                 audio_output_path=AUDIO_OUTPUT_PATH,
                 tacotron_model_path=TACOTRON_MODEL_PATH,
                 hifi_config=HIFI_PARAMS,
+                device=DEVICE
             )
             st.audio(AUDIO_OUTPUT_PATH)
 
