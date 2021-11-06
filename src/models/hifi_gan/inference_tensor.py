@@ -29,5 +29,4 @@ def inference(generator: Generator, tensor: torch.Tensor, device: torch.device) 
         x = tensor.unsqueeze(0).to(device)
         y_g_hat = generator(x)
         audio = y_g_hat.squeeze()
-        audio = audio * MAX_WAV_VALUE
-    return audio.type(torch.int16)
+    return audio

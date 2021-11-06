@@ -23,7 +23,7 @@ N_SPEAKERS = 109
 MEL_CHANNELS = 80
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 G2P_OUTPUT_PATH = "predictions/to_g2p.txt"
-AUDIO_OUTPUT_PATH = "predicitions/generated.wav"
+AUDIO_OUTPUT_PATH = "predictions/generated.wav"
 G2P_MODEL_PATH = "models/g2p/english_g2p.zip"
 TACOTRON_MODEL_PATH = "models/tacotron/model.pth"
 HIFI_PARAMS = HIFIParams(
@@ -129,36 +129,24 @@ def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> list:
     return phonemes_ids
 
 
-def get_tacotron_batch(phonemes_ids: list, speaker_id: int = 0):
-    # TODO: check dims
-    text_lengths = torch.tensor([len(phonemes_ids)])
-    phonemes_ids = torch.tensor(phonemes_ids, dtype=torch.int32).unsqueeze(0)
-    return phonemes_ids, text_lengths, torch.tensor([speaker_id])
+def get_tacotron_batch(phonemes_ids: list, speaker_id: int = 0, device=DEVICE):
+    text_lengths = torch.LongTensor([len(phonemes_ids)])
+    phonemes_ids = torch.LongTensor(phonemes_ids).unsqueeze(0).to(device)
+    speaker_ids = torch.LongTensor([speaker_id]).to(device)
+    return phonemes_ids, text_lengths, speaker_ids
 
 
 def inference_text_to_speech(
     input_text: str,
+    speaker_id: int,
     audio_output_path: str,
     tacotron_model_path: str,
     hifi_config: HIFIParams,
 ) -> None:
     text_to_file(input_text)
     phoneme_ids = parse_g2p()
-    batch = get_tacotron_batch(phoneme_ids)
-    tacotron = NonAttentiveTacotron(
-        n_phonems=N_PHONEMES,
-        n_speakers=N_SPEAKERS,
-        n_mel_channels=MEL_CHANNELS,
-        device=DEVICE,
-        config=ModelParams(
-            EncoderParams(),
-            GaussianUpsampleParams(DurationParams(), RangeParams()),
-            DecoderParams(),
-            PostNetParams(),
-        ),
-    )
-    state_dict = torch.load(tacotron_model_path, map_location=DEVICE).get("state_dict")
-    tacotron.load_state_dict(state_dict)
+    batch = get_tacotron_batch(phoneme_ids, speaker_id, DEVICE)
+    tacotron = torch.load(tacotron_model_path, map_location=DEVICE)
     tacotron.eval()
     mels = tacotron.inference(batch)
     mels = mels.permute(0, 2, 1).squeeze(0)
@@ -170,8 +158,9 @@ def inference_text_to_speech(
 
 if __name__ == "__main__":
     inference_text_to_speech(
-        "1 ring to rule tham all",
-        AUDIO_OUTPUT_PATH,
-        TACOTRON_MODEL_PATH,
-        HIFI_PARAMS,
+        input_text="1 ring to rule tham all",
+        speaker_id=0,
+        audio_output_path=AUDIO_OUTPUT_PATH,
+        tacotron_model_path=TACOTRON_MODEL_PATH,
+        hifi_config=HIFI_PARAMS,
     )
