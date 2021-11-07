@@ -5,7 +5,7 @@ f_max: 8000
 win_size: 1024
 n_fft: 1024
 n_mels: 80
-checkpoint_name: tacotron_vctk_default
+checkpoint_name: tacotron_vctk_default_20_dur
 hifi:
   dir_path: hifi
   model_name: generator_v1

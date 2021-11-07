@@ -50,9 +50,8 @@ class Trainer:
             n_mel_channels=self.config.n_mels,
             n_phonems=len(self.phonemes_to_id),
             n_speakers=len(self.speakers_to_id),
-            device=torch.device(self.config.device),
             config=self.config.model,
-        )
+        ).to(self.device)
 
         self.vocoder: Generator = load_hifi(self.config.hifi, self.device)
         self.optimizer = Adam(
@@ -73,14 +72,13 @@ class Trainer:
 
         self.upload_checkpoints()
 
-    @staticmethod
-    def batch_to_device(batch: VCTKBatch, device: torch.device) -> VCTKBatch:
+    def batch_to_device(self, batch: VCTKBatch) -> VCTKBatch:
         batch_on_device = VCTKBatch(
-            phonemes=batch.phonemes.to(device),
+            phonemes=batch.phonemes.to(self.device),
             num_phonemes=batch.num_phonemes,
-            speaker_ids=batch.speaker_ids.to(device),
-            durations=batch.durations.to(device),
-            mels=batch.mels.to(device),
+            speaker_ids=batch.speaker_ids.to(self.device),
+            durations=batch.durations.to(self.device),
+            mels=batch.mels.to(self.device),
         )
         return batch_on_device
 
@@ -219,7 +217,7 @@ class Trainer:
         for epoch in range(self.start_epoch, self.config.epochs):
             for i, batch in enumerate(self.train_loader, start=self.iteration_step):
                 global_step = epoch * len(self.train_loader) + i
-                batch = self.batch_to_device(batch, self.device)
+                batch = self.batch_to_device(batch)
                 self.optimizer.zero_grad()
                 durations, mel_outputs_postnet, mel_outputs = self.feature_model(batch)
 
@@ -284,7 +282,7 @@ class Trainer:
             val_loss_postnet = 0.0
             val_loss_durations = 0.0
             for batch in self.valid_loader:
-                batch = self.batch_to_device(batch, self.feature_model.device)
+                batch = self.batch_to_device(batch)
                 durations, mel_outputs_postnet, mel_outputs = self.feature_model(batch)
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
