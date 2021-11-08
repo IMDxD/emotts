@@ -1,0 +1,31 @@
+name: emotts
+channels:
+  - conda-forge
+  - pypi
+  - pytorch
+dependencies:
+  - baumwelch
+  - click
+  - cpuonly
+  - gdown
+  - git
+  - inflect
+  - librosa
+  - llvmlite
+  - ngram
+  - openblas
+  - openfst
+  - pip
+  - pynini
+  - pysoundfile
+  - python=3.8
+  - pytorch
+  - torchaudio
+  - tqdm
+  - unidecode
+  - unzip
+  - pip:
+    - montreal-forced-aligner
+    - git+https://github.com/MontrealCorpusTools/Montreal-Forced-Aligner.git
+    - streamlit
+    - tgt
