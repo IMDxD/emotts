@@ -17,6 +17,7 @@ class AttrDict:
     upsample_rates: List[int]
     upsample_kernel_sizes: List[int]
     upsample_initial_channel: int
+    resblock_initial_channel: int
     resblock_kernel_sizes: List[int]
     resblock_dilation_sizes: List[List[int]]
     resblock_initial_channel: int

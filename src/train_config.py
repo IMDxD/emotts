@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 import yaml
 from marshmallow_dataclass import class_schema
 
+from src.constants import PATHLIKE
 from src.data_process.config import VCTKDatasetParams
 from src.models.feature_models.config import ModelParams
 from src.models.hifi_gan import HIFIParams
@@ -60,7 +61,7 @@ class TrainParams:
 TrainConfigSchema = class_schema(TrainParams)
 
 
-def load_config(path: str) -> TrainParams:
+def load_config(path: PATHLIKE) -> TrainParams:
     with open(path, "r") as input_stream:
         schema = TrainConfigSchema()
         return schema.load(yaml.safe_load(input_stream))

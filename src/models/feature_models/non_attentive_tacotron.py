@@ -146,11 +146,10 @@ class RangePredictor(nn.Module):
 
 class Attention(nn.Module):
     def __init__(
-        self, embedding_dim: int, config: GaussianUpsampleParams, device: torch.device
+        self, embedding_dim: int, config: GaussianUpsampleParams
     ):
         super().__init__()
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
-        self.device = device
         self.eps = config.eps
         self.dropout = config.attention_dropout
 
@@ -160,8 +159,7 @@ class Attention(nn.Module):
         self.range_predictor = RangePredictor(embedding_dim, config.range_config)
         self.positional_encoder = PositionalEncoding(
             config.positional_dim,
-            device,
-            dropout=config.positional_dropout,
+            dropout=config.positional_dropout
         )
 
     def calc_scores(
@@ -171,7 +169,7 @@ class Attention(nn.Module):
         duration_cumsum = durations.cumsum(dim=1).float()
         max_duration = duration_cumsum[:, -1, :].max().long()
         c = duration_cumsum - 0.5 * durations
-        t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(self.device)
+        t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(ranges.device)
 
         weights = torch.exp(-(ranges ** -2) * ((t - c) ** 2))
         weights_norm = torch.sum(weights, dim=1, keepdim=True) + self.eps
@@ -285,14 +283,13 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(
-        self, n_mel_channels: int, attention_out_dim: int, config: DecoderParams, device: torch.device
+        self, n_mel_channels: int, attention_out_dim: int, config: DecoderParams
     ):
         super().__init__()
         self.n_mel_channels = n_mel_channels
         self.decoder_rnn_dim = config.decoder_rnn_dim
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
         self.p_decoder_dropout = config.dropout
-        self.device = device
 
         self.prenet = Prenet(
             n_mel_channels,
@@ -314,7 +311,7 @@ class Decoder(nn.Module):
 
     def forward(self, memory: torch.Tensor, y_mels: torch.Tensor) -> torch.Tensor:
 
-        previous_frame = torch.zeros(memory.shape[0], 1, self.n_mel_channels).to(self.device)
+        previous_frame = torch.zeros(memory.shape[0], 1, self.n_mel_channels).to(memory.device)
         y_mels = torch.cat((previous_frame, y_mels[:, :-1, :]), dim=1)
         previous_frame = previous_frame[:, 0, :]
 
@@ -342,7 +339,7 @@ class Decoder(nn.Module):
 
     def inference(self, memory: torch.Tensor) -> torch.Tensor:
 
-        previous_frame = torch.zeros(memory.shape[0], self.n_mel_channels).to(self.device)
+        previous_frame = torch.zeros(memory.shape[0], self.n_mel_channels).to(memory.device)
 
         mel_outputs = []
         decoder_state = None
@@ -370,11 +367,10 @@ class NonAttentiveTacotron(nn.Module):
         n_phonems: int,
         n_speakers: int,
         n_mel_channels: int,
-        device: torch.device,
         config: ModelParams,
     ):
         super().__init__()
-        self.device = torch.device(device)
+
         full_embedding_dim = config.phonem_embedding_dim + config.speaker_embedding_dim
         self.phonem_embedding = nn.Embedding(n_phonems, config.phonem_embedding_dim)
         self.speaker_embedding = nn.Embedding(
@@ -397,20 +393,17 @@ class NonAttentiveTacotron(nn.Module):
         )
         self.attention = Attention(
             full_embedding_dim,
-            config.attention_config,
-            torch.device(device),
+            config.attention_config
         )
         self.decoder = Decoder(
             n_mel_channels,
             full_embedding_dim + config.attention_config.positional_dim,
-            config.decoder_config,
-            device=device
+            config.decoder_config
         )
         self.postnet = Postnet(
             n_mel_channels,
             config.postnet_config,
         )
-        self.to(self.device)
 
     def forward(
         self, batch: VCTKBatch
@@ -431,7 +424,7 @@ class NonAttentiveTacotron(nn.Module):
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
         mask = get_mask_from_lengths(
-            batch.durations.cumsum(dim=1)[:, -1].long(), device=self.device
+            batch.durations.cumsum(dim=1)[:, -1].long(), device=batch.phonemes.device
         )
         mel_outputs_postnet[mask] = 0
         mel_outputs[mask] = 0
