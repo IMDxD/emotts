@@ -7,12 +7,17 @@ dependencies:
   - baumwelch
   - click
   - cpuonly
+  - enum34
   - gdown
   - git
   - inflect
   - librosa
   - llvmlite
+  - marshmallow
+  - marshmallow-dataclass
+  - matplotlib
   - ngram
+  - numpy
   - openblas
   - openfst
   - pip
@@ -20,8 +25,12 @@ dependencies:
   - pysoundfile
   - python=3.8
   - pytorch
+  - pyyaml
+  - scipy
+  - tensorboard
   - torchaudio
   - tqdm
+  - types-pyyaml
   - unidecode
   - unzip
   - pip:
