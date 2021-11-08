@@ -1,6 +1,6 @@
 import argparse
 
-from src import Trainer
+from src import Inferencer
 
 
 def main() -> None:
@@ -9,8 +9,9 @@ def main() -> None:
         '--config', type=str, required=True, help='configuration file path'
     )
     args = parser.parse_args()
-    trainer = Trainer(args.config)
-    trainer.train()
+    inferencer = Inferencer(args.config)
+    inferencer.feature_model.to("cuda")
+    inferencer.proceed_data()
 
 
 if __name__ == '__main__':

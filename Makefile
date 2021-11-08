@@ -3,7 +3,7 @@ requirements:
 
 start: requirements
 
-test:
+pytest:
 	pytest --cov=src --cov-fail-under 80 --blockage  --cov-report term-missing
 
 coverage-collect:
@@ -23,4 +23,4 @@ flake8:
 isort:
 	isort .
 
-check: isort flake8 mypy test
+check: isort flake8 mypy pytest

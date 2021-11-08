@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from src.constants import CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, LOG_DIR
+from src.constants import CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, LOG_DIR, PHONEMES_FILENAME, SPEAKERS_FILENAME
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
 from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
@@ -24,8 +24,6 @@ class Trainer:
     SCHEDULER_FILENAME = "scheduler.pth"
     ITERATION_FILENAME = "iter.json"
     ITERATION_NAME = "iteration"
-    PHONEMES_FILENAME = "phonemes.json"
-    SPEAKERS_FILENAME = "speakers.json"
     EPOCH_NAME = "epoch"
     SAMPLE_SIZE = 10
 
@@ -87,9 +85,9 @@ class Trainer:
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
     def mapping_is_exist(self) -> bool:
-        if not os.path.isfile(self.checkpoint_path / self.SPEAKERS_FILENAME):
+        if not os.path.isfile(self.checkpoint_path / SPEAKERS_FILENAME):
             return False
-        if not os.path.isfile(self.checkpoint_path / self.PHONEMES_FILENAME):
+        if not os.path.isfile(self.checkpoint_path / PHONEMES_FILENAME):
             return False
         return True
 
@@ -114,9 +112,9 @@ class Trainer:
 
     def upload_mapping(self) -> None:
         if self.mapping_is_exist():
-            with open(self.checkpoint_path / self.SPEAKERS_FILENAME) as f:
+            with open(self.checkpoint_path / SPEAKERS_FILENAME) as f:
                 self.speakers_to_id.update(json.load(f))
-            with open(self.checkpoint_path / self.PHONEMES_FILENAME) as f:
+            with open(self.checkpoint_path / PHONEMES_FILENAME) as f:
                 self.phonemes_to_id.update(json.load(f))
 
     def upload_checkpoints(self) -> None:
@@ -139,9 +137,9 @@ class Trainer:
             self.iteration_step = iteration_dict[self.ITERATION_NAME]
 
     def save_checkpoint(self, epoch: int, iteration: int) -> None:
-        with open(self.checkpoint_path / self.SPEAKERS_FILENAME, "w") as f:
+        with open(self.checkpoint_path / SPEAKERS_FILENAME, "w") as f:
             json.dump(self.speakers_to_id, f)
-        with open(self.checkpoint_path / self.PHONEMES_FILENAME, "w") as f:
+        with open(self.checkpoint_path / PHONEMES_FILENAME, "w") as f:
             json.dump(self.phonemes_to_id, f)
         with open(self.checkpoint_path / self.ITERATION_FILENAME, "w") as f:
             json.dump({
