@@ -5,7 +5,6 @@ import torch
 from src.constants import MODEL_DIR
 from src.models.hifi_gan.env import AttrDict
 from src.models.hifi_gan.hifi_config import HIFIParams
-from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
 from src.models.hifi_gan.models import Generator
 
 
