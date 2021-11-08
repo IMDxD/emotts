@@ -15,10 +15,10 @@ coverage-report:
 coverage: coverage-collect coverage-report
 
 mypy:
-	mypy src
+	mypy .
 
 flake8:
-	flake8 .
+	flake8 src .
 
 isort:
 	isort .

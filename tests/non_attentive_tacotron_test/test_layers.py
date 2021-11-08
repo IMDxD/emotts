@@ -48,7 +48,7 @@ def test_conv_norm_layer(
 def test_positional_encoding_layer(
         dimension: int, input_tensor: torch.Tensor, expected_shape: Tuple[int, int, int]
 ) -> None:
-    layer = PositionalEncoding(dimension, torch.device("cpu"))
+    layer = PositionalEncoding(dimension)
     layer_out = layer(input_tensor)
     assert (
         layer_out.shape == expected_shape

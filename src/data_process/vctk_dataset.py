@@ -36,7 +36,7 @@ class VCTKBatch:
     mels: torch.Tensor
 
 
-class VctkDataset(Dataset[VCTKSample]):
+class VCTKDataset(Dataset[VCTKSample]):
     def __init__(self, data: List[VCTKSample]):
         self._dataset = data
         self._dataset.sort(key=lambda x: len(x.phonemes))
@@ -81,16 +81,14 @@ class VCTKFactory:
     PAD_TOKEN = "<PAD>"
     LEXICON_OOV_TOKEN = "spn"
     PHONES_TIER = "phones"
-    SPEAKER_JSON_NAME = "speakers.json"
-    PHONEMES_JSON_NAME = "phonemes.json"
 
     def __init__(
         self,
         sample_rate: int,
         hop_size: int,
         config: VCTKDatasetParams,
-        phonemes_to_id: Dict[str, int] = None,
-        speakers_to_id: Dict[str, int] = None,
+        phonemes_to_id: Dict[str, int],
+        speakers_to_id: Dict[str, int],
     ):
 
         self._mels_dir = Path(config.mels_dir)
@@ -99,17 +97,10 @@ class VCTKFactory:
         self._mels_ext = config.mels_ext
         self.sample_rate = sample_rate
         self.hop_size = hop_size
-        if phonemes_to_id:
-            self.phoneme_to_id: Dict[str, int] = phonemes_to_id
-        else:
-            self.phoneme_to_id = {
-                self.PAD_TOKEN: 0,
-                self.PAUSE_TOKEN: 1,
-            }
-        if speakers_to_id:
-            self.speaker_to_id: Dict[str, int] = speakers_to_id
-        else:
-            self.speaker_to_id = {}
+        self.phoneme_to_id: Dict[str, int] = phonemes_to_id
+        self.phoneme_to_id[self.PAD_TOKEN] = 0
+        self.phoneme_to_id[self.PAUSE_TOKEN] = 1
+        self.speaker_to_id: Dict[str, int] = speakers_to_id
         self._dataset: List[VCTKSample] = self._build_dataset()
 
     @staticmethod
@@ -195,7 +186,7 @@ class VCTKFactory:
 
     def split_train_valid(
         self, test_fraction: float
-    ) -> Tuple[VctkDataset, VctkDataset]:
+    ) -> Tuple[VCTKDataset, VCTKDataset]:
         speakers_to_data_id: Dict[int, List[int]] = defaultdict(list)
 
         for i, sample in enumerate(self._dataset):
@@ -214,16 +205,10 @@ class VCTKFactory:
                 test_data.append(self._dataset[i])
             else:
                 train_data.append(self._dataset[i])
-        return VctkDataset(train_data), VctkDataset(test_data)
-
-    def save_mapping(self, path: Path) -> None:
-        with open(path / self.SPEAKER_JSON_NAME, "w") as f:
-            json.dump(self.speaker_to_id, f)
-        with open(path / self.PHONEMES_JSON_NAME, "w") as f:
-            json.dump(self.phoneme_to_id, f)
+        return VCTKDataset(train_data), VCTKDataset(test_data)
 
 
-class VctkCollate:
+class VCTKCollate:
     """
     Zero-pads model inputs and targets based on number of frames per setep
     """
