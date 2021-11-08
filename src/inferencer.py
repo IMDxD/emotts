@@ -28,7 +28,8 @@ class Inferencer:
     ):
         config = load_config(config_path)
         checkpoint_path = CHECKPOINT_DIR / config.checkpoint_name
-        dataset_path = Path(config.data.text_dir)
+        text_data_path = Path(config.data.text_dir)
+        data_path = text_data_path.parent
         with open(checkpoint_path / PHONEMES_FILENAME) as f:
             self.phonemes_to_idx: Dict[str, int] = json.load(f)
         with open(checkpoint_path / SPEAKERS_FILENAME) as f:
@@ -37,8 +38,8 @@ class Inferencer:
         self.feature_model: NonAttentiveTacotron = torch.load(
             checkpoint_path / FEATURE_MODEL_FILENAME, map_location=self.device
         )
-        self.text_pathes = dataset_path.rglob(f"*{config.data.text_ext}")
-        self.feature_model_mels_path = checkpoint_path / self.TACOTRON_DIR
+        self.text_pathes = text_data_path.rglob(f"*{config.data.text_ext}")
+        self.feature_model_mels_path = data_path / self.TACOTRON_DIR
         self.feature_model_mels_path.mkdir(parents=True, exist_ok=True)
 
     def proceed_data(self) -> None:
@@ -60,8 +61,10 @@ class Inferencer:
             output = self.feature_model.inference(batch)
             output = output.permute(0, 2, 1).squeeze(0)
             output = output * MELS_STD.to(self.device) + MELS_MEAN.to(self.device)
+            save_dir = self.feature_model_mels_path / speaker
+            save_dir.mkdir(exist_ok=True)
             torch.save(
-                output, self.feature_model_mels_path / f"{filename}.{self.MEL_EXT}"
+                output, save_dir / f"{filename}.{self.MEL_EXT}"
             )
 
     def parse_file(self, filepath: Path) -> Optional[List[int]]:
