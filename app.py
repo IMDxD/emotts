@@ -34,7 +34,7 @@ def layout_app() -> None:
     with st.form(key="input_form"):
         emotion = st.select_slider(label="🎨 Эмоция", options=EMOTIONS)
         st_empty_block(2)
-        input_text = st.text_area(label="📜 Что мне сказать?")
+        input_text = st.text_area(label="📜 Что мне сказать?", value="50 points to Dumbledore")
         st_empty_block(2)
         form_submit = st.form_submit_button("Синтезировать речь")
 

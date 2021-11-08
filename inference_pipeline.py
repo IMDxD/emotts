@@ -14,6 +14,7 @@ from src.models.hifi_gan.inference_tensor import inference as hifi_inference
 from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
 from src.preprocessing.text.cleaners import english_cleaners
 
+
 SAMPLING_RATE = 22050
 MEL_CHANNELS = 80
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -34,6 +35,7 @@ SPEAKERS_PATH = "models/tacotron/speakers.json"
 with open(SPEAKERS_PATH, "r") as json_file:
     SPEAKERS_TO_IDS = json.load(json_file)
 N_SPEAKERS = len(SPEAKERS_TO_IDS)
+
 
 def text_to_file(user_query: str) -> None:
     text_path = pathlib.Path("tmp.txt")
@@ -100,7 +102,7 @@ def inference_text_to_speech(
 if __name__ == "__main__":
     inference_text_to_speech(
         input_text="1 ring to rule them all and plus 50 points to griffindor",
-        speaker_id=100,
+        speaker_id=50,
         audio_output_path=AUDIO_OUTPUT_PATH,
         tacotron_model_path=TACOTRON_MODEL_PATH,
         hifi_config=HIFI_PARAMS,
