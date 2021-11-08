@@ -81,19 +81,18 @@ class ConvNorm(torch.nn.Module):
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, dimension: int, device: torch.device, dropout: float = 0.1):
+    def __init__(self, dimension: int, dropout: float = 0.1):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.dimension = dimension
-        self.device = device
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
 
-        position = torch.arange(x.shape[1]).unsqueeze(1).to(self.device)
+        position = torch.arange(x.shape[1]).unsqueeze(1).to(x.device)
         div_term = torch.exp(
             torch.arange(0, self.dimension, 2) * (-math.log(10000.0) / self.dimension)
-        ).to(self.device)
-        pe: torch.Tensor = torch.zeros(1, x.shape[1], self.dimension).to(self.device)
+        ).to(x.device)
+        pe: torch.Tensor = torch.zeros(1, x.shape[1], self.dimension).to(x.device)
         pe[0, :, 0::2] = torch.sin(position * div_term)
         pe[0, :, 1::2] = torch.cos(position * div_term)
         pe = torch.repeat_interleave(pe, x.shape[0], 0)

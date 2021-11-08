@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import pytest
 import torch
 
 from src.data_process import VCTKBatch
@@ -126,7 +127,7 @@ def test_attention_layer_forward() -> None:
     )
     expected_shape_dur = (16, 50)
     layer = Attention(
-        EMBEDDING_DIM, config=ATTENTION_CONFIG, device=torch.device("cpu")
+        EMBEDDING_DIM, config=ATTENTION_CONFIG
     )
     dur, out = layer(EMBEDDING, INPUT_LENGTH, INPUT_DURATIONS)
     assert (
@@ -148,7 +149,7 @@ def test_attention_layer_inference(mock_duration: MagicMock) -> None:
         EMBEDDING_DIM + ATTENTION_CONFIG.positional_dim,
     )
     layer = Attention(
-        EMBEDDING_DIM, config=ATTENTION_CONFIG, device=torch.device("cpu")
+        EMBEDDING_DIM, config=ATTENTION_CONFIG
     )
     out = layer.inference(EMBEDDING, INPUT_LENGTH)
     assert (
@@ -177,7 +178,6 @@ def test_decoder_layer_forward() -> None:
         N_MELS_DIM,
         ATTENTION_OUT_DIM,
         config=DECODER_CONFIG,
-        device=torch.device("cpu"),
     )
     out = layer(ATTENTION_OUT, INPUT_MELS)
     assert (
@@ -192,7 +192,6 @@ def test_decoder_layer_inference() -> None:
         N_MELS_DIM,
         ATTENTION_OUT_DIM,
         config=DECODER_CONFIG,
-        device=torch.device("cpu"),
     )
     out = layer.inference(ATTENTION_OUT)
     assert (
@@ -218,9 +217,49 @@ def test_model_forward() -> None:
     expected_duration_shape = (16, 50)
 
     model = NonAttentiveTacotron(
-        N_PHONEMES, N_SPEAKER, N_MELS_DIM, device=torch.device("cpu"), config=MODEL_CONFIG
+        N_PHONEMES, N_SPEAKER, N_MELS_DIM, config=MODEL_CONFIG
     )
     durations, mel_fixed, mel_predicted = model(MODEL_INPUT)
+    assert (
+        durations.shape == expected_duration_shape
+    ), f"Wrong shape, expected {expected_duration_shape}, got: {durations.shape}"
+    assert (
+        mel_predicted.shape == expected_mel_shape
+    ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_predicted.shape}"
+    assert (
+        mel_fixed.shape == expected_mel_shape
+    ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_fixed.shape}"
+    for idx, length in enumerate(DURATIONS_MAX):
+        assert (
+            mel_fixed[idx, length:] == 0
+        ).all(), "All values of tensor higher sequence length must be zero"
+        assert (
+            mel_fixed[idx, length - 1] != 0
+        ).any(), f"Wrong zero vector for id = {idx}"
+        assert (
+            mel_predicted[idx, length:] == 0
+        ).all(), "All values of tensor higher sequence length must be zero"
+        assert (
+            mel_predicted[idx, length - 1] != 0
+        ).any(), f"Wrong zero vector for id = {idx}"
+
+
+@pytest.mark.skipif(torch.cuda.is_available() is False, reason="No cuda")
+def test_model_forward_gpu() -> None:
+    expected_mel_shape = INPUT_MELS.shape
+    expected_duration_shape = (16, 50)
+
+    model = NonAttentiveTacotron(
+        N_PHONEMES, N_SPEAKER, N_MELS_DIM, config=MODEL_CONFIG
+    ).to("cuda")
+    gpu_input = VCTKBatch(
+        phonemes=INPUT_PHONEMES.to("cuda"),
+        num_phonemes=INPUT_LENGTH,
+        speaker_ids=INPUT_SPEAKERS.to("cuda"),
+        durations=INPUT_DURATIONS.to("cuda"),
+        mels=INPUT_MELS.to("cuda")
+    )
+    durations, mel_fixed, mel_predicted = model(gpu_input)
     assert (
         durations.shape == expected_duration_shape
     ), f"Wrong shape, expected {expected_duration_shape}, got: {durations.shape}"
@@ -253,7 +292,7 @@ def test_model_inference(mock_duration: MagicMock) -> None:
     expected_mel_shape = INPUT_MELS.shape
 
     model = NonAttentiveTacotron(
-        N_PHONEMES, N_SPEAKER, N_MELS_DIM, device=torch.device("cpu"), config=MODEL_CONFIG
+        N_PHONEMES, N_SPEAKER, N_MELS_DIM, config=MODEL_CONFIG
     )
     mel_predicted = model.inference(MODEL_INFERENCE_INPUT)
     assert (
