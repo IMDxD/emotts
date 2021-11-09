@@ -37,11 +37,11 @@ def mel_spectrogram(y: torch.Tensor,
 
     y = torch.nn.functional.pad(y.unsqueeze(1),
                                 (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
-                                mode='reflect')
+                                mode="reflect")
 
     spec = torch.stft(y.squeeze(1), n_fft, hop_length=hop_size,
                       win_length=win_size, window=hann_window[str(y.device)],
-                      center=center, pad_mode='reflect',
+                      center=center, pad_mode="reflect",
                       normalized=False, onesided=True)
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-9)
@@ -52,28 +52,28 @@ def mel_spectrogram(y: torch.Tensor,
 
 
 @click.command()
-@click.option('--input-dir', type=Path, required=True,
-              help='Directory with audios to process.')
-@click.option('--output-dir', type=Path, required=True,
-              help='Directory for audios with pauses trimmed.')
+@click.option("--input-dir", type=Path, required=True,
+              help="Directory with audios to process.")
+@click.option("--output-dir", type=Path, required=True,
+              help="Directory for audios with pauses trimmed.")
 def main(input_dir: Path, output_dir: Path) -> None:
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    filepath_list = list(input_dir.rglob('*.flac'))
-    print(f'Number of audio files found: {len(filepath_list)}')
-    print('Transforming audio to mel...')
+    filepath_list = list(input_dir.rglob("*.flac"))
+    print(f"Number of audio files found: {len(filepath_list)}")
+    print("Transforming audio to mel...")
 
-    for file in tqdm(filepath_list):
-        new_path = output_dir / file.stem
+    for filepath in tqdm(filepath_list):
+        new_path = output_dir / filepath.stem
 
-        wave_tensor, _ = torchaudio.load(file)
+        wave_tensor, _ = torchaudio.load(filepath)
 
         mels_tensor = mel_spectrogram(wave_tensor)  # [n_channels x n_mels x time]
-        torch.save(mels_tensor, new_path.with_suffix('.pkl'))
+        torch.save(mels_tensor, new_path.with_suffix(".pkl"))
 
-    print('Finished successfully.')
-    print(f'Processed files are located at {output_dir}')
+    print("Finished successfully.")
+    print(f"Processed files are located at {output_dir}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

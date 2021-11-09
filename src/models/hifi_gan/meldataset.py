@@ -63,14 +63,14 @@ def mel_spectrogram(
     center: bool = False,
 ) -> torch.Tensor:
     if torch.min(y) < -1.0:
-        print('min value is ', torch.min(y))
+        print(f"min value is {torch.min(y)}")
     if torch.max(y) > 1.0:
-        print('max value is ', torch.max(y))
+        print(f"max value is {torch.max(y)}")
 
     global mel_basis, hann_window
     if fmax not in mel_basis:
         mel = librosa_mel_fn(sampling_rate, n_fft, num_mels, fmin, fmax)
-        mel_basis[str(fmax) + '_' + str(y.device)] = (
+        mel_basis[str(fmax) + "_" + str(y.device)] = (
             torch.from_numpy(mel).float().to(y.device)
         )
         hann_window[str(y.device)] = torch.hann_window(win_size).to(y.device)
@@ -78,7 +78,7 @@ def mel_spectrogram(
     y = torch.nn.functional.pad(
         y.unsqueeze(1),
         (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
-        mode='reflect',
+        mode="reflect",
     )
     y = y.squeeze(1)
 
@@ -89,31 +89,31 @@ def mel_spectrogram(
         win_length=win_size,
         window=hann_window[str(y.device)],
         center=center,
-        pad_mode='reflect',
+        pad_mode="reflect",
         normalized=False,
         onesided=True,
     )
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-9)
 
-    spec = torch.matmul(mel_basis[str(fmax) + '_' + str(y.device)], spec)
+    spec = torch.matmul(mel_basis[str(fmax) + "_" + str(y.device)], spec)
     spec = spectral_normalize_torch(spec)
 
     return spec
 
 
 def get_dataset_filelist(arguments: argparse.Namespace) -> Tuple[List[str], List[str]]:
-    with open(arguments.input_training_file, 'r', encoding='utf-8') as fi:
+    with open(arguments.input_training_file, "r", encoding="utf-8") as fi:
         training_files = [
-            os.path.join(arguments.input_wavs_dir, x.split('|')[0] + '.wav')
-            for x in fi.read().split('\n')
+            os.path.join(arguments.input_wavs_dir, x.split("|")[0] + ".wav")
+            for x in fi.read().split("\n")
             if len(x) > 0
         ]
 
-    with open(arguments.input_validation_file, 'r', encoding='utf-8') as fi:
+    with open(arguments.input_validation_file, "r", encoding="utf-8") as fi:
         validation_files = [
-            os.path.join(arguments.input_wavs_dir, x.split('|')[0] + '.wav')
-            for x in fi.read().split('\n')
+            os.path.join(arguments.input_wavs_dir, x.split("|")[0] + ".wav")
+            for x in fi.read().split("\n")
             if len(x) > 0
         ]
     return training_files, validation_files
@@ -122,7 +122,7 @@ def get_dataset_filelist(arguments: argparse.Namespace) -> Tuple[List[str], List
 class MelDataset(
     torch.utils.data.Dataset[Tuple[torch.Tensor, torch.Tensor, str, torch.Tensor]]
 ):
-    def __init__(
+    def __init__(  # noqa: CFQ002
         self,
         training_files: List[str],
         base_mels_path: str,
@@ -163,7 +163,7 @@ class MelDataset(
         self.fine_tuning = fine_tuning
         self.base_mels_path = base_mels_path
 
-    def __getitem__(
+    def __getitem__(  # noqa: CCR001
         self, index: int
     ) -> Tuple[torch.Tensor, torch.Tensor, str, torch.Tensor]:
         filename = self.audio_files[index]
@@ -193,7 +193,7 @@ class MelDataset(
                     audio = audio[:, audio_start: audio_start + self.segment_size]
                 else:
                     audio = torch.nn.functional.pad(
-                        audio, (0, self.segment_size - audio.size(1)), 'constant'
+                        audio, (0, self.segment_size - audio.size(1)), "constant"
                     )
 
             mel = mel_spectrogram(
@@ -211,7 +211,7 @@ class MelDataset(
             mel = np.load(
                 os.path.join(
                     self.base_mels_path,
-                    os.path.splitext(os.path.split(filename)[-1])[0] + '.npy',
+                    os.path.splitext(os.path.split(filename)[-1])[0] + ".npy",
                 )
             )
             mel = torch.from_numpy(mel)
@@ -227,16 +227,14 @@ class MelDataset(
                     mel = mel[:, :, mel_start: mel_start + frames_per_seg]
                     audio = audio[
                         :,
-                        mel_start
-                        * self.hop_size : (mel_start + frames_per_seg)
-                        * self.hop_size,
+                        mel_start * self.hop_size:(mel_start + frames_per_seg) * self.hop_size,
                     ]
                 else:
                     mel = torch.nn.functional.pad(
-                        mel, (0, frames_per_seg - mel.size(2)), 'constant'
+                        mel, (0, frames_per_seg - mel.size(2)), "constant"
                     )
                     audio = torch.nn.functional.pad(
-                        audio, (0, self.segment_size - audio.size(1)), 'constant'
+                        audio, (0, self.segment_size - audio.size(1)), "constant"
                     )
 
         mel_loss = mel_spectrogram(

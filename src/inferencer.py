@@ -6,11 +6,12 @@ import tgt
 import torch
 
 from src.constants import (
-   CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, PHONEMES_FILENAME, SPEAKERS_FILENAME,
+    CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, PHONEMES_FILENAME,
+    SPEAKERS_FILENAME,
 )
-from src.train_config import load_config
 from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models.feature_models import NonAttentiveTacotron
+from src.train_config import load_config
 
 
 class Inferencer:

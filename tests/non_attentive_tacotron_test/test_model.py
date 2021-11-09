@@ -44,13 +44,13 @@ for i, l in enumerate(INPUT_LENGTH):
     INPUT_DURATIONS[i, l:] = 0
 DURATIONS_MAX = INPUT_DURATIONS.cumsum(dim=1).max(dim=1).values
 INPUT_MELS = torch.randn(
-    16, DURATIONS_MAX.max(), N_MELS_DIM, dtype=torch.float
+    16, int(DURATIONS_MAX.max()), N_MELS_DIM, dtype=torch.float
 )
 for i, l in enumerate(DURATIONS_MAX):
     INPUT_MELS[i, l:, :] = 0
 ATTENTION_OUT_DIM = EMBEDDING_DIM + ATTENTION_CONFIG.positional_dim
 DECODER_RNN_OUT = torch.randn(16, 1, DECODER_CONFIG.decoder_rnn_dim)
-ATTENTION_OUT = torch.randn((16, DURATIONS_MAX.max(), ATTENTION_OUT_DIM))
+ATTENTION_OUT = torch.randn((16, int(DURATIONS_MAX.max()), ATTENTION_OUT_DIM))
 for i, l in enumerate(DURATIONS_MAX):
     ATTENTION_OUT[i, l:, :] = 0
 MODEL_INPUT = VCTKBatch(

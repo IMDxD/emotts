@@ -10,7 +10,10 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from src.constants import CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, LOG_DIR, PHONEMES_FILENAME, SPEAKERS_FILENAME
+from src.constants import (
+    CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, LOG_DIR, PHONEMES_FILENAME,
+    SPEAKERS_FILENAME,
+)
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
 from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
