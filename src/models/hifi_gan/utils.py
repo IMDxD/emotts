@@ -52,5 +52,5 @@ def scan_checkpoint(cp_dir: str, prefix: str) -> str:
     pattern = os.path.join(cp_dir, prefix + '*')
     cp_list = glob.glob(pattern)
     if len(cp_list) == 0:
-        return ''
+        return None
     return sorted(cp_list)[-1]

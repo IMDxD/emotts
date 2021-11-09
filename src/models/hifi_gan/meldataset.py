@@ -2,11 +2,14 @@ import argparse
 import math
 import os
 import random
+from pathlib import Path
 from typing import Any, List, Optional, TextIO, Tuple, Union
 
 import numpy as np
 import torch
 import torch.utils.data
+import torchaudio
+from torchaudio.transforms import Resample
 from librosa.filters import mel as librosa_mel_fn
 from librosa.util import normalize
 from scipy.io.wavfile import read
@@ -169,15 +172,26 @@ class MelDataset(
         filename = self.audio_files[index]
         raw_audio: Optional[AudioData]
         if self._cache_ref_count == 0:
-            raw_audio, sampling_rate = load_wav(filename)
-            raw_audio = raw_audio / MAX_WAV_VALUE
+            file_extension = Path(filename).suffix
+            if file_extension == ".wav":
+                raw_audio, sampling_rate = load_wav(filename)
+                raw_audio = raw_audio / MAX_WAV_VALUE
+            elif file_extension == ".flac":
+                raw_audio, sampling_rate = torchaudio.load(filename)
+            else:
+                raise ValueError(f"{file_extension} extension is not handled yet."
+                                 "Switch to wav or flac.")
+
             if not self.fine_tuning:
                 raw_audio = normalize(raw_audio) * 0.95
+
             self.cached_wav = raw_audio
             if sampling_rate != self.sampling_rate:
-                raise ValueError(
-                    f"{sampling_rate} SR doesn't match target {self.sampling_rate} SR"
-                )
+                resampler = Resample(orig_freq=sampling_rate,
+                                     new_freq=self.sampling_rate,
+                                     resampling_method='sinc_interpolation'
+                                     )
+                raw_audio = resampler(raw_audio)
             self._cache_ref_count = self.n_cache_reuse
         else:
             raw_audio = self.cached_wav
@@ -208,13 +222,21 @@ class MelDataset(
                 center=False,
             )
         else:
-            mel = np.load(
-                os.path.join(
-                    self.base_mels_path,
-                    os.path.splitext(os.path.split(filename)[-1])[0] + '.npy',
-                )
+            # mel = np.load(
+            #     os.path.join(
+            #         self.base_mels_path,
+            #         os.path.splitext(os.path.split(filename)[-1])[0] + '.npy',
+            #     )
+            # )
+            # mel = torch.from_numpy(mel)
+
+            filename = Path(
+                self.base_mels_path,
+                Path(
+                    *list(Path(filename).parts[1:])
+                ).with_suffix(".pth")
             )
-            mel = torch.from_numpy(mel)
+            mel = torch.load(filename)
 
             if len(mel.shape) < 3:
                 mel = mel.unsqueeze(0)

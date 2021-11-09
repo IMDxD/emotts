@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from src.models.hifi_gan.env import AttrDict, build_env
 from src.models.hifi_gan.meldataset import (
-    MelDataset, get_dataset_filelist, mel_spectrogram,
+    MelDataset, mel_spectrogram,
 )
 from src.models.hifi_gan.models import (
     Generator, MultiPeriodDiscriminator, MultiScaleDiscriminator,
@@ -25,6 +25,7 @@ from src.models.hifi_gan.models import (
 from src.models.hifi_gan.utils import (
     load_checkpoint, plot_spectrogram, save_checkpoint, scan_checkpoint,
 )
+from src.models.hifi_gan.train_valid_split import split_vctk_data
 
 torch.backends.cudnn.benchmark = True
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -80,7 +81,7 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noq
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=h.lr_decay, last_epoch=last_epoch)
     scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=h.lr_decay, last_epoch=last_epoch)
 
-    training_filelist, validation_filelist = get_dataset_filelist(arguments)
+    training_filelist, validation_filelist = split_vctk_data(arguments.input_wavs_dir)
 
     trainset = MelDataset(training_files=training_filelist,
                           base_mels_path=arguments.input_mels_dir,
