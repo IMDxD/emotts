@@ -44,9 +44,9 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noq
     msd: Union[DistributedDataParallel, MultiScaleDiscriminator] = MultiScaleDiscriminator().to(device)
 
     if rank == 0:
-        print(generator)
+        # print(generator)
         os.makedirs(arguments.checkpoint_path, exist_ok=True)
-        print("checkpoints directory : ", arguments.checkpoint_path)
+        # print("checkpoints directory : ", arguments.checkpoint_path)
 
     if os.path.isdir(arguments.checkpoint_path):
         cp_g = scan_checkpoint(arguments.checkpoint_path, 'g_')
@@ -81,7 +81,8 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noq
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=h.lr_decay, last_epoch=last_epoch)
     scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=h.lr_decay, last_epoch=last_epoch)
 
-    training_filelist, validation_filelist = split_vctk_data(arguments.input_wavs_dir)
+    training_filelist, validation_filelist = split_vctk_data(arguments.input_wavs_dir,
+                                                             arguments.input_mels_dir)
 
     trainset = MelDataset(training_files=training_filelist,
                           base_mels_path=arguments.input_mels_dir,
@@ -300,7 +301,8 @@ def main() -> None:
     if h.num_gpus > 1:
         mp.spawn(train, nprocs=h.num_gpus, args=(a, h,))
     else:
-        train(0, a, h)
+        mp.spawn(train, nprocs=1, args=(a, h,))
+        # train(0, a, h)
 
 
 if __name__ == '__main__':

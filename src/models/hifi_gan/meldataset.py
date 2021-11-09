@@ -14,6 +14,8 @@ from librosa.filters import mel as librosa_mel_fn
 from librosa.util import normalize
 from scipy.io.wavfile import read
 
+from src.models.hifi_gan.train_valid_split import get_mel_file_path
+
 MAX_WAV_VALUE = 32768.0
 AudioData = np.ndarray
 
@@ -78,8 +80,10 @@ def mel_spectrogram(
         )
         hann_window[str(y.device)] = torch.hann_window(win_size).to(y.device)
 
+    if len(y.shape) == 2:
+        y = y.unsqueeze(1)
     y = torch.nn.functional.pad(
-        y.unsqueeze(1),
+        y,
         (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
         mode='reflect',
     )
@@ -222,20 +226,8 @@ class MelDataset(
                 center=False,
             )
         else:
-            # mel = np.load(
-            #     os.path.join(
-            #         self.base_mels_path,
-            #         os.path.splitext(os.path.split(filename)[-1])[0] + '.npy',
-            #     )
-            # )
-            # mel = torch.from_numpy(mel)
 
-            filename = Path(
-                self.base_mels_path,
-                Path(
-                    *list(Path(filename).parts[1:])
-                ).with_suffix(".pth")
-            )
+            filename = get_mel_file_path(filename, self.base_mels_path)
             mel = torch.load(filename)
 
             if len(mel.shape) < 3:
@@ -273,7 +265,9 @@ class MelDataset(
             center=False,
         )
 
-        return mel.squeeze(), audio.squeeze(0), filename, mel_loss.squeeze()
+        print(filename, mel.squeeze().shape, audio.squeeze(0).shape, mel_loss.squeeze().shape)
+
+        return mel.squeeze().detach(), audio.squeeze(0).detach(), filename, mel_loss.squeeze().detach()
 
     def __len__(self) -> int:
         return len(self.audio_files)
