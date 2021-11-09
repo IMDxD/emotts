@@ -80,10 +80,8 @@ def mel_spectrogram(
         )
         hann_window[str(y.device)] = torch.hann_window(win_size).to(y.device)
 
-    if len(y.shape) == 2:
-        y = y.unsqueeze(1)
     y = torch.nn.functional.pad(
-        y,
+        y.unsqueeze(1),
         (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
         mode='reflect',
     )
@@ -182,6 +180,7 @@ class MelDataset(
                 raw_audio = raw_audio / MAX_WAV_VALUE
             elif file_extension == ".flac":
                 raw_audio, sampling_rate = torchaudio.load(filename)
+                raw_audio = raw_audio.squeeze(0)
             else:
                 raise ValueError(f"{file_extension} extension is not handled yet."
                                  "Switch to wav or flac.")
@@ -228,7 +227,7 @@ class MelDataset(
         else:
 
             filename = get_mel_file_path(filename, self.base_mels_path)
-            mel = torch.load(filename)
+            mel = torch.load(filename, map_location="cpu")
 
             if len(mel.shape) < 3:
                 mel = mel.unsqueeze(0)
@@ -237,7 +236,10 @@ class MelDataset(
                 frames_per_seg = math.ceil(self.segment_size / self.hop_size)
 
                 if audio.size(1) >= self.segment_size:
-                    mel_start = random.randint(0, mel.size(2) - frames_per_seg - 1)
+                    frame_max = min(mel.size(2) - frames_per_seg - 1,
+                                    int((audio.size(1) - self.segment_size) / self.hop_size) - 1
+                                    )
+                    mel_start = random.randint(0, frame_max)
                     mel = mel[:, :, mel_start: mel_start + frames_per_seg]
                     audio = audio[
                         :,
@@ -265,9 +267,16 @@ class MelDataset(
             center=False,
         )
 
-        print(filename, mel.squeeze().shape, audio.squeeze(0).shape, mel_loss.squeeze().shape)
+        if mel_loss.size(2) > mel.size(2):
+            mel = torch.nn.functional.pad(
+                        mel, (0, mel_loss.size(2) - mel.size(2)), 'constant'
+                    )
+        elif mel_loss.size(2) < mel.size(2):
+            mel_loss = torch.nn.functional.pad(
+                        mel_loss, (0, mel.size(2) - mel_loss.size(2)), 'constant'
+                    )
 
-        return mel.squeeze().detach(), audio.squeeze(0).detach(), filename, mel_loss.squeeze().detach()
+        return mel.squeeze().detach(), audio.squeeze(0).detach(), str(filename), mel_loss.squeeze().detach()
 
     def __len__(self) -> int:
         return len(self.audio_files)
