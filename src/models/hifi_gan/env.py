@@ -20,7 +20,6 @@ class AttrDict:
     resblock_initial_channel: int
     resblock_kernel_sizes: List[int]
     resblock_dilation_sizes: List[List[int]]
-    resblock_initial_channel: int
     segment_size: int
     num_mels: int
     num_freq: int

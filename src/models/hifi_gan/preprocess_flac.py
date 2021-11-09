@@ -26,8 +26,7 @@ def preprocess(input_flac_dir: str, new_sample_rate: int, output_dir: str) -> No
         if isfile(file_path):
             pure_file_path: PurePath = PurePath(file_path)
             flac_tmp_audio_data = AudioSegment.from_file(pure_file_path, pure_file_path.suffix[1:])
-            output_file_path = output_dir + \
-                pure_file_path.name.replace(pure_file_path.suffix, "") + ".wav"
+            output_file_path = output_dir + pure_file_path.name.replace(pure_file_path.suffix, "") + ".wav"
 
             flac_tmp_audio_data.export(output_file_path, format="wav")
             downsample(output_file_path, new_sample_rate, output_dir)
