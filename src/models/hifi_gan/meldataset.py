@@ -236,8 +236,9 @@ class MelDataset(
                 frames_per_seg = math.ceil(self.segment_size / self.hop_size)
 
                 if audio.size(1) >= self.segment_size:
-                    frame_max = min(mel.size(2) - frames_per_seg - 1,
-                                    int((audio.size(1) - self.segment_size) / self.hop_size) - 1
+                    frame_max = max(0,
+                                    min(mel.size(2) - frames_per_seg - 1, 
+                                        int((audio.size(1) - self.segment_size) / self.hop_size) - 1)
                                     )
                     mel_start = random.randint(0, frame_max)
                     mel = mel[:, :, mel_start: mel_start + frames_per_seg]
