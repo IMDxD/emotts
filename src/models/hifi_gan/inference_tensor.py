@@ -5,7 +5,6 @@ import torch
 from src.constants import MODEL_DIR
 from src.models.hifi_gan.env import AttrDict
 from src.models.hifi_gan.hifi_config import HIFIParams
-from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
 from src.models.hifi_gan.models import Generator
 
 
@@ -17,7 +16,7 @@ def load_model(hifi_config: HIFIParams, device: torch.device) -> Generator:
         config = AttrDict(**json.load(f))
     generator = Generator(config).to(device)
     state_dict = torch.load(model_path, map_location=device)
-    generator.load_state_dict(state_dict['generator'])
+    generator.load_state_dict(state_dict["generator"])
     generator.remove_weight_norm()
     generator.eval()
     return generator
@@ -29,5 +28,4 @@ def inference(generator: Generator, tensor: torch.Tensor, device: torch.device) 
         x = tensor.unsqueeze(0).to(device)
         y_g_hat = generator(x)
         audio = y_g_hat.squeeze()
-        audio = audio * MAX_WAV_VALUE
-    return audio.type(torch.int16)
+    return audio
