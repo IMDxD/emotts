@@ -2,8 +2,8 @@
 import streamlit as st
 
 from inference_pipeline import (
-    AUDIO_OUTPUT_PATH, HIFI_PARAMS, SPEAKERS_TO_IDS, TACOTRON_MODEL_PATH,
-    inference_text_to_speech, DEVICE
+    AUDIO_OUTPUT_PATH, DEVICE, HIFI_PARAMS, SPEAKERS_TO_IDS,
+    TACOTRON_MODEL_PATH, inference_text_to_speech,
 )
 from src.web.streamlit_utils import (
     hide_hamburger_menu, st_empty_block, st_header_centered,

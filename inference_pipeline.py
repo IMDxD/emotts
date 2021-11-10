@@ -14,7 +14,6 @@ from src.models.hifi_gan.inference_tensor import inference as hifi_inference
 from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
 from src.preprocessing.text.cleaners import english_cleaners
 
-
 SAMPLING_RATE = 22050
 MEL_CHANNELS = 80
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
