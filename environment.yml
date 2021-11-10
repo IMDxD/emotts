@@ -11,6 +11,7 @@ dependencies:
   - gdown
   - git
   - inflect
+  - kaldi
   - librosa
   - llvmlite
   - marshmallow
@@ -27,6 +28,7 @@ dependencies:
   - pytorch
   - pyyaml
   - scipy
+  - sox
   - tensorboard
   - torchaudio
   - tqdm
@@ -34,7 +36,6 @@ dependencies:
   - unidecode
   - unzip
   - pip:
-    - montreal-forced-aligner
-    - git+https://github.com/MontrealCorpusTools/Montreal-Forced-Aligner.git
-    - streamlit
+    - montreal-forced-aligner==2.0.0b4
+    - streamlit==1.1.0
     - tgt
