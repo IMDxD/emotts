@@ -1,4 +1,3 @@
-import json
 import random
 from collections import defaultdict
 from dataclasses import dataclass
@@ -77,7 +76,7 @@ class VCTKFactory:
     """
 
     PAUSE_TOKEN = "<SIL>"
-    MFA_PAUSE_TOKEN = ''
+    MFA_PAUSE_TOKEN = ""
     PAD_TOKEN = "<PAD>"
     LEXICON_OOV_TOKEN = "spn"
     PHONES_TIER = "phones"
@@ -113,18 +112,41 @@ class VCTKFactory:
     def seconds_to_frame(self, seconds: float) -> float:
         return seconds * self.sample_rate / self.hop_size
 
+    def split_train_valid(
+        self, test_fraction: float
+    ) -> Tuple[VCTKDataset, VCTKDataset]:
+        speakers_to_data_id: Dict[int, List[int]] = defaultdict(list)
+
+        for i, sample in enumerate(self._dataset):
+            speakers_to_data_id[sample.speaker_id].append(i)
+        test_ids: List[int] = []
+        for ids in speakers_to_data_id.values():
+            test_size = int(len(ids) * test_fraction)
+            if test_size > 0:
+                test_indexes = random.choices(ids, k=test_size)
+                test_ids.extend(test_indexes)
+
+        train_data = []
+        test_data = []
+        for i in range(len(self._dataset)):
+            if i in test_ids:
+                test_data.append(self._dataset[i])
+            else:
+                train_data.append(self._dataset[i])
+        return VCTKDataset(train_data), VCTKDataset(test_data)
+
     def _build_dataset(self) -> List[VCTKSample]:
         speakers_counter = 0
         phonemes_counter = 2
         dataset: List[VCTKSample] = []
-        texts_set = set(
+        texts_set = {
             Path(x.parent.name) / x.stem
-            for x in self._text_dir.rglob(f'*{self._text_ext}')
-        )
-        mels_set = set(
+            for x in self._text_dir.rglob(f"*{self._text_ext}")
+        }
+        mels_set = {
             Path(x.parent.name) / x.stem
-            for x in self._mels_dir.rglob(f'*{self._mels_ext}')
-        )
+            for x in self._mels_dir.rglob(f"*{self._mels_ext}")
+        }
         samples = list(mels_set & texts_set)
         for sample in tqdm(samples):
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
@@ -164,8 +186,6 @@ class VCTKFactory:
             mels = (mels - MELS_MEAN) / MELS_STD
 
             pad_size = mels.shape[-1] - int(sum(durations))
-            # assert pad_size >= 0, f'Expected {mels.shape[-1]} mel frames, got {sum(input_sample["durations"])}'
-            # TODO: fix problem when pad_size < 0
             if pad_size < 0:
                 durations[-1] -= pad_size
                 assert durations[-1] >= 0
@@ -184,29 +204,6 @@ class VCTKFactory:
             )
         return dataset
 
-    def split_train_valid(
-        self, test_fraction: float
-    ) -> Tuple[VCTKDataset, VCTKDataset]:
-        speakers_to_data_id: Dict[int, List[int]] = defaultdict(list)
-
-        for i, sample in enumerate(self._dataset):
-            speakers_to_data_id[sample.speaker_id].append(i)
-        test_ids: List[int] = []
-        for ids in speakers_to_data_id.values():
-            test_size = int(len(ids) * test_fraction)
-            if test_size > 0:
-                test_indexes = random.choices(ids, k=test_size)
-                test_ids.extend(test_indexes)
-
-        train_data = []
-        test_data = []
-        for i in range(len(self._dataset)):
-            if i in test_ids:
-                test_data.append(self._dataset[i])
-            else:
-                train_data.append(self._dataset[i])
-        return VCTKDataset(train_data), VCTKDataset(test_data)
-
 
 class VCTKCollate:
     """
@@ -220,7 +217,7 @@ class VCTKCollate:
         """Collate's training batch from normalized text and mel-spectrogram
         PARAMS
         ------
-        batch: [{}, {}, ...]
+        batch: [{...}, {...}, ...]
         """
         # Right zero-pad all one-hot text sequences to max input length
         batch_size = len(batch)

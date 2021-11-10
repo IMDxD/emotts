@@ -42,16 +42,19 @@ class Postnet(nn.Module):
     def __init__(self, n_mel_channels: int, config: PostNetParams):
         super().__init__()
         self.dropout = config.dropout
-        convolutions: List[nn.Module] = [ConvNorm(
-            n_mel_channels,
-            config.embedding_dim,
-            kernel_size=config.kernel_size,
-            stride=1,
-            padding=int((config.kernel_size - 1) / 2),
-            dilation=1,
-            dropout_rate=config.dropout,
-            w_init_gain="tanh",
-        ), nn.Tanh()]
+        convolutions: List[nn.Module] = [
+            ConvNorm(
+                n_mel_channels,
+                config.embedding_dim,
+                kernel_size=config.kernel_size,
+                stride=1,
+                padding=int((config.kernel_size - 1) / 2),
+                dilation=1,
+                dropout_rate=config.dropout,
+                w_init_gain="tanh",
+            ),
+            nn.Tanh()
+        ]
 
         for _ in range(config.n_convolutions - 2):
             convolutions.append(

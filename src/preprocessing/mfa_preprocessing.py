@@ -7,19 +7,17 @@ from tqdm import tqdm
 
 
 @click.command()
-@click.option('--input-dir', type=Path, required=True,
-              help='Directory to move audio from.')
-@click.option('--output-dir', type=Path, required=True,
-              help='Directory to move audio to.')
+@click.option("--input-dir", type=Path, required=True,
+              help="Directory to move audio from.")
+@click.option("--output-dir", type=Path, required=True,
+              help="Directory to move audio to.")
 def main(input_dir: Path, output_dir: Path) -> None:
-    file_cnt = 0
-    for dir_path in tqdm(input_dir.iterdir()):
-        for file in dir_path.iterdir():
-            move(str(file), output_dir / dir_path.name)
-            file_cnt += 1
+    for _i, dir_path in tqdm(enumerate(input_dir.iterdir())):
+        for _j, filepath in enumerate(dir_path.iterdir()):
+            move(str(filepath), output_dir / dir_path.name)
         dir_path.rmdir()
 
-    print(f"{file_cnt} files were moved to {output_dir}")
+    print(f"{_i + _j + 2} files were moved to {output_dir}")
 
 
 if __name__ == "__main__":

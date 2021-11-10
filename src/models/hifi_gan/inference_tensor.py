@@ -16,7 +16,7 @@ def load_model(hifi_config: HIFIParams, device: torch.device) -> Generator:
         config = AttrDict(**json.load(f))
     generator = Generator(config).to(device)
     state_dict = torch.load(model_path, map_location=device)
-    generator.load_state_dict(state_dict['generator'])
+    generator.load_state_dict(state_dict["generator"])
     generator.remove_weight_norm()
     generator.eval()
     return generator
