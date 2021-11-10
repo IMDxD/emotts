@@ -17,7 +17,8 @@ def main(input_dir: Path) -> None:
         dir_path.mkdir(exist_ok=True)
         move(str(filepath), dir_path)
 
-    print(f"Finished successfully.")
+    print("Finished successfully.")
+
 
 if __name__ == "__main__":
     main()
