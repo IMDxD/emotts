@@ -36,11 +36,18 @@ with open(SPEAKERS_PATH, "r") as json_file:
 N_SPEAKERS = len(SPEAKERS_TO_IDS)
 
 
+class CleanedTextIsEmptyStringError(Exception):
+    """Raised when input text after cleaning is empty string"""
+    pass
+
+
 def text_to_file(user_query: str) -> None:
     text_path = pathlib.Path("tmp.txt")
     with open(text_path, "w") as fout:
         normalized_content = english_cleaners(user_query)
         normalized_content = " ".join(re.findall("[a-zA-Z]+", normalized_content))
+        if len(normalized_content) < 1:
+            raise CleanedTextIsEmptyStringError
         fout.write(normalized_content)
     subprocess.call(
         ["mfa", "g2p", G2P_MODEL_PATH, text_path.absolute(), G2P_OUTPUT_PATH]
