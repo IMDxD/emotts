@@ -14,6 +14,7 @@ from src.models.hifi_gan.inference_tensor import inference as hifi_inference
 from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
 from src.preprocessing.text.cleaners import english_cleaners
 
+
 SAMPLING_RATE = 22050
 MEL_CHANNELS = 80
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -22,7 +23,7 @@ AUDIO_OUTPUT_PATH = "predictions/generated.wav"
 G2P_MODEL_PATH = "models/g2p/english_g2p.zip"
 TACOTRON_MODEL_PATH = "models/tacotron/feature_model.pth"
 HIFI_PARAMS = HIFIParams(
-    dir_path="hifi", config_name="config.json", model_name="generator_v1"
+    dir_path="hifi", config_name="config.json", model_name="generator.hifi"
 )
 
 PHONEME_PATH = "models/tacotron/phonemes.json"
