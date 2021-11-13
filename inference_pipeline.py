@@ -2,7 +2,7 @@ import json
 import pathlib
 import re
 import subprocess
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import torch
 from scipy.io.wavfile import write as wav_write
@@ -13,7 +13,6 @@ from src.models.hifi_gan.hifi_config import HIFIParams
 from src.models.hifi_gan.inference_tensor import inference as hifi_inference
 from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
 from src.preprocessing.text.cleaners import english_cleaners
-
 
 SAMPLING_RATE = 22050
 MEL_CHANNELS = 80
@@ -42,29 +41,32 @@ class CleanedTextIsEmptyStringError(Exception):
     pass
 
 
-def text_to_file(user_query: str) -> None:
+def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> Dict[str, list]:
+    word_to_phones = {}
+    with open(g2p_path, "r") as fin:
+        for line in fin:
+            word, phones = line.rstrip().split("\t", 1)
+            word_to_phones[word] = [PHONEMES_TO_IDS[ph] for ph in phones.split(" ")]
+    return word_to_phones
+
+
+def phonemise(user_query: str) -> List[int]:
+    normalized_content = english_cleaners(user_query)
+    normalized_content = " ".join(re.findall("[a-zA-Z]+", normalized_content))
+    if len(normalized_content) < 1:
+        raise CleanedTextIsEmptyStringError
     text_path = pathlib.Path("tmp.txt")
     with open(text_path, "w") as fout:
-        normalized_content = english_cleaners(user_query)
-        normalized_content = " ".join(re.findall("[a-zA-Z]+", normalized_content))
-        if len(normalized_content) < 1:
-            raise CleanedTextIsEmptyStringError
         fout.write(normalized_content)
     subprocess.call(
         ["mfa", "g2p", G2P_MODEL_PATH, text_path.absolute(), G2P_OUTPUT_PATH]
     )
     text_path.unlink()
-
-
-def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> List[int]:
-    with open(g2p_path, "r") as fin:
-        phonemes_ids = []
-        for line in fin:
-            _, word_to_phones = line.rstrip().split("\t", 1)
-            phonemes_ids.extend(
-                [PHONEMES_TO_IDS[ph] for ph in word_to_phones.split(" ")]
-            )
-    return phonemes_ids
+    word_to_phones = parse_g2p()
+    phoneme_ids = []
+    for word in normalized_content.split(" "):
+        phoneme_ids.extend(word_to_phones[word])
+    return phoneme_ids
 
 
 def get_tacotron_batch(
@@ -84,8 +86,7 @@ def inference_text_to_speech(
     hifi_config: HIFIParams,
     device: torch.device = DEVICE,
 ) -> None:
-    text_to_file(input_text)
-    phoneme_ids = parse_g2p()
+    phoneme_ids = phonemise(input_text)
     batch = get_tacotron_batch(phoneme_ids, speaker_id, device)
 
     tacotron = torch.load(tacotron_model_path, map_location=device)
@@ -108,8 +109,8 @@ def inference_text_to_speech(
 
 if __name__ == "__main__":
     inference_text_to_speech(
-        input_text="1 ring to rule them all and plus 50 points to griffindor",
-        speaker_id=50,
+        input_text="Two months after receiving his doctorate, Pauli completed the article, which came to 237 pages",
+        speaker_id=21,
         audio_output_path=AUDIO_OUTPUT_PATH,
         tacotron_model_path=TACOTRON_MODEL_PATH,
         hifi_config=HIFI_PARAMS,
