@@ -13,6 +13,7 @@ LANGUAGES = ["English (en-EN)", "Русский (ru-RU)"]
 EMOTIONS = ["😄", "😃", "🙂", "😐", "😑", "😒", "😡"]
 RUSSIAN_VOICES = ["Игорь", "Ержан"]
 ENGLISH_VOICES = sorted(SPEAKERS_TO_IDS.keys())
+DEFAULT_USER_INPUT = "One ring to rule them all,\n1 Ring to find them,\nOne ring to bring them all,\nand in the darkness bind them"
 
 
 def layout_app() -> None:
@@ -34,7 +35,7 @@ def layout_app() -> None:
     with st.form(key="input_form"):
         emotion = st.select_slider(label="🎨 Emotion", options=EMOTIONS)
         st_empty_block(2)
-        input_text = st.text_area(label="📜 What should I say?", value="50 points to Dumbledore", max_chars=140)
+        input_text = st.text_area(label="📜 What should I say?", value=DEFAULT_USER_INPUT, max_chars=140)
         st_empty_block(2)
         form_submit = st.form_submit_button("Synthesize speech")
 
