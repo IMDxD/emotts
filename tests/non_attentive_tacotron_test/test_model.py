@@ -171,11 +171,16 @@ def test_prenet_layer() -> None:
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
 
 
-def test_decoder_layer_forward() -> None:
+@pytest.mark.parametrize(
+    "n_frames_per_step",
+    [1, 2, 3]
+)
+def test_decoder_layer_forward(n_frames_per_step) -> None:
     expected_shape = (16, DURATIONS_MAX.max(), N_MELS_DIM)
 
     layer = Decoder(
         N_MELS_DIM,
+        n_frames_per_step,
         ATTENTION_OUT_DIM,
         config=DECODER_CONFIG,
     )
@@ -185,11 +190,16 @@ def test_decoder_layer_forward() -> None:
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
 
 
-def test_decoder_layer_inference() -> None:
+@pytest.mark.parametrize(
+    "n_frames_per_step",
+    [1, 2, 3]
+)
+def test_decoder_layer_inference(n_frames_per_step) -> None:
     expected_shape = (16, DURATIONS_MAX.max(), N_MELS_DIM)
 
     layer = Decoder(
         N_MELS_DIM,
+        n_frames_per_step,
         ATTENTION_OUT_DIM,
         config=DECODER_CONFIG,
     )

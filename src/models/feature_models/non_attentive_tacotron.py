@@ -286,82 +286,135 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(
-        self, n_mel_channels: int, attention_out_dim: int, config: DecoderParams
+        self, n_mel_channels: int,
+            n_frames_per_step: int,
+            attention_out_dim: int,
+            config: DecoderParams
     ):
         super().__init__()
         self.n_mel_channels = n_mel_channels
         self.decoder_rnn_dim = config.decoder_rnn_dim
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
         self.p_decoder_dropout = config.dropout
+        self.n_frames_per_step = n_frames_per_step
 
         self.prenet = Prenet(
-            n_mel_channels,
+            self.n_mel_channels,
             config.prenet_layers,
             config.prenet_dropout,
         )
 
         self.decoder_rnn = nn.LSTM(
-            attention_out_dim + config.prenet_layers[-1],
-            config.decoder_rnn_dim,
+            (attention_out_dim + config.prenet_layers[-1]) * self.n_frames_per_step,
+            config.decoder_rnn_dim * self.n_frames_per_step,
             num_layers=config.decoder_num_layers,
             bidirectional=False,
             batch_first=True,
         )
 
         self.linear_projection = LinearWithActivation(
-            config.decoder_rnn_dim + attention_out_dim, n_mel_channels
+            (config.decoder_rnn_dim + attention_out_dim) * self.n_frames_per_step,
+            n_mel_channels * self.n_frames_per_step
         )
 
     def forward(self, memory: torch.Tensor, y_mels: torch.Tensor) -> torch.Tensor:
 
-        previous_frame = torch.zeros(memory.shape[0], 1, self.n_mel_channels).to(memory.device)
-        y_mels = torch.cat((previous_frame, y_mels[:, :-1, :]), dim=1)
+        batch_size = memory.shape[0]
+        previous_frame = torch.zeros(
+            memory.shape[0],
+            1,
+            self.n_mel_channels * self.n_frames_per_step
+        ).to(memory.device)
+        to_pad_mels = self.n_frames_per_step - y_mels.shape[1] % self.n_frames_per_step
+        padded_y_mels = f.pad(
+            y_mels.permute(0, 2, 1),
+            (0, to_pad_mels),
+            mode="constant",
+            value=0
+        ).permute(0, 2, 1)
+        padded_memory = f.pad(
+            memory.permute(0, 2, 1),
+            (0, to_pad_mels),
+            mode="constant",
+            value=0
+        ).permute(0, 2, 1)
+        new_len = padded_memory.shape[1] // self.n_frames_per_step
+        padded_y_mels = padded_y_mels.reshape(batch_size, new_len, -1)
+        padded_y_mels = torch.cat((previous_frame, padded_y_mels[:, :-1, :]), dim=1)
+        padded_memory = padded_memory.reshape(batch_size, new_len, -1)
         previous_frame = previous_frame[:, 0, :]
 
         mel_outputs = []
         decoder_state = None
 
-        for i in range(memory.shape[1]):
-            previous_frame = self.prenet(previous_frame)
+        for i in range(new_len):
+            previous_frame = self.prenet(
+                previous_frame.view(
+                    batch_size,
+                    -1,
+                    self.n_mel_channels
+                )
+            )
             decoder_input: torch.Tensor = torch.cat(
-                (previous_frame, memory[:, i, :]), dim=-1
+                (previous_frame.view(batch_size, -1), padded_memory[:, i, :]), dim=-1
             )
             out, decoder_state = self.decoder_rnn(
                 decoder_input.unsqueeze(1), decoder_state
             )
-            out = torch.cat((out, memory[:, i, :].unsqueeze(1)), dim=-1)
+            out = torch.cat((out, padded_memory[:, i, :].unsqueeze(1)), dim=-1)
             mel_out = self.linear_projection(out)
             mel_outputs.append(mel_out)
             if random.uniform(0, 1) > self.teacher_forcing_ratio:
                 previous_frame = mel_out.squeeze(1)
             else:
-                previous_frame = y_mels[:, i, :]
+                previous_frame = padded_y_mels[:, i, :]
 
         mel_tensor_outputs: torch.Tensor = torch.cat(mel_outputs, dim=1)
-        return mel_tensor_outputs
+        mel_tensor_outputs = mel_tensor_outputs.reshape(batch_size, -1, self.n_mel_channels)
+        return mel_tensor_outputs[:, :-to_pad_mels, :]
 
     def inference(self, memory: torch.Tensor) -> torch.Tensor:
 
-        previous_frame = torch.zeros(memory.shape[0], self.n_mel_channels).to(memory.device)
+        batch_size = memory.shape[0]
+        to_pad_mels = self.n_frames_per_step - memory.shape[1] % self.n_frames_per_step
+        previous_frame = torch.zeros(
+            memory.shape[0],
+            self.n_mel_channels * self.n_frames_per_step
+        ).to(memory.device)
+        padded_memory = f.pad(
+            memory.permute(0, 2, 1),
+            (0, to_pad_mels),
+            mode="constant",
+            value=0
+        ).permute(0, 2, 1)
+        new_len = padded_memory.shape[1] // self.n_frames_per_step
+        padded_memory = padded_memory.reshape(batch_size, new_len, -1)
 
         mel_outputs = []
         decoder_state = None
 
-        for i in range(memory.shape[1]):
-            previous_frame = self.prenet(previous_frame)
+        for i in range(new_len):
+            previous_frame = self.prenet(
+                previous_frame.view(
+                    batch_size,
+                    -1,
+                    self.n_mel_channels
+                )
+            )
             decoder_input: torch.Tensor = torch.cat(
-                (previous_frame, memory[:, i, :]), dim=-1
+                (previous_frame.view(batch_size, -1), padded_memory[:, i, :]), dim=-1
             )
             out, decoder_state = self.decoder_rnn(
                 decoder_input.unsqueeze(1), decoder_state
             )
-            out = torch.cat((out, memory[:, i, :].unsqueeze(1)), dim=-1)
+            out = torch.cat((out, padded_memory[:, i, :].unsqueeze(1)), dim=-1)
             mel_out = self.linear_projection(out)
             mel_outputs.append(mel_out)
             previous_frame = mel_out.squeeze(1)
 
         mel_tensor_outputs: torch.Tensor = torch.cat(mel_outputs, dim=1)
-        return mel_tensor_outputs
+        mel_tensor_outputs = mel_tensor_outputs.reshape(batch_size, -1, self.n_mel_channels)
+        return mel_tensor_outputs[:, :memory.shape[1], :]
 
 
 class NonAttentiveTacotron(nn.Module):
@@ -400,6 +453,7 @@ class NonAttentiveTacotron(nn.Module):
         )
         self.decoder = Decoder(
             n_mel_channels,
+            config.n_frames_per_step,
             full_embedding_dim + config.attention_config.positional_dim,
             config.decoder_config
         )

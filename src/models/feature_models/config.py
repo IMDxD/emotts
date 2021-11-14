@@ -68,6 +68,7 @@ class ModelParams:
     attention_config: GaussianUpsampleParams
     decoder_config: DecoderParams
     postnet_config: PostNetParams
+    n_frames_per_step: int = field(default=3)
     mask_padding: bool = field(default=True)
     phonem_embedding_dim: int = field(default=512)
     speaker_embedding_dim: int = field(default=256)
