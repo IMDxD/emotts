@@ -6,16 +6,17 @@ from torch import nn
 from torch.nn import functional as f
 
 from src.data_process import VCTKBatch
-from src.models.feature_models.config import (
+from .config import (
     DecoderParams, DurationParams, EncoderParams, GaussianUpsampleParams,
     ModelParams, PostNetParams, RangeParams,
 )
-from src.models.feature_models.layers import (
-    ConvNorm, LinearWithActivation, PositionalEncoding,
+from .layers import (
+    Conv1DNorm, LinearWithActivation, PositionalEncoding,
 )
-from src.models.feature_models.utils import (
+from .utils import (
     get_mask_from_lengths, norm_emb_layer,
 )
+from .gst import GST
 
 
 class Prenet(nn.Module):
@@ -43,7 +44,7 @@ class Postnet(nn.Module):
         super().__init__()
         self.dropout = config.dropout
         convolutions: List[nn.Module] = [
-            ConvNorm(
+            Conv1DNorm(
                 n_mel_channels,
                 config.embedding_dim,
                 kernel_size=config.kernel_size,
@@ -58,7 +59,7 @@ class Postnet(nn.Module):
 
         for _ in range(config.n_convolutions - 2):
             convolutions.append(
-                ConvNorm(
+                Conv1DNorm(
                     config.embedding_dim,
                     config.embedding_dim,
                     kernel_size=config.kernel_size,
@@ -71,7 +72,7 @@ class Postnet(nn.Module):
             convolutions.append(nn.Tanh())
 
         convolutions.append(
-            ConvNorm(
+            Conv1DNorm(
                 config.embedding_dim,
                 n_mel_channels,
                 kernel_size=config.kernel_size,
@@ -220,7 +221,7 @@ class Encoder(nn.Module):
         super().__init__()
 
         convolutions: List[nn.Module] = [
-            ConvNorm(
+            Conv1DNorm(
                 phonem_embedding_dim,
                 config.conv_channel,
                 kernel_size=config.kernel_size,
@@ -233,7 +234,7 @@ class Encoder(nn.Module):
         ]
 
         for _ in range(config.n_convolutions - 2):
-            conv_layer = ConvNorm(
+            conv_layer = Conv1DNorm(
                 config.conv_channel,
                 config.conv_channel,
                 kernel_size=config.kernel_size,
@@ -245,7 +246,7 @@ class Encoder(nn.Module):
             convolutions.append(conv_layer)
 
         convolutions.append(
-            ConvNorm(
+            Conv1DNorm(
                 config.conv_channel,
                 phonem_embedding_dim,
                 kernel_size=config.kernel_size,
@@ -428,7 +429,7 @@ class NonAttentiveTacotron(nn.Module):
         super().__init__()
 
         full_embedding_dim = config.phonem_embedding_dim + config.speaker_embedding_dim
-        self.phonem_embedding = nn.Embedding(n_phonems, config.phonem_embedding_dim)
+        self.phonem_embedding = nn.Embedding(n_phonems, config.phonem_embedding_dim, padding_idx=0)
         self.speaker_embedding = nn.Embedding(
             n_speakers,
             config.speaker_embedding_dim,
@@ -451,10 +452,19 @@ class NonAttentiveTacotron(nn.Module):
             full_embedding_dim,
             config.attention_config
         )
+        self.gst = GST(
+            n_mel_channels=n_mel_channels,
+            config=config.gst_config
+        )
+        styled_attention_dim = (
+            full_embedding_dim +
+            config.attention_config.positional_dim +
+            config.gst_config.emb_dim
+        )
         self.decoder = Decoder(
             n_mel_channels,
             config.n_frames_per_step,
-            full_embedding_dim + config.attention_config.positional_dim,
+            styled_attention_dim,
             config.decoder_config
         )
         self.postnet = Postnet(
@@ -477,7 +487,10 @@ class NonAttentiveTacotron(nn.Module):
         durations, attented_embeddings = self.attention(
             embeddings, batch.num_phonemes, batch.durations
         )
-        mel_outputs = self.decoder(attented_embeddings, batch.mels)
+        style_emb = self.gst(batch.mels)
+        style_emb = torch.repeat_interleave(style_emb, attented_embeddings.shape[1], dim=1)
+        styled_attention_embedding = torch.cat([attented_embeddings, style_emb], dim=-1)
+        mel_outputs = self.decoder(styled_attention_embedding, batch.mels)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
         mask = get_mask_from_lengths(
@@ -489,10 +502,10 @@ class NonAttentiveTacotron(nn.Module):
         return durations, mel_outputs_postnet, mel_outputs
 
     def inference(
-        self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
 
-        text_inputs, text_lengths, speaker_ids = batch
+        text_inputs, text_lengths, speaker_ids, reference_mel = batch
         phonem_emb = self.phonem_embedding(text_inputs).transpose(1, 2)
         speaker_emb = self.speaker_embedding(speaker_ids).unsqueeze(1)
 
@@ -502,7 +515,10 @@ class NonAttentiveTacotron(nn.Module):
         embeddings = torch.cat((phonem_emb, speaker_emb), dim=-1)
 
         attented_embeddings = self.attention.inference(embeddings, text_lengths)
-        mel_outputs = self.decoder.inference(attented_embeddings)
+        style_emb = self.gst(reference_mel)
+        style_emb = torch.repeat_interleave(style_emb, attented_embeddings.shape[1], dim=1)
+        styled_attention_embedding = torch.cat([attented_embeddings, style_emb], dim=-1)
+        mel_outputs = self.decoder.inference(styled_attention_embedding)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
 

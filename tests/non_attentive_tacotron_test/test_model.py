@@ -6,7 +6,7 @@ import torch
 from src.data_process import VCTKBatch
 from src.models.feature_models.config import (
     DecoderParams, DurationParams, EncoderParams, GaussianUpsampleParams,
-    ModelParams, PostNetParams, RangeParams,
+    ModelParams, PostNetParams, RangeParams, GSTParams
 )
 from src.models.feature_models.non_attentive_tacotron import (
     Attention, Decoder, DurationPredictor, Encoder, NonAttentiveTacotron,
@@ -21,11 +21,13 @@ ATTENTION_CONFIG = GaussianUpsampleParams(
     duration_config=DURATION_CONFIG, range_config=RANGE_CONFIG
 )
 POSTNET_CONFIG = PostNetParams()
+GST_CONFIG = GSTParams()
 MODEL_CONFIG = ModelParams(
     encoder_config=ENCODER_CONFIG,
     attention_config=ATTENTION_CONFIG,
     decoder_config=DECODER_CONFIG,
     postnet_config=POSTNET_CONFIG,
+    gst_config=GST_CONFIG
 )
 N_PHONEMES = 100
 N_SPEAKER = 4
@@ -64,6 +66,7 @@ MODEL_INFERENCE_INPUT = (
     INPUT_PHONEMES,
     INPUT_LENGTH,
     INPUT_SPEAKERS,
+    INPUT_MELS,
 )
 
 

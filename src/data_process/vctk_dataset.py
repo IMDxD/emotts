@@ -13,6 +13,8 @@ from src.data_process.config import VCTKDatasetParams
 from src.data_process.constanst import MELS_MEAN, MELS_STD
 
 NUMBER = Union[int, float]
+PHONES_TIER = "phones"
+PAD_TOKEN = "<PAD>"
 
 
 @dataclass
@@ -26,6 +28,15 @@ class VCTKSample:
 
 
 @dataclass
+class VCTKInfo:
+
+    text_path: Path
+    mel_path: Path
+    speaker_id: int
+    phonemes_length: int
+
+
+@dataclass
 class VCTKBatch:
 
     phonemes: torch.Tensor
@@ -36,15 +47,56 @@ class VCTKBatch:
 
 
 class VCTKDataset(Dataset[VCTKSample]):
-    def __init__(self, data: List[VCTKSample]):
+
+    def __init__(
+            self,
+            sample_rate: int,
+            hop_size: int,
+            phoneme_to_ids: Dict[str, int],
+            data: List[VCTKInfo]
+    ):
+        self._phoneme_to_id = phoneme_to_ids
         self._dataset = data
-        self._dataset.sort(key=lambda x: len(x.phonemes))
+        self._dataset.sort(key=lambda x: len(x.audio_length))
+        self.sample_rate = sample_rate
+        self.hop_size = hop_size
 
     def __len__(self) -> int:
         return len(self._dataset)
 
     def __getitem__(self, idx: int) -> VCTKSample:
-        return self._dataset[idx]
+
+        info = self._dataset[idx]
+        text_grid = tgt.read_textgrid(info.text_path)
+        phones_tier = text_grid.get_tier_by_name(PHONES_TIER)
+        phoneme_ids = [self._phoneme_to_id[x.text] for x in phones_tier.get_copy_with_gaps_filled()]
+
+        durations = [
+            self.seconds_to_frame(x.duration())
+            for x in phones_tier.get_copy_with_gaps_filled()
+        ]
+
+        mels: torch.Tensor = torch.load(info.mel_path)
+        mels = (mels - MELS_MEAN) / MELS_STD
+
+        pad_size = mels.shape[-1] - int(sum(durations))
+        if pad_size < 0:
+            durations[-1] -= pad_size
+            assert durations[-1] >= 0
+        if pad_size > 0:
+            phoneme_ids.append(self._phoneme_to_id[PAD_TOKEN])
+            durations.append(pad_size)
+
+        return VCTKSample(
+            phonemes=phoneme_ids,
+            num_phonemes=len(phoneme_ids),
+            speaker_id=info.speaker_id,
+            mels=mels,
+            durations=durations
+        )
+
+    def seconds_to_frame(self, seconds: float) -> float:
+        return seconds * self.sample_rate / self.hop_size
 
 
 class VCTKFactory:
@@ -75,11 +127,7 @@ class VCTKFactory:
                 └──...
     """
 
-    PAUSE_TOKEN = "<SIL>"
-    MFA_PAUSE_TOKEN = ""
-    PAD_TOKEN = "<PAD>"
     LEXICON_OOV_TOKEN = "spn"
-    PHONES_TIER = "phones"
 
     def __init__(
         self,
@@ -89,18 +137,16 @@ class VCTKFactory:
         phonemes_to_id: Dict[str, int],
         speakers_to_id: Dict[str, int],
     ):
-
+        self.sample_rate = sample_rate
+        self.hop_size = hop_size
         self._mels_dir = Path(config.mels_dir)
         self._text_dir = Path(config.text_dir)
         self._text_ext = config.text_ext
         self._mels_ext = config.mels_ext
-        self.sample_rate = sample_rate
-        self.hop_size = hop_size
         self.phoneme_to_id: Dict[str, int] = phonemes_to_id
-        self.phoneme_to_id[self.PAD_TOKEN] = 0
-        self.phoneme_to_id[self.PAUSE_TOKEN] = 1
+        self.phoneme_to_id[PAD_TOKEN] = 0
         self.speaker_to_id: Dict[str, int] = speakers_to_id
-        self._dataset: List[VCTKSample] = self._build_dataset()
+        self._dataset: List[VCTKInfo] = self._build_dataset()
 
     @staticmethod
     def add_to_mapping(mapping: Dict[str, int], token: str, index: int) -> int:
@@ -108,9 +154,6 @@ class VCTKFactory:
             mapping[token] = index
             index += 1
         return index
-
-    def seconds_to_frame(self, seconds: float) -> float:
-        return seconds * self.sample_rate / self.hop_size
 
     def split_train_valid(
         self, test_fraction: float
@@ -133,12 +176,14 @@ class VCTKFactory:
                 test_data.append(self._dataset[i])
             else:
                 train_data.append(self._dataset[i])
-        return VCTKDataset(train_data), VCTKDataset(test_data)
+        train_dataset = VCTKDataset(self.sample_rate, self.hop_size, self.phoneme_to_id, train_data)
+        test_dataset = VCTKDataset(self.sample_rate, self.hop_size, self.phoneme_to_id, test_data)
+        return train_dataset, test_dataset
 
-    def _build_dataset(self) -> List[VCTKSample]:
+    def _build_dataset(self) -> List[VCTKInfo]:
         speakers_counter = 0
         phonemes_counter = 2
-        dataset: List[VCTKSample] = []
+        dataset: List[VCTKInfo] = []
         texts_set = {
             Path(x.parent.name) / x.stem
             for x in self._text_dir.rglob(f"*{self._text_ext}")
@@ -150,58 +195,33 @@ class VCTKFactory:
         samples = list(mels_set & texts_set)
         for sample in tqdm(samples):
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
+            mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
+
             text_grid = tgt.read_textgrid(tg_path)
-
-            if self.PHONES_TIER not in text_grid.get_tier_names():
-                continue
-
-            phones_tier = text_grid.get_tier_by_name(self.PHONES_TIER)
-
-            phonemes = [x.text for x in phones_tier.get_copy_with_gaps_filled()]
-
-            if self.LEXICON_OOV_TOKEN in phonemes:
-                continue
-
             speakers_counter = self.add_to_mapping(
                 self.speaker_to_id, sample.parent.name, speakers_counter
             )
             speaker_id = self.speaker_to_id[sample.parent.name]
 
-            phoneme_ids = []
-            for phoneme in phonemes:
-                if phoneme == self.MFA_PAUSE_TOKEN:
-                    phoneme = self.PAUSE_TOKEN
-                phonemes_counter = self.add_to_mapping(
-                    self.phoneme_to_id, phoneme, phonemes_counter
+            if PHONES_TIER in text_grid.get_tier_names():
+
+                phones_tier = text_grid.get_tier_by_name(PHONES_TIER)
+                phonemes = [x.text for x in phones_tier.get_copy_with_gaps_filled()]
+
+                for phoneme in phonemes:
+                    phonemes_counter = self.add_to_mapping(
+                        self.phoneme_to_id, phoneme, phonemes_counter
+                    )
+
+                dataset.append(
+                    VCTKInfo(
+                        text_path=tg_path,
+                        mel_path=mels_path,
+                        phonemes_length=len(phonemes),
+                        speaker_id=speaker_id
+                    )
                 )
-                phoneme_ids.append(self.phoneme_to_id[phoneme])
 
-            durations = [
-                self.seconds_to_frame(x.duration())
-                for x in phones_tier.get_copy_with_gaps_filled()
-            ]
-
-            mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
-            mels: torch.Tensor = torch.load(mels_path)
-            mels = (mels - MELS_MEAN) / MELS_STD
-
-            pad_size = mels.shape[-1] - int(sum(durations))
-            if pad_size < 0:
-                durations[-1] -= pad_size
-                assert durations[-1] >= 0
-            if pad_size > 0:
-                phoneme_ids.append(self.phoneme_to_id[self.PAUSE_TOKEN])
-                durations.append(pad_size)
-
-            dataset.append(
-                VCTKSample(
-                    phonemes=phoneme_ids,
-                    num_phonemes=len(phoneme_ids),
-                    speaker_id=speaker_id,
-                    durations=durations,
-                    mels=mels,
-                )
-            )
         return dataset
 
 
@@ -240,27 +260,22 @@ class VCTKCollate:
             durations = batch[idx].durations
             durations_padded[i, : len(durations)] = torch.FloatTensor(durations)
 
-        # Right zero-pad mel-spec
         num_mels = batch[0].mels.squeeze(0).size(0)
         max_target_len = max([x.mels.squeeze(0).size(1) for x in batch])
-        if max_target_len % self.n_frames_per_step != 0:
-            max_target_len += (
-                self.n_frames_per_step - max_target_len % self.n_frames_per_step
-            )
-            assert max_target_len % self.n_frames_per_step == 0
 
         # include mel padded and gate padded
         mel_padded = torch.zeros(
             (batch_size, num_mels, max_target_len), dtype=torch.float
         )
         for i, idx in enumerate(ids_sorted_decreasing):
-            mel = batch[idx].mels.squeeze(0)
-            mel_padded[i, :, : mel.size(1)] = mel
+            mel: torch.Tensor = batch[idx].mels.squeeze(0)
+            mel_padded[i, :, : mel.shape[1]] = mel
         mel_padded = mel_padded.permute(0, 2, 1)
+
         return VCTKBatch(
             phonemes=text_padded,
             num_phonemes=input_lengths,
             speaker_ids=input_speaker_ids,
             durations=durations_padded,
-            mels=mel_padded,
+            mels=mel_padded
         )

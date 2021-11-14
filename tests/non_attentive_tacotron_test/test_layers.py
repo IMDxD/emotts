@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from src.models.feature_models.layers import (
-    ConvNorm, Idomp, LinearWithActivation, PositionalEncoding,
+    Conv1DNorm, Idomp, LinearWithActivation, PositionalEncoding,
 )
 
 
@@ -29,7 +29,7 @@ def test_conv_norm_layer(
     input_tensor: torch.Tensor,
     expected_shape: Tuple[int, int, int]
 ) -> None:
-    layer = ConvNorm(
+    layer = Conv1DNorm(
         input_tensor.shape[1], output_channel, kernel_size, dilation=dilation
     )
     layer_out = layer(input_tensor)

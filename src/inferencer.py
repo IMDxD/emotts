@@ -39,18 +39,32 @@ class Inferencer:
         self.feature_model: NonAttentiveTacotron = torch.load(
             checkpoint_path / FEATURE_MODEL_FILENAME, map_location=self.device
         )
-        self.text_pathes = text_data_path.rglob(f"*{config.data.text_ext}")
+        self._text_dir = Path(config.data.text_dir)
+        self._mels_dir = Path(config.data.mels_dir)
+        self._text_ext = config.data.text_ext
+        self._mels_ext = config.data.mels_ext
         self.feature_model_mels_path = data_path / self.TACOTRON_DIR
         self.feature_model_mels_path.mkdir(parents=True, exist_ok=True)
 
     def proceed_data(self) -> None:
-        for text_file in self.text_pathes:
-            filename = text_file.stem
-            speaker = text_file.parent.name
+        texts_set = {
+            Path(x.parent.name) / x.stem
+            for x in self._text_dir.rglob(f"*{self._text_ext}")
+        }
+        mels_set = {
+            Path(x.parent.name) / x.stem
+            for x in self._mels_dir.rglob(f"*{self._mels_ext}")
+        }
+        samples = list(mels_set & texts_set)
+        for sample in samples:
+            tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
+            mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
+            mel = torch.load(mels_path)
+            speaker = sample.parent.name
             if speaker not in self.speakers_to_idx:
                 continue
             speaker_id = self.speakers_to_idx[speaker]
-            phoneme_ids = self.parse_file(text_file)
+            phoneme_ids = self.parse_file(tg_path)
             if phoneme_ids is None:
                 continue
             phonemes_len = len(phoneme_ids)
@@ -58,6 +72,7 @@ class Inferencer:
                 torch.LongTensor([phoneme_ids]).to(self.device),
                 torch.LongTensor([phonemes_len]),
                 torch.LongTensor([speaker_id]).to(self.device),
+                mel.to(self.device)
             )
             output = self.feature_model.inference(batch)
             output = output.permute(0, 2, 1).squeeze(0)
@@ -65,7 +80,7 @@ class Inferencer:
             save_dir = self.feature_model_mels_path / speaker
             save_dir.mkdir(exist_ok=True)
             torch.save(
-                output, save_dir / f"{filename}.{self.MEL_EXT}"
+                output, save_dir / f"{str(sample)}.{self.MEL_EXT}"
             )
 
     def parse_file(self, filepath: Path) -> Optional[List[int]]:
