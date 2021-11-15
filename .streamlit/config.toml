@@ -10,7 +10,8 @@ primaryColor = "Orchid"
 backgroundColor = "#20180e"
 
 # Background color used for the sidebar and most interactive widgets.
-secondaryBackgroundColor = "Purple"
+#secondaryBackgroundColor = "Purple"
+secondaryBackgroundColor = "#563763"
 
 # Color used for almost all text.
 textColor = "FloralWhite"

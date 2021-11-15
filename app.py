@@ -13,12 +13,13 @@ LANGUAGES = ["English (en-EN)", "Русский (ru-RU)"]
 EMOTIONS = ["😄", "😃", "🙂", "😐", "😑", "😒", "😡"]
 RUSSIAN_VOICES = ["Игорь", "Ержан"]
 ENGLISH_VOICES = sorted(SPEAKERS_TO_IDS.keys())
-DEFAULT_USER_INPUT = "One ring to rule them all,\n1 Ring to find them,\nOne ring to bring them all,\nand in the darkness bind them"
+DEFAULT_USER_INPUT = "50 points to mr Dumbledore"
 
 
 def layout_app() -> None:
 
-    header_text = "🥀 EMOtts dEMO 💔"
+    # header_text = "🥀 EMOtts dEMO 💔"
+    header_text = "EmoTTS Project"
     st_header_centered(header_text)
     st_empty_block(2)
 
