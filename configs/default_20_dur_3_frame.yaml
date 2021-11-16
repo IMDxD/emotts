@@ -5,7 +5,7 @@ f_max: 8000
 win_size: 1024
 n_fft: 1024
 n_mels: 80
-checkpoint_name: tacotron_vctk_default
+checkpoint_name: tacotron_vctk_default_20_dur_3_frame
 hifi:
   dir_path: hifi
   model_name: generator_v1
@@ -36,7 +36,7 @@ data:
   text_dir: data/vctk/mfa_outputs
   mels_dir: data/vctk/mels
 model:
-  n_frames_per_step: 1
+  n_frames_per_step: 3
   encoder_config:
     n_convolutions: 3
     kernel_size: 5
