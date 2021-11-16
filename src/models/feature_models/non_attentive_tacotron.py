@@ -428,7 +428,7 @@ class NonAttentiveTacotron(nn.Module):
     ):
         super().__init__()
 
-        full_embedding_dim = config.phonem_embedding_dim + config.speaker_embedding_dim
+        full_embedding_dim = config.phonem_embedding_dim + config.speaker_embedding_dim + config.gst_config.emb_dim
         self.phonem_embedding = nn.Embedding(n_phonems, config.phonem_embedding_dim, padding_idx=0)
         self.speaker_embedding = nn.Embedding(
             n_speakers,
@@ -456,15 +456,11 @@ class NonAttentiveTacotron(nn.Module):
             n_mel_channels=n_mel_channels,
             config=config.gst_config
         )
-        styled_attention_dim = (
-            full_embedding_dim +
-            config.attention_config.positional_dim +
-            config.gst_config.emb_dim
-        )
         self.decoder = Decoder(
             n_mel_channels,
             config.n_frames_per_step,
-            styled_attention_dim,
+            full_embedding_dim +
+            config.attention_config.positional_dim,
             config.decoder_config
         )
         self.postnet = Postnet(
@@ -482,15 +478,16 @@ class NonAttentiveTacotron(nn.Module):
         phonem_emb = self.encoder(phonem_emb, batch.num_phonemes)
 
         speaker_emb = torch.repeat_interleave(speaker_emb, phonem_emb.shape[1], dim=1)
-        embeddings = torch.cat((phonem_emb, speaker_emb), dim=-1)
+        
+        style_emb = self.gst(batch.mels)
+        style_emb = torch.repeat_interleave(style_emb, speaker_emb.shape[1], dim=1)
+        embeddings = torch.cat((phonem_emb, speaker_emb, style_emb), dim=-1)
 
         durations, attented_embeddings = self.attention(
             embeddings, batch.num_phonemes, batch.durations
         )
-        style_emb = self.gst(batch.mels)
-        style_emb = torch.repeat_interleave(style_emb, attented_embeddings.shape[1], dim=1)
-        styled_attention_embedding = torch.cat([attented_embeddings, style_emb], dim=-1)
-        mel_outputs = self.decoder(styled_attention_embedding, batch.mels)
+        
+        mel_outputs = self.decoder(attented_embeddings, batch.mels)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
         mask = get_mask_from_lengths(
@@ -512,13 +509,14 @@ class NonAttentiveTacotron(nn.Module):
         phonem_emb = self.encoder(phonem_emb, text_lengths)
 
         speaker_emb = torch.repeat_interleave(speaker_emb, phonem_emb.shape[1], dim=1)
-        embeddings = torch.cat((phonem_emb, speaker_emb), dim=-1)
+        
+        style_emb = self.gst(reference_mel)
+        style_emb = torch.repeat_interleave(style_emb, phonem_emb.shape[1], dim=1)
+        embeddings = torch.cat((phonem_emb, speaker_emb, style_emb), dim=-1)
 
         attented_embeddings = self.attention.inference(embeddings, text_lengths)
-        style_emb = self.gst(reference_mel)
-        style_emb = torch.repeat_interleave(style_emb, attented_embeddings.shape[1], dim=1)
-        styled_attention_embedding = torch.cat([attented_embeddings, style_emb], dim=-1)
-        mel_outputs = self.decoder.inference(styled_attention_embedding)
+
+        mel_outputs = self.decoder.inference(attented_embeddings)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
 
