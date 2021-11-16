@@ -81,7 +81,7 @@ class VCTKDataset(Dataset[VCTKSample]):
 
         pad_size = mels.shape[-1] - int(sum(durations))
         if pad_size < 0:
-            durations[-1] -= pad_size
+            durations[-1] += pad_size
             assert durations[-1] >= 0
         if pad_size > 0:
             phoneme_ids.append(self._phoneme_to_id[PAD_TOKEN])
@@ -127,8 +127,6 @@ class VCTKFactory:
                 └──...
     """
 
-    LEXICON_OOV_TOKEN = "spn"
-
     def __init__(
         self,
         sample_rate: int,
@@ -149,11 +147,9 @@ class VCTKFactory:
         self._dataset: List[VCTKInfo] = self._build_dataset()
 
     @staticmethod
-    def add_to_mapping(mapping: Dict[str, int], token: str, index: int) -> int:
+    def add_to_mapping(mapping: Dict[str, int], token: str) -> int:
         if token not in mapping:
-            mapping[token] = index
-            index += 1
-        return index
+            mapping[token] = len(mapping)
 
     def split_train_valid(
         self, test_fraction: float
@@ -181,8 +177,7 @@ class VCTKFactory:
         return train_dataset, test_dataset
 
     def _build_dataset(self) -> List[VCTKInfo]:
-        speakers_counter = 0
-        phonemes_counter = 2
+
         dataset: List[VCTKInfo] = []
         texts_set = {
             Path(x.parent.name) / x.stem
@@ -198,9 +193,7 @@ class VCTKFactory:
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
 
             text_grid = tgt.read_textgrid(tg_path)
-            speakers_counter = self.add_to_mapping(
-                self.speaker_to_id, sample.parent.name, speakers_counter
-            )
+            self.add_to_mapping(self.speaker_to_id, sample.parent.name)
             speaker_id = self.speaker_to_id[sample.parent.name]
 
             if PHONES_TIER in text_grid.get_tier_names():
@@ -209,9 +202,7 @@ class VCTKFactory:
                 phonemes = [x.text for x in phones_tier.get_copy_with_gaps_filled()]
 
                 for phoneme in phonemes:
-                    phonemes_counter = self.add_to_mapping(
-                        self.phoneme_to_id, phoneme, phonemes_counter
-                    )
+                    self.add_to_mapping(self.phoneme_to_id, phoneme)
 
                 dataset.append(
                     VCTKInfo(
