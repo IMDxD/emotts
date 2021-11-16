@@ -57,7 +57,7 @@ class VCTKDataset(Dataset[VCTKSample]):
     ):
         self._phoneme_to_id = phoneme_to_ids
         self._dataset = data
-        self._dataset.sort(key=lambda x: len(x.audio_length))
+        self._dataset.sort(key=lambda x: x.phonemes_length)
         self.sample_rate = sample_rate
         self.hop_size = hop_size
 
