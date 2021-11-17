@@ -2,10 +2,10 @@
 #TACOTRON_ZIP_GDRIVE_FILEID=1gEpxOIT7hlKfUyBsTqogU3LPO7wa5Jo9
 
 # Version 11-14
-TACOTRON_ZIP_GDRIVE_FILEID=13du7oJEGuk8orQ9Qd7qn2tYHHjJZyJlT
+#TACOTRON_ZIP_GDRIVE_FILEID=13du7oJEGuk8orQ9Qd7qn2tYHHjJZyJlT
 
-# Version 11-15
-#TACOTRON_ZIP_GDRIVE_FILEID=1NgtqKEQeITfcgo1HPcNwh66jgJqkdaNf
+# Version 11-15 (3 frames per step)
+TACOTRON_ZIP_GDRIVE_FILEID=1NgtqKEQeITfcgo1HPcNwh66jgJqkdaNf
 
 echo "Downloading Non-Attentive TacoTron model checkpoint..."
 gdown --id $TACOTRON_ZIP_GDRIVE_FILEID --output models/tacotron/zipped.zip

@@ -57,6 +57,8 @@ def layout_app() -> None:
             except CleanedTextIsEmptyStringError:
                 st.warning("😔 Looks like input text can not be pronounced")
                 st.stop()
+            except KeyError:
+                st.warning
 
 
 def main() -> None:
