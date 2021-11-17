@@ -1,0 +1,41 @@
+name: emotts
+channels:
+  - conda-forge
+  - pypi
+  - pytorch-lts
+dependencies:
+  - baumwelch=0.3.6
+  - click=7.1.2
+  - cpuonly=1.0
+  - enum34=1.1.10
+  - gdown=4.2.0
+  - git=2.33.1
+  - inflect=5.3.0
+  - kaldi=5.5.985
+  - librosa=0.8.1
+  - llvmlite=0.37.0
+  - marshmallow=3.14.0
+  - marshmallow-dataclass=8.4.1
+  - matplotlib=3.4.3
+  - Montreal-Forced-Aligner==2.0.0b4
+  - ngram=1.3.13
+  - numpy=1.20.3
+  - openblas=0.3.18
+  - openfst=1.8.1
+  - pandas
+  - pip=21.3.1
+  - pynini=2.1.4
+  - pysoundfile=0.10.3.post1
+  - python=3.8
+  - pytorch=1.8.2
+  - pyyaml=6.0
+  - scipy=1.7.1
+  - sox=14.4.2  # need for mfa to convert flac to wav
+  - tensorboard=2.6.0
+  - torchaudio=0.8.2
+  - tqdm=4.60.0
+  - types-pyyaml=6.0.0
+  - unidecode=1.3.2
+  - unzip=6.0
+  - pip:
+    - tgt==1.4.4
