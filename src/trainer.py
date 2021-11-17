@@ -75,11 +75,11 @@ class Trainer:
 
     def batch_to_device(self, batch: VCTKBatch) -> VCTKBatch:
         batch_on_device = VCTKBatch(
-            phonemes=batch.phonemes.to(self.device),
-            num_phonemes=batch.num_phonemes,
-            speaker_ids=batch.speaker_ids.to(self.device),
-            durations=batch.durations.to(self.device),
-            mels=batch.mels.to(self.device),
+            phonemes=batch.phonemes.to(self.device).detach(),
+            num_phonemes=batch.num_phonemes.detach(),
+            speaker_ids=batch.speaker_ids.to(self.device).detach(),
+            durations=batch.durations.to(self.device).detach(),
+            mels=batch.mels.to(self.device).detach(),
         )
         return batch_on_device
 
