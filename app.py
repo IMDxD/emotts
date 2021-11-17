@@ -1,4 +1,6 @@
 # flake8: noqa
+import random
+
 import streamlit as st
 
 from inference_pipeline import (
@@ -14,6 +16,11 @@ EMOTIONS = ["😄", "😃", "🙂", "😐", "😑", "😒", "😡"]
 RUSSIAN_VOICES = ["Игорь", "Ержан"]
 ENGLISH_VOICES = sorted(SPEAKERS_TO_IDS.keys())
 DEFAULT_USER_INPUT = "50 points to mr Dumbledore"
+LOADING_PHRASES = [
+    "👷‍♂️ Building language corpuses...",
+    "😋 Dreaming about free GPU hosting...",
+    "💫 Permuting tensors...",
+]
 
 
 def layout_app() -> None:
@@ -41,9 +48,12 @@ def layout_app() -> None:
         form_submit = st.form_submit_button("Synthesize speech")
 
     if form_submit:
-        with st.spinner("👷‍♂️ Some loading..."):
+        loading_phrase = random.choice(LOADING_PHRASES)
+        with st.spinner(loading_phrase):
             # Handle incorrect input
             try:
+                if language == LANGUAGES[1]:
+                    raise NotImplementedError
                 # Run inference pipeline
                 inference_text_to_speech(
                     input_text=input_text,
@@ -57,8 +67,12 @@ def layout_app() -> None:
             except CleanedTextIsEmptyStringError:
                 st.warning("😔 Looks like input text can not be pronounced")
                 st.stop()
-            except KeyError:
-                st.warning
+            except NotImplementedError:
+                st.warning("Ну нет пока русского, сорян 👉👈")
+                st.stop()
+            except Exception:
+                st.error("Oops! Forget about it and hit F5 🙈")
+                st.stop()
 
 
 def main() -> None:

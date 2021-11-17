@@ -1,5 +1,6 @@
 import json
 import pathlib
+import random
 import re
 import subprocess
 from typing import Dict, List, Tuple
@@ -29,6 +30,7 @@ PHONEME_PATH = "models/tacotron/phonemes.json"
 with open(PHONEME_PATH, "r") as json_file:
     PHONEMES_TO_IDS = json.load(json_file)
 N_PHONEMES = len(PHONEMES_TO_IDS)
+PAUSE_TOKEN = PHONEMES_TO_IDS.get("<SIL>")
 
 SPEAKERS_PATH = "models/tacotron/speakers.json"
 with open(SPEAKERS_PATH, "r") as json_file:
@@ -55,7 +57,7 @@ def phonemise(user_query: str) -> List[int]:
     normalized_content = " ".join(re.findall("[a-zA-Z]+", normalized_content))
     if len(normalized_content) < 1:
         raise CleanedTextIsEmptyStringError
-    text_path = pathlib.Path("tmp.txt")
+    text_path = pathlib.Path(f"tmp{random.randrange(100000)}.txt")
     with open(text_path, "w") as fout:
         fout.write(normalized_content)
     subprocess.call(
@@ -66,6 +68,7 @@ def phonemise(user_query: str) -> List[int]:
     phoneme_ids = []
     for word in normalized_content.split(" "):
         phoneme_ids.extend(word_to_phones[word])
+    phoneme_ids = [PAUSE_TOKEN] + phoneme_ids + [PAUSE_TOKEN]
     return phoneme_ids
 
 
