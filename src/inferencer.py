@@ -67,6 +67,12 @@ class Inferencer:
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
             text_grid = tgt.read_textgrid(tg_path)
 
+            save_dir = self.feature_model_mels_path / sample.parent.name
+            save_dir.mkdir(exist_ok=True)
+            filepath = save_dir / f"{sample.name}.{self.MEL_EXT}"
+            if filepath.exists():
+                continue
+
             if self.PHONES_TIER not in text_grid.get_tier_names():
                 continue
 
@@ -96,7 +102,7 @@ class Inferencer:
 
             pad_size = mels.shape[-1] - int(sum(durations))
             if pad_size < 0:
-                durations[-1] -= pad_size
+                durations[-1] += pad_size
                 assert durations[-1] >= 0
             if pad_size > 0:
                 phoneme_ids.append(self.phonemes_to_idx[self.PAUSE_TOKEN])
@@ -114,8 +120,4 @@ class Inferencer:
                 output = output.permute(0, 2, 1).squeeze(0)
                 output = output * MELS_STD.to(self.device) + MELS_MEAN.to(self.device)
 
-            save_dir = self.feature_model_mels_path / sample.parent.name
-            save_dir.mkdir(exist_ok=True)
-            torch.save(
-                output, save_dir / f"{sample.name}.{self.MEL_EXT}"
-            )
+            torch.save(output, filepath)
