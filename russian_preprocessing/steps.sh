@@ -4,6 +4,7 @@ conda activate emotts
 export RUSSIAN_DATASET_PATH=/media/diskB/ruslan_a/data/datasets/EMO/russian/
 export OUTPUT_DIR=$RUSSIAN_DATASET_PATH/processed
 
+# 16164it [03:36, 74.61it/s]
 echo -e "\n1) Prep raw files"
 python src/preprocessing/prep_files_russian.py --dataset-dir $RUSSIAN_DATASET_PATH/original --text-output-dir $OUTPUT_DIR/text/raw --audio-output-dir $OUTPUT_DIR/audio/raw
 

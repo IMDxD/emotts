@@ -22,6 +22,7 @@ dependencies:
   - numpy=1.20.3
   - openblas=0.3.18
   - openfst=1.8.1
+  - openpyxl
   - pandas
   - pip=21.3.1
   - pynini=2.1.4
