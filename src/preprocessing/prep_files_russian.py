@@ -34,34 +34,57 @@ def process_annotation(annot_path: Path, text_output_dir: Path) -> None:
 
 
 @click.command()
-@click.option("--dataset-dir", type=Path,
-              help="Directory with russian dataset")
-@click.option("--text-output-dir", type=Path, default="trimmed",
-              help="Directory for audios with pauses trimmed.")
-@click.option("--audio-output-dir", type=Path, default="trimmed",
-              help="Directory for audios with pauses trimmed.")
-@click.option("--annot-ext", type=str, default="xlsx",
-              help="Extension of audio files.")
-@click.option("--audio-ext", type=str, default="wav",
-              help="Extension of audio files.")
-def main(dataset_dir: Path, text_output_dir: Path, audio_output_dir: Path, audio_ext: str, annot_ext: str) -> None:
+@click.option(
+    "--dataset-dir", type=Path, help="Directory with original russian dataset"
+)
+@click.option(
+    "--text-output-dir",
+    type=Path,
+    default="texts",
+    help="Directory for text files extracted from annotations.",
+)
+@click.option(
+    "--audio-output-dir",
+    type=Path,
+    default="wavs",
+    help="Directory for rearranged audio files.",
+)
+@click.option(
+    "--log-path",
+    type=Path,
+    default="logs/preprocessing/russian-skipped-paths.txt",
+    help="Path for logging list of skipped items.",
+)
+@click.option(
+    "--annot-ext", type=str, default="xlsx", help="Extension of annotation files."
+)
+@click.option("--audio-ext", type=str, default="wav", help="Extension of audio files.")
+def main(
+    dataset_dir: Path,
+    text_output_dir: Path,
+    audio_output_dir: Path,
+    log_path: Path,
+    audio_ext: str,
+    annot_ext: str,
+) -> None:
 
     text_output_dir.mkdir(exist_ok=True, parents=True)
     audio_output_dir.mkdir(exist_ok=True, parents=True)
+    log_path.parent.mkdir(exist_ok=True, parents=True)
+    log_path.unlink(missing_ok=True)
 
     for path in tqdm(dataset_dir.rglob("*")):
 
         # If audio, get speaker, get emotion and copy it with new name
         if path.suffix == f".{audio_ext}":
             process_audio(path, audio_output_dir)
-
         # If annotation, parse it and rearrange texts
         elif path.suffix == f".{annot_ext}":
             process_annotation(path, text_output_dir)
-
-        # else WTF
+        # else do nothing, log skipped path
         else:
-            print(f"Skipped: {path}")
+            with open(log_path, "a") as logfile:
+                logfile.write(f"{path}\n")
             continue
 
 
