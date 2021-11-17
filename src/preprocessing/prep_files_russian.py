@@ -22,9 +22,15 @@ def process_annotation(annot_path: Path, text_output_dir: Path) -> None:
     speaker = annot_path.parent.name.replace("_", "-")
     emotion = annot_path.parent.parent.name
     df: pd.DataFrame = pd.read_excel(annot_path)
+    df = df.iloc[:, :3]
+    df.columns = ["resource", "number", "sentence"]
     for idx, row in df.iterrows():
-        filename = row["number"]
-        content = row["sentence"]
+        try:
+            filename = row["number"]
+            content = row["sentence"]
+        except KeyError:
+            print(row)
+            raise
         new_filename = f"{speaker}_{emotion}_{filename}.{text_ext}"
         new_dir = text_output_dir / speaker
         new_dir.mkdir(parents=True, exist_ok=True)
@@ -56,7 +62,7 @@ def process_annotation(annot_path: Path, text_output_dir: Path) -> None:
     help="Path for logging list of skipped items.",
 )
 @click.option(
-    "--annot-ext", type=str, default="xlsx", help="Extension of annotation files."
+    "--annot-ext", type=str, multiple=True, default=["xls", "xlsx"], help="Extension of annotation files."
 )
 @click.option("--audio-ext", type=str, default="wav", help="Extension of audio files.")
 def main(
@@ -79,7 +85,7 @@ def main(
         if path.suffix == f".{audio_ext}":
             process_audio(path, audio_output_dir)
         # If annotation, parse it and rearrange texts
-        elif path.suffix == f".{annot_ext}":
+        elif path.suffix[1:] in annot_ext:
             process_annotation(path, text_output_dir)
         # else do nothing, log skipped path
         else:
