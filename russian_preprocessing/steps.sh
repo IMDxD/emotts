@@ -21,6 +21,8 @@ echo -e "\n4) Audio to Mel"
 python src/preprocessing/wav_to_mel.py --input-dir $OUTPUT_DIR/audio/resampled --output-dir $OUTPUT_DIR/mels --audio-ext wav
 
 # 16069/16069 [05:21<00:00, 49.96it/s]
+# Model is needed: https://github.com/snakers4/russian_stt_text_normalization/blob/master/jit_s2s.pt
+# Put model to src/preprocessing/text/russian/
 echo -e "\n5) Text normalization"
 python src/preprocessing/text_normalization_russian.py --input-dir $OUTPUT_DIR/text/raw --output-dir $OUTPUT_DIR/mfa_inputs
 
