@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from pathlib import Path
+import ssl
 
 import click
 import torch
@@ -13,8 +14,15 @@ from tqdm import tqdm
               help="Directory for audios with pauses trimmed.")
 @click.option("--target-sr", type=int, default=48000,
               help="Sample rate of trimmed audios.")
-def main(input_dir: str, output_dir: str, target_sr: int) -> None:
+@click.option("--audio-ext", type=str, default="flac",
+              help="Extension of audio files.")
+def main(input_dir: str, output_dir: str, audio_ext: str, target_sr: int) -> None:
     """Remove silence from audios."""
+    
+    # Disables SSL cert check for urllib which will be called
+    # in subsequent call of torch.hub.load
+    ssl._create_default_https_context = ssl._create_unverified_context
+    
     model, utils = torch.hub.load(
         repo_or_dir="snakers4/silero-vad",
         model="silero_vad",
@@ -35,7 +43,7 @@ def main(input_dir: str, output_dir: str, target_sr: int) -> None:
     processed_path = Path(output_dir)
     processed_path.mkdir(exist_ok=True, parents=True)
 
-    filepath_list = list(path.rglob("*.flac"))
+    filepath_list = list(path.rglob(f"*.{audio_ext}"))
     print(f"Number of audio files found: {len(filepath_list)}")
     print("Performing pausation cutting...")
 

@@ -2,7 +2,7 @@ echo -e "\n0) Setup env"
 conda env create -n emotts -f russian_preprocessing/environment.yaml
 conda activate emotts
 conda config --set ssl_verify no
-export RUSSIAN_DATASET_PATH=/media/diskB/ruslan_a/data/datasets/EMO/russian/
+export RUSSIAN_DATASET_PATH=/media/diskB/ruslan_a/data/datasets/EMO/russian
 export OUTPUT_DIR=$RUSSIAN_DATASET_PATH/processed
 
 # 16164it [03:36, 74.61it/s] 
@@ -10,7 +10,7 @@ echo -e "\n1) Prep raw files"
 python src/preprocessing/prep_files_russian.py --dataset-dir $RUSSIAN_DATASET_PATH/original --text-output-dir $OUTPUT_DIR/text/raw --audio-output-dir $OUTPUT_DIR/audio/raw
 
 echo -e "\n2) Pausation cutting with VAD"
-python src/preprocessing/pausation_cutting.py --input-dir $OUTPUT_DIR/audio/raw --output-dir $OUTPUT_DIR/audio/no_pause --target-sr 96000
+python src/preprocessing/pausation_cutting.py --input-dir $OUTPUT_DIR/audio/raw --output-dir $OUTPUT_DIR/audio/no_pause --target-sr 96000 --audio-ext wav
 
 # 16071/16071 [08:29<00:00, 31.51it/s]
 echo -e "\n3) Resampling"
@@ -28,10 +28,11 @@ python src/preprocessing/text_normalization_russian.py --input-dir $OUTPUT_DIR/t
 
 echo -e "\n6. MFA Alignment setup"
 
-# download a pretrained english acoustic model, and english lexicon
+# download a pretrained russian acoustic model, and russian lexicon
 mkdir -p models
-wget -q --show-progress https://github.com/MontrealCorpusTools/mfa-models/raw/main/acoustic/english.zip -P models
-wget -q --show-progress http://www.openslr.org/resources/11/librispeech-lexicon.txt -P models
+wget -q --show-progress http://mlmlab.org/mfa/mfa-models/russian.zip -P models/mfa
+wget -q --show-progress http://mlmlab.org/mfa/mfa-models/g2p/russian_g2p.zip -P models/g2p
+wget -q --show-progress http://www.openslr.org/resources/11/librispeech-lexicon.txt -P models/mfa
 
 conda env config vars set LD_LIBRARY_PATH=$CONDA_PREFIX/lib  # link to libopenblas
 conda deactivate
