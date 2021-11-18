@@ -16,7 +16,7 @@ from tqdm import tqdm
               help="Directory for audios with pauses trimmed.")
 @click.option("--resample-rate", type=int, default=22050, required=True,
               help="Resulting sample rate in Hz.")
-@click.option("--audio-ext", type=str, default="wav", required=True,
+@click.option("--audio-ext", type=str, default="flac", required=True,
               help="Extension of audio files.")
 def main(input_dir: Path, output_dir: Path, audio_ext: str, resample_rate: int) -> None:
     output_dir.mkdir(exist_ok=True, parents=True)

@@ -56,7 +56,7 @@ def mel_spectrogram(y: torch.Tensor,
               help="Directory with audios to process.")
 @click.option("--output-dir", type=Path, required=True,
               help="Directory for audios with pauses trimmed.")
-@click.option("--audio-ext", type=str, default="wav", required=True,
+@click.option("--audio-ext", type=str, default="flac", required=True,
               help="Extension of audio files.")
 def main(input_dir: Path, output_dir: Path, audio_ext: str) -> None:
     output_dir.mkdir(exist_ok=True, parents=True)
