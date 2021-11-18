@@ -11,9 +11,11 @@ python src/preprocessing/prep_files_russian.py --dataset-dir $RUSSIAN_DATASET_PA
 echo -e "\n2) Pausation cutting with VAD"
 python src/preprocessing/pausation_cutting.py --input-dir $OUTPUT_DIR/audio/raw --output-dir $OUTPUT_DIR/audio/no_pause --target-sr 48000
 
+# 16071/16071 [08:29<00:00, 31.51it/s]
 echo -e "\n3) Resampling"
-python src/preprocessing/resampling.py --input-dir $OUTPUT_DIR/audio/no_pause --output-dir $OUTPUT_DIR/audio/resampled --resample-rate 22050
+python src/preprocessing/resampling.py --input-dir $OUTPUT_DIR/audio/raw --output-dir $OUTPUT_DIR/audio/resampled --resample-rate 22050
 
+# 16071/16071 [01:51<00:00, 143.53it/s]
 echo -e "\n4) Audio to Mel"
 python src/preprocessing/wav_to_mel.py --input-dir $OUTPUT_DIR/audio/resampled --output-dir $OUTPUT_DIR/mels
 
