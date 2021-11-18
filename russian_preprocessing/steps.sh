@@ -1,6 +1,7 @@
 echo -e "\n0) Setup env"
 conda env create -n emotts -f russian_preprocessing/environment.yaml
 conda activate emotts
+conda config --set ssl_verify no
 export RUSSIAN_DATASET_PATH=/media/diskB/ruslan_a/data/datasets/EMO/russian/
 export OUTPUT_DIR=$RUSSIAN_DATASET_PATH/processed
 
@@ -9,7 +10,7 @@ echo -e "\n1) Prep raw files"
 python src/preprocessing/prep_files_russian.py --dataset-dir $RUSSIAN_DATASET_PATH/original --text-output-dir $OUTPUT_DIR/text/raw --audio-output-dir $OUTPUT_DIR/audio/raw
 
 echo -e "\n2) Pausation cutting with VAD"
-python src/preprocessing/pausation_cutting.py --input-dir $OUTPUT_DIR/audio/raw --output-dir $OUTPUT_DIR/audio/no_pause --target-sr 48000
+python src/preprocessing/pausation_cutting.py --input-dir $OUTPUT_DIR/audio/raw --output-dir $OUTPUT_DIR/audio/no_pause --target-sr 96000
 
 # 16071/16071 [08:29<00:00, 31.51it/s]
 echo -e "\n3) Resampling"
@@ -19,8 +20,9 @@ python src/preprocessing/resampling.py --input-dir $OUTPUT_DIR/audio/raw --outpu
 echo -e "\n4) Audio to Mel"
 python src/preprocessing/wav_to_mel.py --input-dir $OUTPUT_DIR/audio/resampled --output-dir $OUTPUT_DIR/mels --audio-ext wav
 
+# 16069/16069 [05:21<00:00, 49.96it/s]
 echo -e "\n5) Text normalization"
-python src/preprocessing/text_normalization.py --input-dir $OUTPUT_DIR/text/raw --output-dir $OUTPUT_DIR/mfa_inputs
+python src/preprocessing/text_normalization_russian.py --input-dir $OUTPUT_DIR/text/raw --output-dir $OUTPUT_DIR/mfa_inputs
 
 echo -e "\n6. MFA Alignment setup"
 
