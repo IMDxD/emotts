@@ -9,6 +9,7 @@ export OUTPUT_DIR=$RUSSIAN_DATASET_PATH/processed
 echo -e "\n1) Prep raw files"
 python src/preprocessing/prep_files_russian.py --dataset-dir $RUSSIAN_DATASET_PATH/original --text-output-dir $OUTPUT_DIR/text/raw --audio-output-dir $OUTPUT_DIR/audio/raw
 
+# ~1.5-2.0 hours
 echo -e "\n2) Pausation cutting with VAD"
 python src/preprocessing/pausation_cutting.py --input-dir $OUTPUT_DIR/audio/raw --output-dir $OUTPUT_DIR/audio/no_pause --target-sr 96000 --audio-ext wav
 
@@ -37,6 +38,9 @@ wget -q --show-progress http://www.openslr.org/resources/11/librispeech-lexicon.
 conda env config vars set LD_LIBRARY_PATH=$CONDA_PREFIX/lib  # link to libopenblas
 conda deactivate
 conda activate emotts
+
+# 16069/16069 [00:00<00:00, 21508.15it/s]
+python src/preprocessing/create_corpus.py --input-dir $OUTPUT_DIR/text/raw --output-path $OUTPUT_DIR/meta/lexicon.txt
 
 echo -e "\n7. MFA Preprocessing"
 python src/preprocessing/mfa_preprocessing.py --input-dir $OUTPUT_DIR/processed/resampled --output-dir $OUTPUT_DIR/processed/mfa_inputs

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import shutil
 from pathlib import Path
+from typing import List
 
 import click
 import pandas as pd
@@ -62,7 +63,11 @@ def process_annotation(annot_path: Path, text_output_dir: Path) -> None:
     help="Path for logging list of skipped items.",
 )
 @click.option(
-    "--annot-ext", type=str, multiple=True, default=["xls", "xlsx"], help="Extension of annotation files."
+    "--annot-ext",
+    type=str,
+    multiple=True,
+    default=["xls", "xlsx"],
+    help="Extension of annotation files.",
 )
 @click.option("--audio-ext", type=str, default="wav", help="Extension of audio files.")
 def main(
@@ -71,7 +76,7 @@ def main(
     audio_output_dir: Path,
     log_path: Path,
     audio_ext: str,
-    annot_ext: str,
+    annot_ext: List[str],
 ) -> None:
 
     text_output_dir.mkdir(exist_ok=True, parents=True)
