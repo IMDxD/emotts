@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Resamples audio and converts stereo to mono"""
 from pathlib import Path
 
 import click
@@ -40,6 +41,10 @@ def main(input_dir: Path, output_dir: Path, audio_ext: str, resample_rate: int) 
         waveform, _ = torchaudio_load(filepath)
 
         new_waveform = resampler(waveform)
+
+        # stereo to mono
+        mono_waveform = new_waveform.mean(axis=0, keepdim=True)
+        assert mono_waveform.shape[0] == 1
 
         torchaudio_save(new_dir / filepath.name, new_waveform, resample_rate)
 
