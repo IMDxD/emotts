@@ -44,7 +44,7 @@ python src/preprocessing/create_corpus.py --input-dir $OUTPUT_DIR/text/raw --out
 
 # 25849/25983 [01:19<00:00, 326.82it/s]
 echo -e "\n6.2) Creating G2P lexicon from word list"
-mfa g2p -t mfa_tmp -j 32 --clean --overwrite models/g2p/russian_g2p.zip $OUTPUT_DIR/meta/words.txt models/mfa
+mfa g2p -t mfa_tmp -j 32 --clean --overwrite models/g2p/russian_g2p.zip $OUTPUT_DIR/meta/words.txt models/mfa/russian_lexicon.txt
 rm -rf mfa_tmp
 
 # 42it [00:10,  4.01it/s]

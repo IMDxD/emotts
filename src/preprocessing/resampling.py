@@ -44,9 +44,9 @@ def main(input_dir: Path, output_dir: Path, audio_ext: str, resample_rate: int) 
 
         # stereo to mono
         mono_waveform = new_waveform.mean(axis=0, keepdim=True)
-        assert mono_waveform.shape[0] == 1
+        assert mono_waveform.shape[0] == 1, "Audio has more than 1 channel"
 
-        torchaudio_save(new_dir / filepath.name, new_waveform, resample_rate)
+        torchaudio_save(new_dir / filepath.name, mono_waveform, resample_rate)
 
     print("Finished successfully.")
     print(f"Processed files are located at {output_dir}")
