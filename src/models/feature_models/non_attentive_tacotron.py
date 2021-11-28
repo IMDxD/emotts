@@ -487,12 +487,10 @@ class NonAttentiveTacotron(nn.Module):
         speaker_emb = self.speaker_embedding(speaker_ids).unsqueeze(1)
 
         phonem_emb = self.encoder(phonem_emb, text_lengths)
-
-        speaker_emb = torch.repeat_interleave(speaker_emb, phonem_emb.shape[1], dim=1)
-        
         style_emb = self.gst(reference_mel)
+        style_emb = torch.cat((style_emb, speaker_emb), dim=-1)
         style_emb = torch.repeat_interleave(style_emb, phonem_emb.shape[1], dim=1)
-        embeddings = torch.cat((phonem_emb, speaker_emb, style_emb), dim=-1)
+        embeddings = torch.cat((phonem_emb, style_emb), dim=-1)
 
         attented_embeddings = self.attention.inference(embeddings, text_lengths)
 
