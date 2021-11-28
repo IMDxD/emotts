@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Resamples audio and converts stereo to mono"""
 from pathlib import Path
 
 import click
@@ -14,10 +15,10 @@ from tqdm import tqdm
               help="Directory with audios to process.")
 @click.option("--output-dir", type=Path, required=True,
               help="Directory for audios with pauses trimmed.")
-@click.option("--audio-ext", type=str, default="flac",
-              help="Extension of audio files.")
 @click.option("--resample-rate", type=int, default=22050, required=True,
               help="Resulting sample rate in Hz.")
+@click.option("--audio-ext", type=str, default="flac", required=True,
+              help="Extension of audio files.")
 def main(input_dir: Path, output_dir: Path, audio_ext: str, resample_rate: int) -> None:
     output_dir.mkdir(exist_ok=True, parents=True)
 
@@ -41,7 +42,11 @@ def main(input_dir: Path, output_dir: Path, audio_ext: str, resample_rate: int) 
 
         new_waveform = resampler(waveform)
 
-        torchaudio_save(new_dir / filepath.name, new_waveform, resample_rate)
+        # stereo to mono
+        mono_waveform = new_waveform.mean(axis=0, keepdim=True)
+        assert mono_waveform.shape[0] == 1, "Audio has more than 1 channel"
+
+        torchaudio_save(new_dir / filepath.name, mono_waveform, resample_rate)
 
     print("Finished successfully.")
     print(f"Processed files are located at {output_dir}")
