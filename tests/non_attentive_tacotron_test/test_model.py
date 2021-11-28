@@ -1,3 +1,4 @@
+import math
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -52,9 +53,7 @@ for i, l in enumerate(DURATIONS_MAX):
     INPUT_MELS[i, l:, :] = 0
 ATTENTION_OUT_DIM = EMBEDDING_DIM + ATTENTION_CONFIG.positional_dim
 DECODER_RNN_OUT = torch.randn(16, 1, DECODER_CONFIG.decoder_rnn_dim)
-ATTENTION_OUT = torch.randn((16, int(DURATIONS_MAX.max()), ATTENTION_OUT_DIM))
-for i, l in enumerate(DURATIONS_MAX):
-    ATTENTION_OUT[i, l:, :] = 0
+
 MODEL_INPUT = VCTKBatch(
     phonemes=INPUT_PHONEMES,
     num_phonemes=INPUT_LENGTH,
@@ -68,6 +67,15 @@ MODEL_INFERENCE_INPUT = (
     INPUT_SPEAKERS,
     INPUT_MELS,
 )
+
+
+def get_attention(n_frame_per_step):
+
+    attention_out = torch.randn((16, math.ceil(DURATIONS_MAX.max().long() / n_frame_per_step), ATTENTION_OUT_DIM))
+    durations = torch.ceil(DURATIONS_MAX.long() / n_frame_per_step).long()
+    for idx, length in enumerate(durations):
+        attention_out[idx, length:, :] = 0
+    return attention_out
 
 
 def test_encoder_layer() -> None:
@@ -122,15 +130,19 @@ def test_range_layer() -> None:
         ).any(), f"Wrong zero vector for id = {idx}"
 
 
-def test_attention_layer_forward() -> None:
+@pytest.mark.parametrize(
+    "n_frames_per_step",
+    [1, 3]
+)
+def test_attention_layer_forward(n_frames_per_step: int) -> None:
     expected_shape_out = (
         16,
-        DURATIONS_MAX.max().item(),
+        math.ceil(DURATIONS_MAX.max().item() / n_frames_per_step),
         EMBEDDING_DIM + ATTENTION_CONFIG.positional_dim,
     )
     expected_shape_dur = (16, 50)
     layer = Attention(
-        EMBEDDING_DIM, config=ATTENTION_CONFIG
+        EMBEDDING_DIM, n_frames_per_step=n_frames_per_step, config=ATTENTION_CONFIG
     )
     dur, out = layer(EMBEDDING, INPUT_LENGTH, INPUT_DURATIONS)
     assert (
@@ -144,15 +156,19 @@ def test_attention_layer_forward() -> None:
 @patch(
     "src.models.feature_models.non_attentive_tacotron.DurationPredictor.forward"
 )
-def test_attention_layer_inference(mock_duration: MagicMock) -> None:
+@pytest.mark.parametrize(
+    "n_frames_per_step",
+    [1, 3]
+)
+def test_attention_layer_inference(mock_duration: MagicMock, n_frames_per_step: int) -> None:
     mock_duration.return_value = INPUT_DURATIONS.unsqueeze(2)
     expected_shape_out = (
         16,
-        DURATIONS_MAX.max().item(),
+        math.ceil(DURATIONS_MAX.max().item() / n_frames_per_step),
         EMBEDDING_DIM + ATTENTION_CONFIG.positional_dim,
     )
     layer = Attention(
-        EMBEDDING_DIM, config=ATTENTION_CONFIG
+        EMBEDDING_DIM, n_frames_per_step, config=ATTENTION_CONFIG
     )
     out = layer.inference(EMBEDDING, INPUT_LENGTH)
     assert (
@@ -179,7 +195,7 @@ def test_prenet_layer() -> None:
     [1, 2, 3]
 )
 def test_decoder_layer_forward(n_frames_per_step) -> None:
-    expected_shape = (16, DURATIONS_MAX.max(), N_MELS_DIM)
+    expected_shape = (16, int(DURATIONS_MAX.max().long()), N_MELS_DIM)
 
     layer = Decoder(
         N_MELS_DIM,
@@ -187,7 +203,7 @@ def test_decoder_layer_forward(n_frames_per_step) -> None:
         ATTENTION_OUT_DIM,
         config=DECODER_CONFIG,
     )
-    out = layer(ATTENTION_OUT, INPUT_MELS)
+    out = layer(get_attention(n_frames_per_step), INPUT_MELS)
     assert (
         out.shape == expected_shape
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
@@ -198,7 +214,8 @@ def test_decoder_layer_forward(n_frames_per_step) -> None:
     [1, 2, 3]
 )
 def test_decoder_layer_inference(n_frames_per_step) -> None:
-    expected_shape = (16, DURATIONS_MAX.max(), N_MELS_DIM)
+    output_len = math.ceil(DURATIONS_MAX.max() / n_frames_per_step) * n_frames_per_step
+    expected_shape = (16, output_len, N_MELS_DIM)
 
     layer = Decoder(
         N_MELS_DIM,
@@ -206,7 +223,7 @@ def test_decoder_layer_inference(n_frames_per_step) -> None:
         ATTENTION_OUT_DIM,
         config=DECODER_CONFIG,
     )
-    out = layer.inference(ATTENTION_OUT)
+    out = layer.inference(get_attention(n_frames_per_step))
     assert (
         out.shape == expected_shape
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
@@ -302,7 +319,8 @@ def test_model_forward_gpu() -> None:
 )
 def test_model_inference(mock_duration: MagicMock) -> None:
     mock_duration.return_value = INPUT_DURATIONS.unsqueeze(2)
-    expected_mel_shape = INPUT_MELS.shape
+    output_len = math.ceil(INPUT_MELS.shape[1] / MODEL_CONFIG.n_frames_per_step) * MODEL_CONFIG.n_frames_per_step
+    expected_mel_shape = (INPUT_MELS.shape[0], output_len, INPUT_MELS.shape[2])
 
     model = NonAttentiveTacotron(
         N_PHONEMES, N_SPEAKER, N_MELS_DIM, config=MODEL_CONFIG
