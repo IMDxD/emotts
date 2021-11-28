@@ -11,9 +11,11 @@ from tqdm import tqdm
               help="Directory with audios to process.")
 @click.option("--output-dir", type=str, default="trimmed",
               help="Directory for audios with pauses trimmed.")
+@click.option("--audio-ext", type=str, default="flac",
+              help="Extension of audio files.")
 @click.option("--target-sr", type=int, default=48000,
               help="Sample rate of trimmed audios.")
-def main(input_dir: str, output_dir: str, target_sr: int) -> None:
+def main(input_dir: str, output_dir: str, audio_ext: str, target_sr: int) -> None:
     """Remove silence from audios."""
     model, utils = torch.hub.load(
         repo_or_dir="snakers4/silero-vad",
@@ -35,7 +37,7 @@ def main(input_dir: str, output_dir: str, target_sr: int) -> None:
     processed_path = Path(output_dir)
     processed_path.mkdir(exist_ok=True, parents=True)
 
-    filepath_list = list(path.rglob("*.flac"))
+    filepath_list = list(path.rglob(f"*.{audio_ext}"))
     print(f"Number of audio files found: {len(filepath_list)}")
     print("Performing pausation cutting...")
 

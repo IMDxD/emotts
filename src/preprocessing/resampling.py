@@ -14,12 +14,14 @@ from tqdm import tqdm
               help="Directory with audios to process.")
 @click.option("--output-dir", type=Path, required=True,
               help="Directory for audios with pauses trimmed.")
+@click.option("--audio-ext", type=str, default="flac",
+              help="Extension of audio files.")
 @click.option("--resample-rate", type=int, default=22050, required=True,
               help="Resulting sample rate in Hz.")
-def main(input_dir: Path, output_dir: Path, resample_rate: int) -> None:
+def main(input_dir: Path, output_dir: Path, audio_ext: str, resample_rate: int) -> None:
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    filepath_list = list(input_dir.rglob("*.flac"))
+    filepath_list = list(input_dir.rglob(f"*.{audio_ext}"))
     print(f"Number of audio files found: {len(filepath_list)}")
 
     sample_rate = torchaudio_info(filepath_list[0]).sample_rate
