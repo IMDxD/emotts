@@ -4,7 +4,21 @@ import ssl
 
 import click
 import torch
+import torchaudio
 from tqdm import tqdm
+
+
+SILERO_SAMPLE_RATE = 16_000
+
+
+def align_timestamps(timestamps, fraction):
+    result = []
+    for stamp_dict in timestamps:
+        result.append({
+            "start": round(stamp_dict["start"] * fraction),
+            "end": round(stamp_dict["end"] * fraction),
+        })
+    return result
 
 
 @click.command()
@@ -42,7 +56,7 @@ def main(input_dir: str, output_dir: str, audio_ext: str, target_sr: int) -> Non
     path = Path(input_dir)
     processed_path = Path(output_dir)
     processed_path.mkdir(exist_ok=True, parents=True)
-
+    resample_fraction = target_sr / SILERO_SAMPLE_RATE
     filepath_list = list(path.rglob(f"*.{audio_ext}"))
     print(f"Number of audio files found: {len(filepath_list)}")
     print("Performing pausation cutting...")
@@ -50,13 +64,15 @@ def main(input_dir: str, output_dir: str, audio_ext: str, target_sr: int) -> Non
     log_path = processed_path / "pausation_cutting.log"
     for filepath in tqdm(filepath_list):
         wave_tensor = read_audio(filepath, target_sr=target_sr)
-        speech_timestamps = get_speech_ts_adaptive(wave_tensor, model)
+        wave_resampled = torchaudio.functional.resample(wave_tensor, target_sr, SILERO_SAMPLE_RATE)
+        speech_timestamps = get_speech_ts_adaptive(wave_resampled, model)
+        fixed_timestamps = align_timestamps(speech_timestamps, resample_fraction)
         speaker_dir = processed_path / filepath.parent.name
         speaker_dir.mkdir(exist_ok=True)
         try:
             save_audio(
                 speaker_dir / filepath.name,
-                collect_chunks(speech_timestamps, wave_tensor),
+                collect_chunks(fixed_timestamps, wave_tensor),
                 target_sr,
             )
         except RuntimeError:
