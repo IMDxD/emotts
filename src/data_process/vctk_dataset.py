@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
+import numpy as np
 import tgt
 import torch
 from torch.utils.data import Dataset
@@ -71,10 +72,13 @@ class VCTKDataset(Dataset[VCTKSample]):
         phones_tier = text_grid.get_tier_by_name(PHONES_TIER)
         phoneme_ids = [self._phoneme_to_id[x.text] for x in phones_tier.get_copy_with_gaps_filled()]
 
-        durations = [
-            self.seconds_to_frame(x.duration())
-            for x in phones_tier.get_copy_with_gaps_filled()
-        ]
+        durations = np.array(
+            [
+                self.seconds_to_frame(x.duration())
+                for x in phones_tier.get_copy_with_gaps_filled()
+            ],
+            dtype=np.float32
+        )
 
         mels: torch.Tensor = torch.load(info.mel_path)
         mels = (mels - MELS_MEAN) / MELS_STD
