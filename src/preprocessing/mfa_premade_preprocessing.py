@@ -50,7 +50,7 @@ def main(
                 speaker = path.parent.name
             
             new_speaker = speaker.replace(separator_old, separator_new)
-            new_dir = output_dir / emotion / new_speaker
+            new_dir = output_dir / new_speaker
             new_filename = separator_old.join((new_speaker, emotion, chunk_name))
             new_path = new_dir / new_filename
             new_path.parent.mkdir(exist_ok=True, parents=True)
