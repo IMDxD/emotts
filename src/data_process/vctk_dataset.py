@@ -89,7 +89,7 @@ class VCTKDataset(Dataset[VCTKSample]):
             assert durations[-1] >= 0
         if pad_size > 0:
             phoneme_ids.append(self._phoneme_to_id[PAD_TOKEN])
-            durations.append(pad_size)
+            np.append(durations, pad_size)
 
         return VCTKSample(
             phonemes=phoneme_ids,
