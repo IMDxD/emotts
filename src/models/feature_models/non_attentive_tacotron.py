@@ -151,13 +151,12 @@ class RangePredictor(nn.Module):
 
 class Attention(nn.Module):
     def __init__(
-        self, embedding_dim: int, n_frames_per_step: int, config: GaussianUpsampleParams
+        self, embedding_dim: int, config: GaussianUpsampleParams
     ):
         super().__init__()
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
         self.eps = config.eps
         self.dropout = config.attention_dropout
-        self.n_frames_per_step = n_frames_per_step
         self.duration_predictor = DurationPredictor(
             embedding_dim, config.duration_config
         )
@@ -173,8 +172,7 @@ class Attention(nn.Module):
         # Calc gaussian weight for Gaussian upsampling attention
         duration_cumsum = durations.cumsum(dim=1).float()
         max_duration = duration_cumsum[:, -1, :].max().long()
-        max_duration = torch.ceil(max_duration / self.n_frames_per_step)
-        c = (duration_cumsum - 0.5 * durations) / self.n_frames_per_step
+        c = duration_cumsum - 0.5 * durations
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(ranges.device)
 
         weights = torch.exp(-(ranges ** -2) * ((t - c) ** 2))
@@ -325,13 +323,15 @@ class Decoder(nn.Module):
         batch_size = memory.shape[0]
         mels_view_size = self.n_mel_channels * self.n_frames_per_step
         previous_frame = torch.zeros(memory.shape[0], 1, mels_view_size).to(memory.device)
-        to_get = (
-                math.ceil(y_mels.shape[1] / self.n_frames_per_step) *
-                self.n_frames_per_step -
-                self.n_frames_per_step
-        )
+        padded_size = math.ceil(y_mels.shape[1] / self.n_frames_per_step) * self.n_frames_per_step
+        to_get = padded_size - self.n_frames_per_step
+        to_pad = padded_size - y_mels.shape[1]
+        padding = torch.zeros(batch_size, to_pad, memory.shape[2]).to(memory.device)
+        padded_memory = torch.cat([memory, padding], dim=1)
         padded_y_mels = y_mels[:, :to_get, :].reshape(batch_size, -1, mels_view_size)
         padded_y_mels = torch.cat((previous_frame, padded_y_mels), dim=1)
+        padded_memory = padded_memory.view(batch_size, -1, memory.shape[2], self.n_frames_per_step)
+        padded_memory = padded_memory.sum(dim=3)
         previous_frame = previous_frame[:, 0, :]
 
         mel_outputs = []
@@ -346,12 +346,12 @@ class Decoder(nn.Module):
                 )
             )
             decoder_input: torch.Tensor = torch.cat(
-                (previous_frame.view(batch_size, -1), memory[:, i, :]), dim=-1
+                (previous_frame.view(batch_size, -1), padded_memory[:, i, :]), dim=-1
             )
             out, decoder_state = self.decoder_rnn(
                 decoder_input.unsqueeze(1), decoder_state
             )
-            out = torch.cat((out, memory[:, i, :].unsqueeze(1)), dim=-1)
+            out = torch.cat((out, padded_memory[:, i, :].unsqueeze(1)), dim=-1)
             mel_out = self.linear_projection(out)
             mel_outputs.append(mel_out)
             if random.uniform(0, 1) > self.teacher_forcing_ratio:
@@ -370,11 +370,18 @@ class Decoder(nn.Module):
             memory.shape[0],
             self.n_mel_channels * self.n_frames_per_step
         ).to(memory.device)
+        padded_size = math.ceil(memory.shape[1] / self.n_frames_per_step) * self.n_frames_per_step
+        to_get = padded_size - self.n_frames_per_step
+        to_pad = padded_size - memory.shape[1]
+        padding = torch.zeros(batch_size, to_pad, memory.shape[2]).to(memory.device)
+        padded_memory = torch.cat([memory, padding], dim=1)
+        padded_memory = padded_memory.view(batch_size, -1, memory.shape[2], self.n_frames_per_step)
+        padded_memory = padded_memory.sum(dim=3)
 
         mel_outputs = []
         decoder_state = None
 
-        for i in range(memory.shape[1]):
+        for i in range(padded_memory.shape[1]):
             previous_frame = self.prenet(
                 previous_frame.view(
                     batch_size,
@@ -383,12 +390,12 @@ class Decoder(nn.Module):
                 )
             )
             decoder_input: torch.Tensor = torch.cat(
-                (previous_frame.view(batch_size, -1), memory[:, i, :]), dim=-1
+                (previous_frame.view(batch_size, -1), padded_memory[:, i, :]), dim=-1
             )
             out, decoder_state = self.decoder_rnn(
                 decoder_input.unsqueeze(1), decoder_state
             )
-            out = torch.cat((out, memory[:, i, :].unsqueeze(1)), dim=-1)
+            out = torch.cat((out, padded_memory[:, i, :].unsqueeze(1)), dim=-1)
             mel_out = self.linear_projection(out)
             mel_outputs.append(mel_out)
             previous_frame = mel_out.squeeze(1)
@@ -430,7 +437,6 @@ class NonAttentiveTacotron(nn.Module):
         )
         self.attention = Attention(
             full_embedding_dim,
-            config.n_frames_per_step,
             config.attention_config
         )
         self.gst = GST(
