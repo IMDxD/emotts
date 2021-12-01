@@ -174,7 +174,7 @@ class Attention(nn.Module):
         duration_cumsum = durations.cumsum(dim=1).float()
         max_duration = duration_cumsum[:, -1, :].max().long()
         max_duration = torch.ceil(max_duration / self.n_frames_per_step)
-        c = duration_cumsum / self.n_frames_per_step - 0.5 * durations
+        c = (duration_cumsum - 0.5 * durations) / self.n_frames_per_step
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(ranges.device)
 
         weights = torch.exp(-(ranges ** -2) * ((t - c) ** 2))
