@@ -3,10 +3,10 @@ conda activate emotts
 cd repo
 
 SMALL_DATASET_ID=1vgRmRl4BNrcuVZKrpVL5OSmp34QqEby_
-FULL_DATASET_ID=1vpnvduieFdJSICTNqIqakcOdhn-i_2cU
+FULL_DATASET_ID=1--fDFM0ZYsR6n4L3QWCSi8000GroORzf
 
 # Download dataset
-gdown --id $SMALL_DATASET_ID --output vctk.zip
+gdown --id $FULL_DATASET_ID --output vctk.zip
 
 export OUTPUT_DIR=data
 

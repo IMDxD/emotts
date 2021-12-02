@@ -135,6 +135,6 @@ dmypy.json
 .vscode/
 
 # EMOTTS
-./logs/
-./data/
-./checkpoints/
+.logs/
+.data/
+.checkpoints/
