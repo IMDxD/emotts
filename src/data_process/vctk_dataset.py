@@ -24,7 +24,7 @@ class VCTKSample:
     phonemes: List[int]
     num_phonemes: int
     speaker_id: int
-    durations: List[float]
+    durations: np.ndarray
     mels: torch.Tensor
 
 
@@ -83,7 +83,7 @@ class VCTKDataset(Dataset[VCTKSample]):
         mels: torch.Tensor = torch.load(info.mel_path)
         mels = (mels - MELS_MEAN) / MELS_STD
 
-        pad_size = mels.shape[-1] - int(sum(durations))
+        pad_size = mels.shape[-1] - np.int64(durations.sum())
         if pad_size < 0:
             durations[-1] += pad_size
             assert durations[-1] >= 0
@@ -151,7 +151,7 @@ class VCTKFactory:
         self._dataset: List[VCTKInfo] = self._build_dataset()
 
     @staticmethod
-    def add_to_mapping(mapping: Dict[str, int], token: str) -> int:
+    def add_to_mapping(mapping: Dict[str, int], token: str) -> None:
         if token not in mapping:
             mapping[token] = len(mapping)
 
