@@ -33,6 +33,7 @@ echo -e "\n4) Audio to Mel"
 python src/preprocessing/wav_to_mel.py --input-dir $OUTPUT_DIR/audio/resampled --output-dir $OUTPUT_DIR/mels --audio-ext wav
 
 # 16069/16069 [31:38<00:00,  8.46it/s]
+# 16962/16962 [12:22<00:00, 22.85it/s] mix
 # Model is needed: https://github.com/snakers4/russian_stt_text_normalization/blob/master/jit_s2s.pt
 # Put model to src/preprocessing/text/russian/
 echo -e "\n5) Text normalization"
@@ -44,6 +45,10 @@ echo -e "\n6) MFA Alignment setup"
 mkdir -p models
 wget -q --show-progress https://github.com/MontrealCorpusTools/mfa-models/raw/main/acoustic/russian.zip -P models/mfa
 wget -q --show-progress https://github.com/MontrealCorpusTools/mfa-models/raw/main/g2p/russian_g2p.zip -P models/g2p
+# for non-naive phonetization copy from
+export RUS_ESPEAK_ACOUSTIC_MODEL=/media/diskB/ruslan_a/models/mfa/rus-espeak-mfa/russian_acoustic_model.zip
+export RUS_ESPEAK_LEXICON=/media/diskB/ruslan_a/models/mfa/rus-espeak-mfa/rus-mfa-espeak-lexicon-cleaned.txt
+
 
 # 16069/16069 [00:00<00:00, 21508.15it/s]
 echo -e "\n6.1) Creating word list from dataset"
@@ -55,6 +60,7 @@ mfa g2p -t mfa_tmp -j 32 --clean --overwrite models/g2p/russian_g2p.zip $OUTPUT_
 rm -rf mfa_tmp
 
 # 42it [00:10,  4.01it/s]
+# 58it [00:12,  4.54it/s] mix
 echo -e "\n7) MFA Preprocessing"
 python src/preprocessing/mfa_preprocessing.py --input-dir $OUTPUT_DIR/audio/resampled --output-dir $OUTPUT_DIR/mfa_inputs
 
@@ -63,6 +69,8 @@ python src/preprocessing/mfa_preprocessing.py --input-dir $OUTPUT_DIR/audio/resa
 echo -e "\n8) MFA Alignment"
 echo $OUTPUT_DIR
 mfa align -t mfa_tmp --clean -j 32 $OUTPUT_DIR/mfa_inputs models/mfa/russian_lexicon.txt models/mfa/russian.zip $OUTPUT_DIR/mfa_outputs
+# for mix
+mfa align -t mfa_tmp --clean -j 32 $OUTPUT_DIR/mfa_inputs $RUS_ESPEAK_LEXICON $RUS_ESPEAK_ACOUSTIC_MODEL $OUTPUT_DIR/mfa_outputs
 rm -rf mfa_tmp
 
 echo -e "\n9) MFA Postprocessing"
