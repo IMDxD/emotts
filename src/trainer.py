@@ -1,10 +1,12 @@
 import json
 import os
+from itertools import chain
 from pathlib import Path
 from typing import Dict, OrderedDict, Tuple
 
 import numpy as np
 import torch
+from torch import nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
@@ -53,10 +55,11 @@ class Trainer:
             n_speakers=len(self.speakers_to_id),
             config=self.config.model,
         ).to(self.device)
+        self.style_fc = nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id)).to(self.device)
 
         self.vocoder: Generator = load_hifi(self.config.hifi, self.device)
         self.optimizer = Adam(
-            self.feature_model.parameters(),
+            chain(self.feature_model.parameters(), self.style_fc.parameters()),
             lr=self.config.optimizer.learning_rate,
             weight_decay=self.config.optimizer.reg_weight,
             betas=(self.config.optimizer.adam_beta1, self.config.optimizer.adam_beta2),
@@ -70,6 +73,7 @@ class Trainer:
         self.criterion = NonAttentiveTacotronLoss(
             sample_rate=self.config.sample_rate, hop_size=self.config.hop_size
         )
+        self.adversatial_criterion = nn.CrossEntropyLoss()
 
         self.upload_checkpoints()
 
@@ -220,7 +224,8 @@ class Trainer:
                 global_step = epoch * len(self.train_loader) + i
                 batch = self.batch_to_device(batch)
                 self.optimizer.zero_grad()
-                durations, mel_outputs_postnet, mel_outputs = self.feature_model(batch)
+                durations, mel_outputs_postnet, mel_outputs, style_emb = self.feature_model(batch)
+                style_speaker = self.style_fc(style_emb)
 
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
@@ -229,13 +234,16 @@ class Trainer:
                     batch.durations,
                     batch.mels,
                 )
+                loss_adversarial = -self.adversatial_criterion(style_speaker, batch.speaker_ids)
 
                 loss_mel = self.mels_weight * (loss_prenet + loss_postnet)
                 loss_durations = self.duration_weight * loss_durations
 
                 loss = loss_mel + loss_durations
 
-                loss.backward()
+                loss_full = loss + loss_adversarial
+
+                loss_full.backward()
 
                 torch.nn.utils.clip_grad_norm_(
                     self.feature_model.parameters(), self.config.grad_clip_thresh
