@@ -215,6 +215,9 @@ class MultiPeriodDiscriminator(torch.nn.Module):
             y_d_gs.append(y_d_g)
             fmap_gs.append(fmap_g)
 
+        y_d_rs = torch.cat(y_d_rs, dim=-1)
+        y_d_gs = torch.cat(y_d_gs, dim=-1)
+
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
 
@@ -276,6 +279,9 @@ class MultiScaleDiscriminator(torch.nn.Module):
             fmap_rs.append(fmap_r)
             y_d_gs.append(y_d_g)
             fmap_gs.append(fmap_g)
+
+        y_d_rs = torch.cat(y_d_rs, dim=-1)
+        y_d_gs = torch.cat(y_d_gs, dim=-1)
 
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 

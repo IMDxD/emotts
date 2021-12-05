@@ -19,6 +19,15 @@ class RangeParams:
 
 
 @dataclass
+class GSTParams:
+
+    ref_enc_filters: List[int] = field(default_factory=lambda: [32, 32, 64, 64, 128, 128])
+    emb_dim: int = field(default=256)
+    num_heads: int = field(default=8)
+    token_num: int = field(default=10)
+
+
+@dataclass
 class GaussianUpsampleParams:
 
     duration_config: DurationParams
@@ -68,6 +77,8 @@ class ModelParams:
     attention_config: GaussianUpsampleParams
     decoder_config: DecoderParams
     postnet_config: PostNetParams
+    gst_config: GSTParams
+    n_frames_per_step: int = field(default=3)
     mask_padding: bool = field(default=True)
     phonem_embedding_dim: int = field(default=512)
     speaker_embedding_dim: int = field(default=256)
