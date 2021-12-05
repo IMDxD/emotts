@@ -5,16 +5,16 @@ f_max: 8000
 win_size: 1024
 n_fft: 1024
 n_mels: 80
-checkpoint_name: tacotron_vctk_default_20_dur_3_frame
+checkpoint_name: tacotron_russian_20_dur_mfapremade
 hifi:
   dir_path: hifi
   model_name: generator_v1
   config_name: config.json
 seed: 42
-batch_size: 16
+batch_size: 8
 grad_clip_thresh: 1.0
 log_steps: 1000
-iters_per_checkpoint: 30000
+iters_per_checkpoint: 5000
 epochs: 2500
 test_size: 0.2
 device: cuda
@@ -33,10 +33,10 @@ scheduler:
   decay_rate: 0.5
   last_epoch: 400000
 data:
-  text_dir: data/vctk/mfa_outputs
-  mels_dir: data/vctk/mels
+  text_dir: /media/diskB/ruslan_a/data/datasets/EMO/russian/processed_mix/mfa_outputs/
+  mels_dir: /media/diskB/ruslan_a/data/datasets/EMO/russian/processed_mix/mels
 model:
-  n_frames_per_step: 3
+  n_frames_per_step: 1
   encoder_config:
     n_convolutions: 3
     kernel_size: 5
@@ -44,6 +44,17 @@ model:
     lstm_layers: 1
     lstm_hidden: 256
     dropout: 0.1
+  gst_config:
+    ref_enc_filters:
+      - 32
+      - 32
+      - 64
+      - 64
+      - 128
+      - 128
+    emb_dim: 256
+    num_heads: 8
+    token_num: 10
   attention_config:
     duration_config:
       lstm_layers: 2

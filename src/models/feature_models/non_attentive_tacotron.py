@@ -7,16 +7,17 @@ from torch import nn
 from torch.nn import functional as f
 
 from src.data_process import VCTKBatch
-from src.models.feature_models.config import (
+from .config import (
     DecoderParams, DurationParams, EncoderParams, GaussianUpsampleParams,
     ModelParams, PostNetParams, RangeParams,
 )
-from src.models.feature_models.layers import (
-    ConvNorm, LinearWithActivation, PositionalEncoding,
+from .layers import (
+    Conv1DNorm, LinearWithActivation, PositionalEncoding,
 )
-from src.models.feature_models.utils import (
+from .utils import (
     get_mask_from_lengths, norm_emb_layer,
 )
+from .gst import GST
 
 
 class Prenet(nn.Module):
@@ -44,7 +45,7 @@ class Postnet(nn.Module):
         super().__init__()
         self.dropout = config.dropout
         convolutions: List[nn.Module] = [
-            ConvNorm(
+            Conv1DNorm(
                 n_mel_channels,
                 config.embedding_dim,
                 kernel_size=config.kernel_size,
@@ -59,7 +60,7 @@ class Postnet(nn.Module):
 
         for _ in range(config.n_convolutions - 2):
             convolutions.append(
-                ConvNorm(
+                Conv1DNorm(
                     config.embedding_dim,
                     config.embedding_dim,
                     kernel_size=config.kernel_size,
@@ -72,7 +73,7 @@ class Postnet(nn.Module):
             convolutions.append(nn.Tanh())
 
         convolutions.append(
-            ConvNorm(
+            Conv1DNorm(
                 config.embedding_dim,
                 n_mel_channels,
                 kernel_size=config.kernel_size,
@@ -150,13 +151,12 @@ class RangePredictor(nn.Module):
 
 class Attention(nn.Module):
     def __init__(
-        self, embedding_dim: int, n_frames_per_step: int, config: GaussianUpsampleParams
+        self, embedding_dim: int, config: GaussianUpsampleParams
     ):
         super().__init__()
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
         self.eps = config.eps
         self.dropout = config.attention_dropout
-        self.n_frames_per_step = n_frames_per_step
         self.duration_predictor = DurationPredictor(
             embedding_dim, config.duration_config
         )
@@ -172,7 +172,6 @@ class Attention(nn.Module):
         # Calc gaussian weight for Gaussian upsampling attention
         duration_cumsum = durations.cumsum(dim=1).float()
         max_duration = duration_cumsum[:, -1, :].max().long()
-        max_duration = torch.ceil(max_duration / self.n_frames_per_step)
         c = duration_cumsum - 0.5 * durations
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(ranges.device)
 
@@ -222,7 +221,7 @@ class Encoder(nn.Module):
         super().__init__()
 
         convolutions: List[nn.Module] = [
-            ConvNorm(
+            Conv1DNorm(
                 phonem_embedding_dim,
                 config.conv_channel,
                 kernel_size=config.kernel_size,
@@ -235,7 +234,7 @@ class Encoder(nn.Module):
         ]
 
         for _ in range(config.n_convolutions - 2):
-            conv_layer = ConvNorm(
+            conv_layer = Conv1DNorm(
                 config.conv_channel,
                 config.conv_channel,
                 kernel_size=config.kernel_size,
@@ -247,7 +246,7 @@ class Encoder(nn.Module):
             convolutions.append(conv_layer)
 
         convolutions.append(
-            ConvNorm(
+            Conv1DNorm(
                 config.conv_channel,
                 phonem_embedding_dim,
                 kernel_size=config.kernel_size,
@@ -324,13 +323,15 @@ class Decoder(nn.Module):
         batch_size = memory.shape[0]
         mels_view_size = self.n_mel_channels * self.n_frames_per_step
         previous_frame = torch.zeros(memory.shape[0], 1, mels_view_size).to(memory.device)
-        to_get = (
-                math.ceil(y_mels.shape[1] / self.n_frames_per_step) *
-                self.n_frames_per_step -
-                self.n_frames_per_step
-        )
+        padded_size = math.ceil(y_mels.shape[1] / self.n_frames_per_step) * self.n_frames_per_step
+        to_get = padded_size - self.n_frames_per_step
+        to_pad = padded_size - y_mels.shape[1]
+        padding = torch.zeros(batch_size, to_pad, memory.shape[2]).to(memory.device)
+        padded_memory = torch.cat([memory, padding], dim=1)
         padded_y_mels = y_mels[:, :to_get, :].reshape(batch_size, -1, mels_view_size)
         padded_y_mels = torch.cat((previous_frame, padded_y_mels), dim=1)
+        padded_memory = padded_memory.view(batch_size, -1, memory.shape[2], self.n_frames_per_step)
+        padded_memory = padded_memory.sum(dim=3)
         previous_frame = previous_frame[:, 0, :]
 
         mel_outputs = []
@@ -345,12 +346,12 @@ class Decoder(nn.Module):
                 )
             )
             decoder_input: torch.Tensor = torch.cat(
-                (previous_frame.view(batch_size, -1), memory[:, i, :]), dim=-1
+                (previous_frame.view(batch_size, -1), padded_memory[:, i, :]), dim=-1
             )
             out, decoder_state = self.decoder_rnn(
                 decoder_input.unsqueeze(1), decoder_state
             )
-            out = torch.cat((out, memory[:, i, :].unsqueeze(1)), dim=-1)
+            out = torch.cat((out, padded_memory[:, i, :].unsqueeze(1)), dim=-1)
             mel_out = self.linear_projection(out)
             mel_outputs.append(mel_out)
             if random.uniform(0, 1) > self.teacher_forcing_ratio:
@@ -369,11 +370,18 @@ class Decoder(nn.Module):
             memory.shape[0],
             self.n_mel_channels * self.n_frames_per_step
         ).to(memory.device)
+        padded_size = math.ceil(memory.shape[1] / self.n_frames_per_step) * self.n_frames_per_step
+        to_get = padded_size - self.n_frames_per_step
+        to_pad = padded_size - memory.shape[1]
+        padding = torch.zeros(batch_size, to_pad, memory.shape[2]).to(memory.device)
+        padded_memory = torch.cat([memory, padding], dim=1)
+        padded_memory = padded_memory.view(batch_size, -1, memory.shape[2], self.n_frames_per_step)
+        padded_memory = padded_memory.sum(dim=3)
 
         mel_outputs = []
         decoder_state = None
 
-        for i in range(memory.shape[1]):
+        for i in range(padded_memory.shape[1]):
             previous_frame = self.prenet(
                 previous_frame.view(
                     batch_size,
@@ -382,12 +390,12 @@ class Decoder(nn.Module):
                 )
             )
             decoder_input: torch.Tensor = torch.cat(
-                (previous_frame.view(batch_size, -1), memory[:, i, :]), dim=-1
+                (previous_frame.view(batch_size, -1), padded_memory[:, i, :]), dim=-1
             )
             out, decoder_state = self.decoder_rnn(
                 decoder_input.unsqueeze(1), decoder_state
             )
-            out = torch.cat((out, memory[:, i, :].unsqueeze(1)), dim=-1)
+            out = torch.cat((out, padded_memory[:, i, :].unsqueeze(1)), dim=-1)
             mel_out = self.linear_projection(out)
             mel_outputs.append(mel_out)
             previous_frame = mel_out.squeeze(1)
@@ -407,8 +415,8 @@ class NonAttentiveTacotron(nn.Module):
     ):
         super().__init__()
 
-        full_embedding_dim = config.phonem_embedding_dim + config.speaker_embedding_dim
-        self.phonem_embedding = nn.Embedding(n_phonems, config.phonem_embedding_dim)
+        full_embedding_dim = config.phonem_embedding_dim + config.speaker_embedding_dim + config.gst_config.emb_dim
+        self.phonem_embedding = nn.Embedding(n_phonems, config.phonem_embedding_dim, padding_idx=0)
         self.speaker_embedding = nn.Embedding(
             n_speakers,
             config.speaker_embedding_dim,
@@ -429,13 +437,17 @@ class NonAttentiveTacotron(nn.Module):
         )
         self.attention = Attention(
             full_embedding_dim,
-            config.n_frames_per_step,
             config.attention_config
+        )
+        self.gst = GST(
+            n_mel_channels=n_mel_channels,
+            config=config.gst_config
         )
         self.decoder = Decoder(
             n_mel_channels,
             config.n_frames_per_step,
-            full_embedding_dim + config.attention_config.positional_dim,
+            full_embedding_dim +
+            config.attention_config.positional_dim,
             config.decoder_config
         )
         self.postnet = Postnet(
@@ -449,15 +461,18 @@ class NonAttentiveTacotron(nn.Module):
 
         phonem_emb = self.phonem_embedding(batch.phonemes).transpose(1, 2)
         speaker_emb = self.speaker_embedding(batch.speaker_ids).unsqueeze(1)
-
+        
         phonem_emb = self.encoder(phonem_emb, batch.num_phonemes)
-
-        speaker_emb = torch.repeat_interleave(speaker_emb, phonem_emb.shape[1], dim=1)
-        embeddings = torch.cat((phonem_emb, speaker_emb), dim=-1)
+        style_emb = self.gst(batch.mels)
+        
+        style_emb = torch.cat((style_emb, speaker_emb), dim=-1)
+        style_emb = torch.repeat_interleave(style_emb, phonem_emb.shape[1], dim=1)
+        embeddings = torch.cat((phonem_emb, style_emb), dim=-1)
 
         durations, attented_embeddings = self.attention(
             embeddings, batch.num_phonemes, batch.durations
         )
+        
         mel_outputs = self.decoder(attented_embeddings, batch.mels)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
@@ -470,19 +485,21 @@ class NonAttentiveTacotron(nn.Module):
         return durations, mel_outputs_postnet, mel_outputs
 
     def inference(
-        self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
 
-        text_inputs, text_lengths, speaker_ids = batch
+        text_inputs, text_lengths, speaker_ids, reference_mel = batch
         phonem_emb = self.phonem_embedding(text_inputs).transpose(1, 2)
         speaker_emb = self.speaker_embedding(speaker_ids).unsqueeze(1)
 
         phonem_emb = self.encoder(phonem_emb, text_lengths)
-
-        speaker_emb = torch.repeat_interleave(speaker_emb, phonem_emb.shape[1], dim=1)
-        embeddings = torch.cat((phonem_emb, speaker_emb), dim=-1)
+        style_emb = self.gst(reference_mel)
+        style_emb = torch.cat((style_emb, speaker_emb), dim=-1)
+        style_emb = torch.repeat_interleave(style_emb, phonem_emb.shape[1], dim=1)
+        embeddings = torch.cat((phonem_emb, style_emb), dim=-1)
 
         attented_embeddings = self.attention.inference(embeddings, text_lengths)
+
         mel_outputs = self.decoder.inference(attented_embeddings)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)

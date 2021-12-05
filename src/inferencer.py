@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import Dict
 
+import numpy as np
 import tgt
 import torch
 from tqdm import tqdm
@@ -91,22 +92,25 @@ class Inferencer:
                     phoneme = self.PAUSE_TOKEN
                 phoneme_ids.append(self.phonemes_to_idx[phoneme])
 
-            durations = [
-                self.seconds_to_frame(x.duration())
-                for x in phones_tier.get_copy_with_gaps_filled()
-            ]
+            durations = np.array(
+                [
+                    self.seconds_to_frame(x.duration())
+                    for x in phones_tier.get_copy_with_gaps_filled()
+                ],
+                dtype=np.float32
+            )
 
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
             mels: torch.Tensor = torch.load(mels_path)
             mels = (mels - MELS_MEAN) / MELS_STD
 
-            pad_size = mels.shape[-1] - int(sum(durations))
+            pad_size = mels.shape[-1] - np.int64(durations.sum())
             if pad_size < 0:
                 durations[-1] += pad_size
                 assert durations[-1] >= 0
             if pad_size > 0:
                 phoneme_ids.append(self.phonemes_to_idx[self.PAUSE_TOKEN])
-                durations.append(pad_size)
+                np.append(durations, pad_size)
 
             with torch.no_grad():
                 batch = VCTKBatch(
