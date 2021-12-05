@@ -293,7 +293,7 @@ class Trainer:
             val_loss_durations = 0.0
             for batch in self.valid_loader:
                 batch = self.batch_to_device(batch)
-                durations, mel_outputs_postnet, mel_outputs = self.feature_model(batch)
+                durations, mel_outputs_postnet, mel_outputs, _ = self.feature_model(batch)
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
                     mel_outputs_postnet,
