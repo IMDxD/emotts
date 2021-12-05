@@ -2,14 +2,19 @@ import argparse
 import math
 import os
 import random
+from pathlib import Path
 from typing import Any, List, Optional, TextIO, Tuple, Union
 
 import numpy as np
 import torch
 import torch.utils.data
+import torchaudio
+from torchaudio.transforms import Resample
 from librosa.filters import mel as librosa_mel_fn
 from librosa.util import normalize
 from scipy.io.wavfile import read
+
+from src.models.hifi_gan.train_valid_split import get_mel_file_path
 
 MAX_WAV_VALUE = 32768.0
 AudioData = np.ndarray
@@ -169,15 +174,27 @@ class MelDataset(
         filename = self.audio_files[index]
         raw_audio: Optional[AudioData]
         if self._cache_ref_count == 0:
-            raw_audio, sampling_rate = load_wav(filename)
-            raw_audio = raw_audio / MAX_WAV_VALUE
+            file_extension = Path(filename).suffix
+            if file_extension == ".wav":
+                raw_audio, sampling_rate = load_wav(filename)
+                raw_audio = raw_audio / MAX_WAV_VALUE
+            elif file_extension == ".flac":
+                raw_audio, sampling_rate = torchaudio.load(filename)
+                raw_audio = raw_audio.squeeze(0)
+            else:
+                raise ValueError(f"{file_extension} extension is not handled yet."
+                                 "Switch to wav or flac.")
+
             if not self.fine_tuning:
                 raw_audio = normalize(raw_audio) * 0.95
+
             self.cached_wav = raw_audio
             if sampling_rate != self.sampling_rate:
-                raise ValueError(
-                    f"{sampling_rate} SR doesn't match target {self.sampling_rate} SR"
-                )
+                resampler = Resample(orig_freq=sampling_rate,
+                                     new_freq=self.sampling_rate,
+                                     resampling_method='sinc_interpolation'
+                                     )
+                raw_audio = resampler(raw_audio)
             self._cache_ref_count = self.n_cache_reuse
         else:
             raw_audio = self.cached_wav
@@ -208,13 +225,9 @@ class MelDataset(
                 center=False,
             )
         else:
-            mel = np.load(
-                os.path.join(
-                    self.base_mels_path,
-                    os.path.splitext(os.path.split(filename)[-1])[0] + ".npy",
-                )
-            )
-            mel = torch.from_numpy(mel)
+
+            filename = get_mel_file_path(filename, self.base_mels_path)
+            mel = torch.load(filename, map_location="cpu")
 
             if len(mel.shape) < 3:
                 mel = mel.unsqueeze(0)
@@ -223,7 +236,11 @@ class MelDataset(
                 frames_per_seg = math.ceil(self.segment_size / self.hop_size)
 
                 if audio.size(1) >= self.segment_size:
-                    mel_start = random.randint(0, mel.size(2) - frames_per_seg - 1)
+                    frame_max = max(0,
+                                    min(mel.size(2) - frames_per_seg - 1, 
+                                        int((audio.size(1) - self.segment_size) / self.hop_size) - 1)
+                                    )
+                    mel_start = random.randint(0, frame_max)
                     mel = mel[:, :, mel_start: mel_start + frames_per_seg]
                     audio = audio[
                         :,
@@ -249,7 +266,16 @@ class MelDataset(
             center=False,
         )
 
-        return mel.squeeze(), audio.squeeze(0), filename, mel_loss.squeeze()
+        if mel_loss.size(2) > mel.size(2):
+            mel = torch.nn.functional.pad(
+                        mel, (0, mel_loss.size(2) - mel.size(2)), 'constant'
+                    )
+        elif mel_loss.size(2) < mel.size(2):
+            mel_loss = torch.nn.functional.pad(
+                        mel_loss, (0, mel.size(2) - mel_loss.size(2)), 'constant'
+                    )
+
+        return mel.squeeze().detach(), audio.squeeze(0).detach(), str(filename), mel_loss.squeeze().detach()
 
     def __len__(self) -> int:
         return len(self.audio_files)
