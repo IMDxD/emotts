@@ -1,6 +1,6 @@
 """Flatten MFA files by speakers"""
 from pathlib import Path
-from shutil import move
+from shutil import copy
 
 import click
 from tqdm import tqdm
@@ -12,12 +12,15 @@ from tqdm import tqdm
 @click.option("--output-dir", type=Path, required=True,
               help="Directory to move audio to.")
 def main(input_dir: Path, output_dir: Path) -> None:
-    for _i, dir_path in tqdm(enumerate(input_dir.iterdir())):
-        for _j, filepath in enumerate(dir_path.iterdir()):
-            move(str(filepath), output_dir / dir_path.name)
-        dir_path.rmdir()
+    files_total = 0
+    for dir_path in tqdm(input_dir.iterdir()):
+        new_dir_path = output_dir / dir_path.name
+        new_dir_path.mkdir(exist_ok=True, parents=True)
+        for filepath in dir_path.iterdir():
+            copy(str(filepath), new_dir_path / filepath.name)
+            files_total += 1
 
-    print(f"{_i + _j + 2} files were moved to {output_dir}")
+    print(f"{files_total} files were copied to {output_dir}")
 
 
 if __name__ == "__main__":
