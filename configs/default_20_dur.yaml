@@ -36,6 +36,7 @@ data:
   text_dir: data/vctk/mfa_outputs
   mels_dir: data/vctk/mels
 model:
+  n_frames_per_step: 1
   encoder_config:
     n_convolutions: 3
     kernel_size: 5
