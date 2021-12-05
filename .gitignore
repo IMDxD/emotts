@@ -130,3 +130,11 @@ dmypy.json
 
 # PyCharm
 .idea/
+
+# VSCode
+.vscode/
+
+# EMOTTS
+.logs/
+.data/
+.checkpoints/

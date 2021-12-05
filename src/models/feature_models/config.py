@@ -3,7 +3,7 @@ from typing import List
 
 
 @dataclass
-class DurationConfig:
+class DurationParams:
 
     lstm_layers: int = field(default=2)
     lstm_hidden: int = field(default=256)
@@ -11,7 +11,7 @@ class DurationConfig:
 
 
 @dataclass
-class RangeConfig:
+class RangeParams:
 
     lstm_layers: int = field(default=2)
     lstm_hidden: int = field(default=256)
@@ -19,10 +19,19 @@ class RangeConfig:
 
 
 @dataclass
-class GaussianUpsampleConfig:
+class GSTParams:
 
-    duration_config: DurationConfig
-    range_config: RangeConfig
+    ref_enc_filters: List[int] = field(default_factory=lambda: [32, 32, 64, 64, 128, 128])
+    emb_dim: int = field(default=256)
+    num_heads: int = field(default=8)
+    token_num: int = field(default=10)
+
+
+@dataclass
+class GaussianUpsampleParams:
+
+    duration_config: DurationParams
+    range_config: RangeParams
     eps: float = field(default=1e-6)
     positional_dim: int = field(default=32)
     teacher_forcing_ratio: float = field(default=1.0)
@@ -31,7 +40,7 @@ class GaussianUpsampleConfig:
 
 
 @dataclass
-class DecoderConfig:
+class DecoderParams:
 
     prenet_layers: List[int] = field(default_factory=lambda: [256, 256])
     prenet_dropout: float = field(default=0.5)
@@ -42,7 +51,7 @@ class DecoderConfig:
 
 
 @dataclass
-class EncoderConfig:
+class EncoderParams:
 
     n_convolutions: int = field(default=3)
     kernel_size: int = field(default=5)
@@ -53,7 +62,7 @@ class EncoderConfig:
 
 
 @dataclass
-class PostNetConfig:
+class PostNetParams:
 
     embedding_dim: int = field(default=512)
     n_convolutions: int = field(default=5)
@@ -62,13 +71,14 @@ class PostNetConfig:
 
 
 @dataclass
-class ModelConfig:
+class ModelParams:
 
-    encoder_config: EncoderConfig
-    attention_config: GaussianUpsampleConfig
-    decoder_config: DecoderConfig
-    postnet_config: PostNetConfig
-    n_mel_channels: int = field(default=80)
+    encoder_config: EncoderParams
+    attention_config: GaussianUpsampleParams
+    decoder_config: DecoderParams
+    postnet_config: PostNetParams
+    gst_config: GSTParams
+    n_frames_per_step: int = field(default=3)
     mask_padding: bool = field(default=True)
     phonem_embedding_dim: int = field(default=512)
     speaker_embedding_dim: int = field(default=256)
