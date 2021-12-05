@@ -10,7 +10,10 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from src.constants import CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, LOG_DIR, PHONEMES_FILENAME, SPEAKERS_FILENAME
+from src.constants import (
+    CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, LOG_DIR, PHONEMES_FILENAME,
+    SPEAKERS_FILENAME,
+)
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
 from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
@@ -72,11 +75,11 @@ class Trainer:
 
     def batch_to_device(self, batch: VCTKBatch) -> VCTKBatch:
         batch_on_device = VCTKBatch(
-            phonemes=batch.phonemes.to(self.device),
-            num_phonemes=batch.num_phonemes,
-            speaker_ids=batch.speaker_ids.to(self.device),
-            durations=batch.durations.to(self.device),
-            mels=batch.mels.to(self.device),
+            phonemes=batch.phonemes.to(self.device).detach(),
+            num_phonemes=batch.num_phonemes.detach(),
+            speaker_ids=batch.speaker_ids.to(self.device).detach(),
+            durations=batch.durations.to(self.device).detach(),
+            mels=batch.mels.to(self.device).detach(),
         )
         return batch_on_device
 
@@ -325,6 +328,7 @@ class Trainer:
                 torch.LongTensor([sample.phonemes]).to(self.device),
                 torch.LongTensor([sample.num_phonemes]),
                 torch.LongTensor([sample.speaker_id]).to(self.device),
+                torch.FloatTensor(sample.mels).to(self.device).permute(0, 2, 1),
             )
             output = self.feature_model.inference(batch)
             output = output.permute(0, 2, 1).squeeze(0)
