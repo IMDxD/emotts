@@ -42,6 +42,7 @@ class Trainer:
         self.device = torch.device(self.config.device)
         self.mels_weight = self.config.loss.mels_weight
         self.duration_weight = self.config.loss.duration_weight
+        self.adversarial_weight = self.config.loss.adversarial_weight
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
         self.start_epoch = 0
@@ -241,7 +242,7 @@ class Trainer:
 
                 loss = loss_mel + loss_durations
 
-                loss_full = loss + loss_adversarial
+                loss_full = loss + self.adversarial_weight * loss_adversarial
 
                 loss_full.backward()
 

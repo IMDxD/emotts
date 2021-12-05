@@ -30,6 +30,7 @@ class OptimizerParams:
 class LossParams:
     mels_weight: float = field(default=1.0)
     duration_weight: float = field(default=2.0)
+    adversarial_weight: float = field(default=5e-3)
 
 
 @dataclass

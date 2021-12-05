@@ -21,6 +21,7 @@ device: cuda:0
 loss:
   mels_weight: 1.0
   duration_weight: 2.0
+  adversarial_weight: 0.005
 optimizer:
   learning_rate: 0.001
   adam_beta1: 0.9
