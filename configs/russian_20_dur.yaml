@@ -33,7 +33,7 @@ scheduler:
   decay_rate: 0.5
   last_epoch: 400000
 data:
-  text_dir: /media/diskB/ruslan_a/data/datasets/EMO/russian/processed/mfa_outputs/
+  text_dir: /media/diskB/ruslan_a/data/datasets/EMO/russian/processed/mfa_outputs
   mels_dir: /media/diskB/ruslan_a/data/datasets/EMO/russian/processed/mels
 model:
   n_frames_per_step: 1
