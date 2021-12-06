@@ -56,7 +56,11 @@ class Trainer:
             n_speakers=len(self.speakers_to_id),
             config=self.config.model,
         ).to(self.device)
-        self.style_fc = nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id)).to(self.device)
+        self.style_fc = nn.Sequential(
+            nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id)),
+            nn.Softmax()
+        )
+        self.style_fc = self.style_fc.to(self.device)
 
         self.vocoder: Generator = load_hifi(self.config.hifi, self.device)
         self.optimizer = Adam(
@@ -74,7 +78,7 @@ class Trainer:
         self.criterion = NonAttentiveTacotronLoss(
             sample_rate=self.config.sample_rate, hop_size=self.config.hop_size
         )
-        self.adversatial_criterion = nn.CrossEntropyLoss()
+        self.adversatial_criterion = nn.NLLLoss()
 
         self.upload_checkpoints()
 
@@ -235,7 +239,11 @@ class Trainer:
                     batch.durations,
                     batch.mels,
                 )
-                loss_adversarial = -self.adversatial_criterion(style_speaker, batch.speaker_ids)
+                log_adversarial_speaker = torch.log(1 - style_speaker)
+                loss_adversarial = self.adversatial_criterion(
+                    log_adversarial_speaker,
+                    batch.speaker_ids
+                )
 
                 loss_mel = self.mels_weight * (loss_prenet + loss_postnet)
                 loss_durations = self.duration_weight * loss_durations
