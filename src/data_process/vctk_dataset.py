@@ -11,7 +11,6 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from src.data_process.config import VCTKDatasetParams
-# from src.data_process.constanst import MELS_MEAN, MELS_STD
 
 NUMBER = Union[int, float]
 PHONES_TIER = "phones"
@@ -85,7 +84,6 @@ class VCTKDataset(Dataset[VCTKSample]):
         )
 
         mels: torch.Tensor = torch.load(info.mel_path)
-        # mels = (mels - MELS_MEAN) / MELS_STD
         mels = (mels - self.mels_mean) / self.mels_std
 
         pad_size = mels.shape[-1] - np.int64(durations.sum())
@@ -184,8 +182,22 @@ class VCTKFactory:
                 test_data.append(self._dataset[i])
             else:
                 train_data.append(self._dataset[i])
-        train_dataset = VCTKDataset(self.sample_rate, self.hop_size, self.phoneme_to_id, train_data)
-        test_dataset = VCTKDataset(self.sample_rate, self.hop_size, self.phoneme_to_id, test_data)
+        train_dataset = VCTKDataset(
+            sample_rate=self.sample_rate,
+            hop_size=self.hop_size,
+            mels_mean=self.mels_mean,
+            mels_std=self.mels_std,
+            phoneme_to_ids=self.phoneme_to_id,
+            data=train_data
+        )
+        test_dataset = VCTKDataset(
+            sample_rate=self.sample_rate,
+            hop_size=self.hop_size,
+            mels_mean=self.mels_mean,
+            mels_std=self.mels_std,
+            phoneme_to_ids=self.phoneme_to_id,
+            data=test_data
+        )
         return train_dataset, test_dataset
 
     def _build_dataset(self) -> List[VCTKInfo]:
