@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from src.data_process.config import VCTKDatasetParams
-from src.data_process.constanst import MELS_MEAN, MELS_STD
+# from src.data_process.constanst import MELS_MEAN, MELS_STD
 
 NUMBER = Union[int, float]
 PHONES_TIER = "phones"
@@ -53,6 +53,8 @@ class VCTKDataset(Dataset[VCTKSample]):
             self,
             sample_rate: int,
             hop_size: int,
+            mels_mean: torch.Tensor,
+            mels_std: torch.Tensor,
             phoneme_to_ids: Dict[str, int],
             data: List[VCTKInfo]
     ):
@@ -61,6 +63,8 @@ class VCTKDataset(Dataset[VCTKSample]):
         self._dataset.sort(key=lambda x: x.phonemes_length)
         self.sample_rate = sample_rate
         self.hop_size = hop_size
+        self.mels_mean = mels_mean
+        self.mels_std = mels_std
 
     def __len__(self) -> int:
         return len(self._dataset)
@@ -81,7 +85,8 @@ class VCTKDataset(Dataset[VCTKSample]):
         )
 
         mels: torch.Tensor = torch.load(info.mel_path)
-        mels = (mels - MELS_MEAN) / MELS_STD
+        # mels = (mels - MELS_MEAN) / MELS_STD
+        mels = (mels - self.mels_mean) / self.mels_std
 
         pad_size = mels.shape[-1] - np.int64(durations.sum())
         if pad_size < 0:
@@ -135,12 +140,14 @@ class VCTKFactory:
         self,
         sample_rate: int,
         hop_size: int,
+        n_mels: int,
         config: VCTKDatasetParams,
         phonemes_to_id: Dict[str, int],
         speakers_to_id: Dict[str, int],
     ):
         self.sample_rate = sample_rate
         self.hop_size = hop_size
+        self.n_mels = n_mels
         self._mels_dir = Path(config.mels_dir)
         self._text_dir = Path(config.text_dir)
         self._text_ext = config.text_ext
@@ -149,6 +156,7 @@ class VCTKFactory:
         self.phoneme_to_id[PAD_TOKEN] = 0
         self.speaker_to_id: Dict[str, int] = speakers_to_id
         self._dataset: List[VCTKInfo] = self._build_dataset()
+        self.mels_mean, self.mels_std = self._get_mean_and_std()
 
     @staticmethod
     def add_to_mapping(mapping: Dict[str, int], token: str) -> None:
@@ -218,6 +226,25 @@ class VCTKFactory:
                 )
 
         return dataset
+
+    def _get_mean_and_std(self) -> Tuple[torch.Tensor, torch.Tensor]:
+        mel_sum = torch.zeros((self.n_mels), dtype=torch.float64)
+        mel_squared_sum = torch.zeros((self.n_mels), dtype=torch.float64)
+
+        print(torch.load(self._dataset[0].mel_path).shape)
+
+        for info in tqdm(self._dataset, desc="Computing mels mean and std"):
+            mels: torch.Tensor = torch.load(info.mel_path)
+            mels_mean: torch.Tensor = mels.mean(dim=-1).squeeze(0)
+            mel_sum += mels_mean
+            mel_squared_sum += mels_mean.pow(2)
+
+        mels_mean: torch.Tensor = mel_sum / len(self._dataset)
+        mels_std: torch.Tensor = (
+            mel_squared_sum - mel_sum * mel_sum / len(self._dataset)
+        ) / len(self._dataset)
+
+        return mels_mean.view(-1, 1), mels_std.view(-1, 1)
 
 
 class VCTKCollate:
