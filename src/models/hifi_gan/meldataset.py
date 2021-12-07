@@ -9,10 +9,10 @@ import numpy as np
 import torch
 import torch.utils.data
 import torchaudio
-from torchaudio.transforms import Resample
 from librosa.filters import mel as librosa_mel_fn
 from librosa.util import normalize
 from scipy.io.wavfile import read
+from torchaudio.transforms import Resample
 
 from src.models.hifi_gan.train_valid_split import get_mel_file_path
 

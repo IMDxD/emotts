@@ -7,7 +7,7 @@ import torch
 from src.data_process import VCTKBatch
 from src.models.feature_models.config import (
     DecoderParams, DurationParams, EncoderParams, GaussianUpsampleParams,
-    ModelParams, PostNetParams, RangeParams, GSTParams
+    GSTParams, ModelParams, PostNetParams, RangeParams,
 )
 from src.models.feature_models.non_attentive_tacotron import (
     Attention, Decoder, DurationPredictor, Encoder, NonAttentiveTacotron,

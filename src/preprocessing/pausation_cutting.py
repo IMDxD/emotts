@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-from pathlib import Path
 import ssl
+from pathlib import Path
 
 import click
 import torch
 from torchaudio.transforms import Resample
 from tqdm import tqdm
-
 
 SILERO_SAMPLE_RATE = 16_000
 

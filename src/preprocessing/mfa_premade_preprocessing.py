@@ -6,7 +6,6 @@ from typing import List
 import click
 from tqdm import tqdm
 
-
 VALID_EMOTIONS = ["angry", "happy", "sad", "veryangry", "veryhappy"]
 
 

@@ -2,11 +2,9 @@
 from pathlib import Path
 
 import click
-from tqdm import tqdm
-
 from text.cleaners import collapse_whitespace, lowercase
 from text.russian.normalizer import Normalizer
-
+from tqdm import tqdm
 
 NORMALIZER_MODEL_PATH = "src/preprocessing/text/russian/jit_s2s.pt"
 
