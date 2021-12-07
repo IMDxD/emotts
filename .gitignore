@@ -138,3 +138,8 @@ dmypy.json
 .logs/
 .data/
 .checkpoints/
+.cp_hifigan/
+.ft_dataset/
+.wavs/
+.test_dir/
+.nohup*
