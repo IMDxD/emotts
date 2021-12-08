@@ -85,7 +85,7 @@ def phonemize(user_query: str) -> List[int]:
 
 def get_tacotron_batch(
         phonemes_ids: List[int], reference: torch.Tensor, speaker_id: int = 0, device: torch.device = DEVICE
-) -> Tuple[torch.Tensor, torch.LongTensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.LongTensor, torch.Tensor, torch]:
     text_lengths_tensor = torch.LongTensor([len(phonemes_ids)])
     reference = (reference - MELS_MEAN) / MELS_STD
     reference = reference.permute(0, 2, 1).to(device)

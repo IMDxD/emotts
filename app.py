@@ -10,8 +10,9 @@ from inference_pipeline import (
 from src.web.streamlit_utils import (
     hide_hamburger_menu, st_empty_block, st_header_centered,
 )
+from src.constants import SupportedLanguages
 
-LANGUAGES = ["English (en-EN)", "Русский (ru-RU)"]
+
 EMOTIONS = ["😄", "😃", "🙂", "😐", "😑", "😒", "😡"]
 RUSSIAN_VOICES = ["Игорь", "Ержан"]
 ENGLISH_VOICES = sorted(SPEAKERS_TO_IDS.keys())
@@ -32,11 +33,11 @@ def layout_app() -> None:
 
     col1, col2 = st.columns(2)
     with col1:
-        language = st.selectbox(label="👅 Language", options=LANGUAGES)
+        language = st.selectbox(label="👅 Language", options=SupportedLanguages)
     with col2:
         voice = st.selectbox(
             label="🗣️ Speaker",
-            options=RUSSIAN_VOICES if language == LANGUAGES[1] else ENGLISH_VOICES,
+            options=RUSSIAN_VOICES if language == SupportedLanguages.russian else ENGLISH_VOICES,
         )
     st_empty_block(2)
 
@@ -52,7 +53,7 @@ def layout_app() -> None:
         with st.spinner(loading_phrase):
             # Handle incorrect input
             try:
-                if language == LANGUAGES[1]:
+                if language == SupportedLanguages.russian:
                     raise NotImplementedError
                 # Run inference pipeline
                 inference_text_to_speech(

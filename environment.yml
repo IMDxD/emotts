@@ -37,5 +37,6 @@ dependencies:
   - types-pyyaml
   - unidecode
   - unzip
+  - uvicorn
   - pip:
     - tgt

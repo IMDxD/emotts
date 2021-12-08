@@ -1,15 +1,34 @@
-import random
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTasks
 
-from inference_pipeline import (
-    AUDIO_OUTPUT_PATH, DEVICE, HIFI_PARAMS, SPEAKERS_TO_IDS,
-    TACOTRON_MODEL_PATH, inference_text_to_speech, CleanedTextIsEmptyStringError,
-)
+from inference_pipeline import DEVICE, inference_text_to_speech
+from src.constants import SupportedLanguages, SupportedEmotions
+
+
+EMOTTS_ENDPOINT = "/tts/emo/v1"
+TEST_AUDIO_PATH = "data/testaudio-gs-16b-1c-44100hz.wav"
+ARG_TO_LANGUAGE = {
+    "ru": SupportedLanguages.russian,
+    "en": SupportedLanguages.english,
+}
+ARG_TO_EMOTION = {
+    "angry": SupportedEmotions.angry,
+    "happy": SupportedEmotions.happy,
+    "sad": SupportedEmotions.sad,
+    "veryangry": SupportedEmotions.very_angry,
+    "veryhappy": SupportedEmotions.very_happy,
+}
 
 
 app = FastAPI()
+
+
+def remove_file(path: Path):
+    path.unlink(missing_ok=True)
 
 
 @app.get("/")
@@ -18,26 +37,30 @@ async def root():
 
 
 # To read this from response:
-# r = requests.get("http://localhost:8000/audio", stream=True)
+# r = requests.get("http://<host>:<port>/testaudio", stream=True)
 # if r.status_code == 200:
 #     with open(path, 'wb') as f:
 #         for chunk in r:
 #             f.write(chunk)
-@app.get("/audio", response_class=FileResponse)
+@app.get("/testaudio", response_class=FileResponse)
 async def audio():
-    filepath = "data/audio/beep.wav"
+    filepath = Path(TEST_AUDIO_PATH)
     return filepath
 
 
-@app.get("/tts", response_class=FileResponse)
-async def tts(speaker: int, text: str):
-    filepath = f"generated-{random.randrange(1_000_000)}.wav"
+@app.get(EMOTTS_ENDPOINT, response_class=FileResponse)
+async def tts(lang: str, emo: str, text: str, bg_tasks: BackgroundTasks):
+    language = ARG_TO_LANGUAGE.get(lang)
+    emotion = ARG_TO_EMOTION.get(emo)
+    if not language or emotion:
+        raise HTTPException(status_code=500, detail="OOPS!")
+    generated_audio_path = Path(f"predictions/generated-{str(uuid4())}.wav")
     inference_text_to_speech(
+        language=language,
         input_text=text,
-        speaker_id=SPEAKERS_TO_IDS[speaker],
-        audio_output_path=AUDIO_OUTPUT_PATH,
-        tacotron_model_path=TACOTRON_MODEL_PATH,
-        hifi_config=HIFI_PARAMS,
+        emotion=emotion,
+        audio_output_path=generated_audio_path,
         device=DEVICE,
     )
-    return filepath
+    bg_tasks.add_task(remove_file, generated_audio_path)
+    return generated_audio_path
