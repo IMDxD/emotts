@@ -56,10 +56,12 @@ def mel_spectrogram(y: torch.Tensor,
               help="Directory with audios to process.")
 @click.option("--output-dir", type=Path, required=True,
               help="Directory for audios with pauses trimmed.")
-def main(input_dir: Path, output_dir: Path) -> None:
+@click.option("--audio-ext", type=str, default="flac", required=True,
+              help="Extension of audio files.")
+def main(input_dir: Path, output_dir: Path, audio_ext: str) -> None:
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    filepath_list = list(input_dir.rglob("*.flac"))
+    filepath_list = list(input_dir.rglob(f"*.{audio_ext}"))
     print(f"Number of audio files found: {len(filepath_list)}")
     print("Transforming audio to mel...")
 
@@ -67,6 +69,7 @@ def main(input_dir: Path, output_dir: Path) -> None:
         new_path = output_dir / filepath.stem
 
         wave_tensor, _ = torchaudio.load(filepath)
+        assert wave_tensor.shape[0] == 1, "Audio has more than 1 channel"
 
         mels_tensor = mel_spectrogram(wave_tensor)  # [n_channels x n_mels x time]
         torch.save(mels_tensor, new_path.with_suffix(".pkl"))

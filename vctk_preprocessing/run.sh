@@ -1,11 +1,14 @@
 #!/bin/bash
 conda activate emotts
-cd cur_dir
+cd repo
+
+SMALL_DATASET_ID=1vgRmRl4BNrcuVZKrpVL5OSmp34QqEby_
+FULL_DATASET_ID=1--fDFM0ZYsR6n4L3QWCSi8000GroORzf
 
 # Download dataset
-gdown --id 1vgRmRl4BNrcuVZKrpVL5OSmp34QqEby_ --output vctk.zip
+gdown --id $FULL_DATASET_ID --output vctk.zip
 
-export OUTPUT_DIR=data_test
+export OUTPUT_DIR=data
 
 # Unzip dataset and reorganize folders
 unzip -q vctk.zip txt/* wav48_silence_trimmed/*
@@ -33,12 +36,11 @@ echo -e "\n5. Text normalization"
 python src/preprocessing/text_normalization.py --input-dir $OUTPUT_DIR/raw/text --output-dir $OUTPUT_DIR/processed/mfa_inputs
 
 echo -e "\n6. MFA Alignment setup"
-mfa thirdparty download
 
 # download a pretrained english acoustic model, and english lexicon
 mkdir -p models
-wget -nc -q --show-progress https://github.com/MontrealCorpusTools/mfa-models/raw/main/acoustic/english.zip -P models
-wget -nc -q --show-progress http://www.openslr.org/resources/11/librispeech-lexicon.txt -P models
+wget -q --show-progress https://github.com/MontrealCorpusTools/mfa-models/raw/main/acoustic/english.zip -P models
+wget -q --show-progress http://www.openslr.org/resources/11/librispeech-lexicon.txt -P models
 
 conda env config vars set LD_LIBRARY_PATH=$CONDA_PREFIX/lib  # link to libopenblas
 conda deactivate
@@ -55,5 +57,5 @@ mfa align -t ./temp --clean -j 4 $OUTPUT_DIR/processed/mfa_inputs models/librisp
 rm -rf temp
 
 echo -e "\n9. MFA Postprocessing"
-# python src/preprocessing/mfa_postprocessing.py --input-dir $OUTPUT_DIR/processed/mfa_outputs
+# Aggregate mels by speakers
 python src/preprocessing/mfa_postprocessing.py --input-dir $OUTPUT_DIR/processed/mels

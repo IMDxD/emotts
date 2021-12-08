@@ -19,4 +19,4 @@ RUN conda env create -f environment.yml
 
 COPY run.sh .
 
-# CMD [ "bash", "-i", "run.sh" ]
+CMD [ "bash", "-i", "run.sh" ]

@@ -17,6 +17,10 @@ from unidecode import unidecode
 
 from .numbers import normalize_numbers
 
+
+# Regular expression matching alphanumeric + cyrillic characters and whitespace
+RUSSIAN_NON_LETTERS_PATTERN = "[^A-Za-zА-я0-9 ]+"
+
 # Regular expression matching whitespace:
 _whitespace_re = re.compile(r"\s+")
 
@@ -89,5 +93,19 @@ def english_cleaners(text: str) -> str:
     text = lowercase(text)
     text = expand_numbers(text)
     text = expand_abbreviations(text)
+    text = collapse_whitespace(text)
+    return text
+
+
+def punctuation_to_whitespace(text: str) -> str:
+    pattern = RUSSIAN_NON_LETTERS_PATTERN
+    text = re.sub(pattern, " ", text)
+    return text
+
+
+def russian_cleaners(text: str) -> str:
+    """Pipeline for Russian text, cleaning only."""
+    text = lowercase(text)
+    text = punctuation_to_whitespace(text)
     text = collapse_whitespace(text)
     return text
