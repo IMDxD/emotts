@@ -19,13 +19,21 @@
 #HIFI_CONFIG_GDRIVE_FILEID=1YFXueypxryomZV0sgm2ceJFDlpHjjQDc
 
 ## HIFI version 02550000 (tuned to 3 frames per step)
-HIFI_GENERATOR_GDRIVE_FILEID=1XL1vIlglbPucPC75wjja0Jk2oE-hjiwl
-HIFI_CONFIG_GDRIVE_FILEID=1DNLZ9IPlgQCmnzYcWchZRHef-V2UTfWv
+EN_HIFI_GENERATOR_GDRIVE_FILEID=1XL1vIlglbPucPC75wjja0Jk2oE-hjiwl
+EN_HIFI_CONFIG_GDRIVE_FILEID=1DNLZ9IPlgQCmnzYcWchZRHef-V2UTfWv
 
-echo "Downloading HiFiGAN Generator..."
-gdown --id $HIFI_GENERATOR_GDRIVE_FILEID --output models/hifi/generator.hifi
+## HIFI version 02540000 (russian)
+RU_HIFI_GENERATOR_GDRIVE_FILEID=1ge-ctTXJn2dpuGLrlbWb0FezKzr5Px0f
+RU_HIFI_CONFIG_GDRIVE_FILEID=14j2_Cb0HURB_a_uldbHK3V60Owq3Qsg1
 
-echo "Downloading HiFiGAN Config..."
-gdown --id $HIFI_CONFIG_GDRIVE_FILEID --output models/hifi/config.json
+echo "Downloading HiFiGAN Generator (English)... "
+gdown --id $EN_HIFI_GENERATOR_GDRIVE_FILEID --output models/en/hifi/generator.hifi
+echo "Downloading HiFiGAN Config (English)..."
+gdown --id $EN_HIFI_CONFIG_GDRIVE_FILEID --output models/en/hifi/config.json
+echo "[Finished] HiFiGAN Vocoder Setup (English)"
 
-echo "[Finished] HiFiGAN Vocoder Setup"
+echo "Downloading HiFiGAN Generator (Russian)... "
+gdown --id $RU_HIFI_GENERATOR_GDRIVE_FILEID --output models/ru/hifi/generator.hifi
+echo "Downloading HiFiGAN Config (Russian)..."
+gdown --id $RU_HIFI_CONFIG_GDRIVE_FILEID --output models/ru/hifi/config.json
+echo "[Finished] HiFiGAN Vocoder Setup (Russian)"

@@ -52,8 +52,8 @@ async def audio():
 async def tts(lang: str, emo: str, text: str, bg_tasks: BackgroundTasks):
     language = ARG_TO_LANGUAGE.get(lang)
     emotion = ARG_TO_EMOTION.get(emo)
-    if not language or emotion:
-        raise HTTPException(status_code=500, detail="OOPS!")
+    if not language or not emotion:
+        raise HTTPException(status_code=500, detail=f"OOPS!\nlang:{lang}, emo:{emo}, text:{text}")
     generated_audio_path = Path(f"predictions/generated-{str(uuid4())}.wav")
     inference_text_to_speech(
         language=language,

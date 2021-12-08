@@ -45,7 +45,7 @@ class SupportedLanguages:
     )
     russian: Language = Language(
         name="Russian (ru-RU)",
-        g2p_model_path=Path("models/ru/g2p/english_g2p.zip"),
+        g2p_model_path=Path("models/ru/g2p/russian_g2p.zip"),
         tacotron_checkpoint=TacoTronCheckpoint(path=Path("models/ru/tacotron")),
         hifi_params=HIFIParams(dir_path="ru/hifi", config_name="config.json", model_name="generator.hifi"),
     )

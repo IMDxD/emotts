@@ -53,7 +53,7 @@ def phonemize(user_query: str, language: Language, phonemes_to_ids: Dict[str, in
     with open(text_path, "w") as fout:
         fout.write(normalized_content)
     subprocess.call(
-        ["mfa", "g2p", language.g2p_model_path, text_path.absolute(), g2p_output_path.absolute()]
+        ["mfa", "g2p", language.g2p_model_path, text_path, g2p_output_path]
     )
     word_to_phones = parse_g2p(g2p_output_path, phonemes_to_ids)
     text_path.unlink()
