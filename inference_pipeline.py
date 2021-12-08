@@ -114,7 +114,7 @@ def inference_text_to_speech(
     else:
         raise NotImplementedError
     phoneme_ids = phonemize(input_text, language, phonemes_to_ids)
-    reference_path = emotion.reference_audio_path
+    reference_path = emotion.reference_mels_path
     reference = torch.load(reference_path)
     batch = get_tacotron_batch(phoneme_ids, reference, speaker_id, mels_mean, mels_std, device)
 

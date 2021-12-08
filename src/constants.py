@@ -54,15 +54,15 @@ class SupportedLanguages:
 @dataclass
 class Emotion:
     name: str
-    reference_audio_path: PATHLIKE
+    reference_mels_path: PATHLIKE
     ru_speaker_id: int
     en_speaker_id: int
 
 
 @dataclass
 class SupportedEmotions:
-    angry: Emotion = Emotion(name="angry", reference_audio_path="", ru_speaker_id=10, en_speaker_id=0)
-    happy: Emotion = Emotion(name="happy", reference_audio_path="", ru_speaker_id=21, en_speaker_id=0)
-    sad: Emotion = Emotion(name="sad", reference_audio_path="", ru_speaker_id=40, en_speaker_id=0)
-    very_angry: Emotion = Emotion(name="very_angry", reference_audio_path="", ru_speaker_id=41, en_speaker_id=0)
-    very_happy: Emotion = Emotion(name="happy", reference_audio_path="", ru_speaker_id=12, en_speaker_id=0)
+    angry: Emotion = Emotion(name="angry", reference_mels_path="models/ru/emo_reference/mels/angry.pkl", ru_speaker_id=10, en_speaker_id=0)
+    happy: Emotion = Emotion(name="happy", reference_mels_path="models/ru/emo_reference/mels/happy.pkl", ru_speaker_id=21, en_speaker_id=0)
+    sad: Emotion = Emotion(name="sad", reference_mels_path="models/ru/emo_reference/mels/sad.pkl", ru_speaker_id=40, en_speaker_id=0)
+    very_angry: Emotion = Emotion(name="very_angry", reference_mels_path="models/ru/emo_reference/mels/very_angry.pkl", ru_speaker_id=41, en_speaker_id=0)
+    very_happy: Emotion = Emotion(name="very_happy", reference_mels_path="models/ru/emo_reference/mels/very_happy.pkl", ru_speaker_id=12, en_speaker_id=0)
