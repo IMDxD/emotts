@@ -7,8 +7,11 @@
 # Version 11-15 (3 frames per step)
 EN_TACOTRON_ZIP_GDRIVE_FILEID=1NgtqKEQeITfcgo1HPcNwh66jgJqkdaNf
 
-# 225000 naive phones russian
-RU_TACOTRON_ZIP_GDRIVE_FILEID=1KRhsp6cKXHF02Jv24cCKOivoPtaBdord
+## 225000 naive phones russian
+#RU_TACOTRON_ZIP_GDRIVE_FILEID=1KRhsp6cKXHF02Jv24cCKOivoPtaBdord
+
+# 315000 naive phones russian
+RU_TACOTRON_ZIP_GDRIVE_FILEID=1mkFB0-UmR84WWM-tWFO-ZEIKeaarQjHc
 
 echo "Downloading Non-Attentive TacoTron model checkpoint (English)..."
 gdown --id $EN_TACOTRON_ZIP_GDRIVE_FILEID --output models/en/tacotron/zipped.zip
