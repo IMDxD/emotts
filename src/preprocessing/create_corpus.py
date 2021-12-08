@@ -10,10 +10,8 @@ from pathlib import Path
 from typing import List
 
 import click
-from tqdm import tqdm
-
 from text.cleaners import russian_cleaners
-
+from tqdm import tqdm
 
 ENCODING = "utf8"
 

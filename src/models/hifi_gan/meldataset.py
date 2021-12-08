@@ -9,14 +9,13 @@ import numpy as np
 import torch
 import torch.utils.data
 import torchaudio
-from torchaudio.transforms import Resample
 from librosa.filters import mel as librosa_mel_fn
 from librosa.util import normalize
 from scipy.io.wavfile import read
+from torchaudio.transforms import Resample
 
 from src.models.hifi_gan.train_valid_split import get_mel_file_path
 
-MAX_WAV_VALUE = 32768.0
 AudioData = np.ndarray
 
 
@@ -174,16 +173,8 @@ class MelDataset(
         filename = self.audio_files[index]
         raw_audio: Optional[AudioData]
         if self._cache_ref_count == 0:
-            file_extension = Path(filename).suffix
-            if file_extension == ".wav":
-                raw_audio, sampling_rate = load_wav(filename)
-                raw_audio = raw_audio / MAX_WAV_VALUE
-            elif file_extension == ".flac":
-                raw_audio, sampling_rate = torchaudio.load(filename)
-                raw_audio = raw_audio.squeeze(0)
-            else:
-                raise ValueError(f"{file_extension} extension is not handled yet."
-                                 "Switch to wav or flac.")
+            raw_audio, sampling_rate = torchaudio.load(filename)
+            raw_audio = raw_audio.squeeze(0)
 
             if not self.fine_tuning:
                 raw_audio = normalize(raw_audio) * 0.95

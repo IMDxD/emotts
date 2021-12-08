@@ -1,4 +1,5 @@
 from pathlib import Path, PurePath
+
 import numpy as np
 
 NON_VALID_SPEAKERS = ["p315"]
