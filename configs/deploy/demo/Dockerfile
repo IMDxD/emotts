@@ -9,8 +9,6 @@ RUN conda env create -f environment.yml
 
 # Update models
 RUN ["conda", "run", "-n", "emotts", \
-    "bash", "models/download_g2p.sh"]
-RUN ["conda", "run", "-n", "emotts", \
     "bash", "models/download_hifigan.sh"]
 RUN ["conda", "run", "-n", "emotts", \
     "bash", "models/download_tacotron.sh"]

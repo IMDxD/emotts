@@ -113,6 +113,7 @@ def layout_app() -> None:
                 )
             with open(audio_output_path, "rb") as audio_file:
                 st.audio(audio_file.read())
+            audio_output_path.unlink()
         except CleanedTextIsEmptyStringError:
             st.warning("😔 Looks like input text can not be pronounced")
             st.stop()
