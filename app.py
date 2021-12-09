@@ -32,7 +32,7 @@ LOADING_PHRASES = [
     "💫 Permuting tensors...",
 ]
 
-DEFAULT_USER_INPUT = "Я усиленно обогреваю серверную в эту холодные зимние дни"
+DEFAULT_USER_INPUT = "Я усиленно обогреваю серверную в эти холодные зимние дни"
 
 
 @dataclass
@@ -41,7 +41,7 @@ class AppModes:
     standalone: str = "standalone"
 
 
-APP_MODE = AppModes.api_connector
+APP_MODE = AppModes.standalone
 HOST = "172.28.108.93"
 PORT = 8080
 EMOTTS_API_ENDPOINT = f"http://{HOST}:{PORT}{EMOTTS_API_ROUTE}"
@@ -56,8 +56,6 @@ def run_in_api_connector_mode(language: Language, emotion: Emotion, input_text: 
         with open(audio_output_path, 'wb') as f:
             for chunk in r:
                 f.write(chunk)
-        with st.expander("Your query was:", expanded=False):
-            st.json(r.json())
     else:
         st.warning(f"Status: {r.status_code}")
         st.warning(f"Message: {r.text}")
@@ -113,7 +111,7 @@ def layout_app() -> None:
                     emotion=emotion,
                     audio_output_path=audio_output_path,
                 )
-            with open(audio_output_path, "r") as audio_file:
+            with open(audio_output_path, "rb") as audio_file:
                 st.audio(audio_file.read())
         except CleanedTextIsEmptyStringError:
             st.warning("😔 Looks like input text can not be pronounced")

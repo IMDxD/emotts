@@ -37,7 +37,7 @@ def phonemize(user_query: str, language: Language, phonemes_to_ids: Dict[str, in
     if language == SupportedLanguages.english:
         normalized_content = english_cleaners(user_query)
         normalized_content = " ".join(re.findall("[a-zA-Z]+", normalized_content))
-        pause_token = phonemes_to_ids.get("<SIL>")
+        pause_token = phonemes_to_ids.get("")
     elif language == SupportedLanguages.russian:
         normalized_content = russian_cleaners(user_query)
         normalized_content = " ".join(re.findall("[а-яА-Я]+", normalized_content))
