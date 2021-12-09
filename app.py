@@ -48,21 +48,30 @@ EMOTTS_API_ENDPOINT = f"http://{HOST}:{PORT}{EMOTTS_API_ROUTE}"
 
 
 def run_in_api_connector_mode(language: Language, emotion: Emotion, input_text: str, audio_output_path: Path) -> None:
-    query = f"{EMOTTS_API_ENDPOINT}?lang={language.api_name}&emo={emotion.api_name}&text={input_text}"
-    r = requests.get(query, stream=True)
+    loading_phrase = random.choice(LOADING_PHRASES)
+    with st.spinner(loading_phrase):
+        query = f"{EMOTTS_API_ENDPOINT}?lang={language.api_name}&emo={emotion.api_name}&text={input_text}"
+        r = requests.get(query, stream=True)
     if r.status_code == 200:
         with open(audio_output_path, 'wb') as f:
             for chunk in r:
                 f.write(chunk)
+        with st.expander("Your query was:", expanded=False):
+            st.json(r.json())
+    else:
+        st.warning(f"Status: {r.status_code}")
+        st.warning(f"Message: {r.text}")
 
 
 def run_in_standalone_mode(language: Language, emotion: Emotion, input_text: str, audio_output_path: Path) -> None:
-    inference_text_to_speech(
-        language=language,
-        input_text=input_text,
-        emotion=emotion,
-        audio_output_path=audio_output_path,
-    )
+    loading_phrase = random.choice(LOADING_PHRASES)
+    with st.spinner(loading_phrase):
+        inference_text_to_speech(
+            language=language,
+            input_text=input_text,
+            emotion=emotion,
+            audio_output_path=audio_output_path,
+        )
 
 
 def layout_app() -> None:
@@ -87,33 +96,31 @@ def layout_app() -> None:
         form_submit = st.form_submit_button("Synthesize speech")
 
     if form_submit:
-        loading_phrase = random.choice(LOADING_PHRASES)
-        with st.spinner(loading_phrase):
-            # Handle incorrect input
-            audio_output_path = Path(f"generated-{uuid.uuid4()}.wav")
-            try:
-                # Run inference pipeline
-                if APP_MODE == AppModes.standalone:
-                    run_in_standalone_mode(
-                        language=language,
-                        input_text=input_text,
-                        emotion=emotion,
-                        audio_output_path=audio_output_path,
-                    )
-                elif APP_MODE == AppModes.api_connector:
-                    run_in_api_connector_mode(
-                        language=language,
-                        input_text=input_text,
-                        emotion=emotion,
-                        audio_output_path=audio_output_path,
-                    )
-                st.audio(audio_output_path)
-            except CleanedTextIsEmptyStringError:
-                st.warning("😔 Looks like input text can not be pronounced")
-                st.stop()
-            # except Exception:
-            #     st.error("Oops! Forget about it and hit F5 🙈")
-            #     st.stop()
+        audio_output_path = Path(f"generated-{uuid.uuid4()}.wav")
+        try:
+            # Run inference pipeline
+            if APP_MODE == AppModes.standalone:
+                run_in_standalone_mode(
+                    language=language,
+                    input_text=input_text,
+                    emotion=emotion,
+                    audio_output_path=audio_output_path,
+                )
+            elif APP_MODE == AppModes.api_connector:
+                run_in_api_connector_mode(
+                    language=language,
+                    input_text=input_text,
+                    emotion=emotion,
+                    audio_output_path=audio_output_path,
+                )
+            with open(audio_output_path, "r") as audio_file:
+                st.audio(audio_file.read())
+        except CleanedTextIsEmptyStringError:
+            st.warning("😔 Looks like input text can not be pronounced")
+            st.stop()
+        # except Exception:
+        #     st.error("Oops! Forget about it and hit F5 🙈")
+        #     st.stop()
 
 
 def main() -> None:
