@@ -26,7 +26,7 @@ class CleanedTextIsEmptyStringError(Exception):
 
 def parse_g2p(g2p_path: pathlib.Path, phonemes_to_ids: Dict[str, int]) -> Dict[str, list]:
     word_to_phones = {}
-    with open(g2p_path, "r") as fin:
+    with open(g2p_path.absolute(), "r") as fin:
         for line in fin:
             word, phones = line.rstrip().split("\t", 1)
             word_to_phones[word] = [phonemes_to_ids[ph] for ph in phones.split(" ")]
@@ -53,7 +53,7 @@ def phonemize(user_query: str, language: Language, phonemes_to_ids: Dict[str, in
     with open(text_path, "w") as fout:
         fout.write(normalized_content)
     subprocess.call(
-        ["mfa", "g2p", language.g2p_model_path, text_path, g2p_output_path]
+        ["mfa", "g2p", "-t", "g2p_tmp", language.g2p_model_path, text_path, g2p_output_path]
     )
     word_to_phones = parse_g2p(g2p_output_path, phonemes_to_ids)
     text_path.unlink()

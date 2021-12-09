@@ -9,7 +9,7 @@ from inference_pipeline import DEVICE, inference_text_to_speech
 from src.constants import SupportedLanguages, SupportedEmotions
 
 
-EMOTTS_ENDPOINT = "/tts/emo/v1"
+EMOTTS_API_ROUTE = "/tts/emo/v1"
 TEST_AUDIO_PATH = "data/testaudio-gs-16b-1c-44100hz.wav"
 ARG_TO_LANGUAGE = {
     "ru": SupportedLanguages.russian,
@@ -48,7 +48,7 @@ async def audio():
     return filepath
 
 
-@app.get(EMOTTS_ENDPOINT, response_class=FileResponse)
+@app.get(EMOTTS_API_ROUTE, response_class=FileResponse)
 async def tts(lang: str, emo: str, text: str, bg_tasks: BackgroundTasks):
     language = ARG_TO_LANGUAGE.get(lang)
     emotion = ARG_TO_EMOTION.get(emo)
