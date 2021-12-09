@@ -229,9 +229,8 @@ class Trainer:
                 global_step = epoch * len(self.train_loader) + i
                 batch = self.batch_to_device(batch)
                 self.optimizer.zero_grad()
-                durations, mel_outputs_postnet, mel_outputs, style_emb = self.feature_model(batch)
-                style_speaker = self.style_fc(style_emb)
-
+                durations, mel_outputs_postnet, mel_outputs, style_emb, speaker_emb = self.feature_model(batch)
+                
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
                     mel_outputs_postnet,
@@ -239,9 +238,16 @@ class Trainer:
                     batch.durations,
                     batch.mels,
                 )
-                log_adversarial_speaker = torch.log(1 - style_speaker)
-                loss_adversarial = self.adversatial_criterion(
-                    log_adversarial_speaker,
+                style_speaker_false = self.style_fc(style_emb)
+                style_speaker_true = self.style_fc(speaker_emb)
+                log_adversarial_speaker_false = torch.log(1 - style_speaker_false)
+                log_adversarial_speaker_true = torch.log(style_speaker_true)
+                loss_adversarial_false = self.adversatial_criterion(
+                    log_adversarial_speaker_false,
+                    batch.speaker_ids
+                )
+                loss_adversarial_true = self.adversatial_criterion(
+                    log_adversarial_speaker_true,
                     batch.speaker_ids
                 )
 
@@ -250,7 +256,7 @@ class Trainer:
 
                 loss = loss_mel + loss_durations
 
-                loss_full = loss + self.adversarial_weight * loss_adversarial
+                loss_full = loss + self.adversarial_weight * (loss_adversarial_false + loss_adversarial_true)
 
                 loss_full.backward()
 
@@ -301,7 +307,7 @@ class Trainer:
             val_loss_durations = 0.0
             for batch in self.valid_loader:
                 batch = self.batch_to_device(batch)
-                durations, mel_outputs_postnet, mel_outputs, _ = self.feature_model(batch)
+                durations, mel_outputs_postnet, mel_outputs, _, _ = self.feature_model(batch)
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
                     mel_outputs_postnet,

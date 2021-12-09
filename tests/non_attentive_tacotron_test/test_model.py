@@ -244,13 +244,16 @@ def test_model_forward() -> None:
     model = NonAttentiveTacotron(
         N_PHONEMES, N_SPEAKER, N_MELS_DIM, config=MODEL_CONFIG
     )
-    durations, mel_fixed, mel_predicted, style_emb = model(MODEL_INPUT)
+    durations, mel_fixed, mel_predicted, style_emb, speaker_emb = model(MODEL_INPUT)
     assert (
         durations.shape == expected_duration_shape
     ), f"Wrong shape, expected {expected_duration_shape}, got: {durations.shape}"
     assert (
             style_emb.shape == expected_style_shape
     ), f"Wrong shape, expected {expected_style_shape}, got: {style_emb.shape}"
+    assert (
+            speaker_emb.shape == expected_style_shape
+    ), f"Wrong shape, expected {expected_style_shape}, got: {speaker_emb.shape}"
     assert (
         mel_predicted.shape == expected_mel_shape
     ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_predicted.shape}"
@@ -276,6 +279,7 @@ def test_model_forward() -> None:
 def test_model_forward_gpu() -> None:
     expected_mel_shape = INPUT_MELS.shape
     expected_duration_shape = (16, 50)
+    expected_style_shape = (16, MODEL_CONFIG.gst_config.emb_dim)
 
     model = NonAttentiveTacotron(
         N_PHONEMES, N_SPEAKER, N_MELS_DIM, config=MODEL_CONFIG
@@ -287,10 +291,16 @@ def test_model_forward_gpu() -> None:
         durations=INPUT_DURATIONS.to("cuda"),
         mels=INPUT_MELS.to("cuda")
     )
-    durations, mel_fixed, mel_predicted = model(gpu_input)
+    durations, mel_fixed, mel_predicted, style_emb, speaker_emb = model(gpu_input)
     assert (
         durations.shape == expected_duration_shape
     ), f"Wrong shape, expected {expected_duration_shape}, got: {durations.shape}"
+    assert (
+            style_emb.shape == expected_style_shape
+    ), f"Wrong shape, expected {expected_style_shape}, got: {style_emb.shape}"
+    assert (
+            speaker_emb.shape == expected_style_shape
+    ), f"Wrong shape, expected {expected_style_shape}, got: {speaker_emb.shape}"
     assert (
         mel_predicted.shape == expected_mel_shape
     ), f"Wrong shape, expected {expected_mel_shape}, got: {mel_predicted.shape}"

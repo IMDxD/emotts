@@ -482,7 +482,7 @@ class NonAttentiveTacotron(nn.Module):
         mel_outputs_postnet[mask] = 0
         mel_outputs[mask] = 0
 
-        return durations, mel_outputs_postnet, mel_outputs, gst_emb.squeeze(1)
+        return durations, mel_outputs_postnet, mel_outputs, gst_emb.squeeze(1), speaker_emb.squeeze(1)
 
     def inference(
         self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]

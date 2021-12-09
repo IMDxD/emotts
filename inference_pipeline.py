@@ -1,3 +1,4 @@
+import json
 import pathlib
 import re
 import subprocess
@@ -16,88 +17,23 @@ from src.preprocessing.text.cleaners import english_cleaners
 SAMPLING_RATE = 22050
 N_SPEAKERS = 109
 MEL_CHANNELS = 80
-DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+DEVICE = torch.device("cuda:3") if torch.cuda.is_available() else torch.device("cpu")
+CHECKPOINT_PATH = pathlib.Path("checkpoints/adversarial_gst_3_frame_6_head_01_adv")
 G2P_OUTPUT_PATH = "predictions/to_g2p.txt"
 AUDIO_OUTPUT_PATH = "predictions/generated.wav"
 G2P_MODEL_PATH = "models/g2p/english_g2p.zip"
-TACOTRON_MODEL_PATH = "models/tacotron/model_full.pth"
+TACOTRON_MODEL_PATH = CHECKPOINT_PATH / "feature_model.pth"
+REFERENCE_PATH = "data/full/mels/F05/F05_S01_H_000.pkl"
 HIFI_PARAMS = HIFIParams(
     dir_path="hifi", config_name="config.json", model_name="generator_v1"
 )
 
-PHONEMES_TO_IDS = {
-    "<PAD>": 0,
-    "<SIL>": 1,
-    "IH1": 2,
-    "T": 3,
-    "W": 4,
-    "AH1": 5,
-    "Z": 6,
-    "AH0": 7,
-    "HH": 8,
-    "AY1": 9,
-    "AE1": 10,
-    "M": 11,
-    "JH": 12,
-    "IH0": 13,
-    "S": 14,
-    "R": 15,
-    "NG": 16,
-    "D": 17,
-    "UW1": 18,
-    "AA1": 19,
-    "B": 20,
-    "DH": 21,
-    "P": 22,
-    "AO1": 23,
-    "EH2": 24,
-    "L": 25,
-    "OW2": 26,
-    "EH1": 27,
-    "SH": 28,
-    "ER0": 29,
-    "N": 30,
-    "EY1": 31,
-    "IY0": 32,
-    "Y": 33,
-    "UH1": 34,
-    "K": 35,
-    "CH": 36,
-    "OY1": 37,
-    "V": 38,
-    "IY1": 39,
-    "OW1": 40,
-    "F": 41,
-    "AW1": 42,
-    "IH2": 43,
-    "OW0": 44,
-    "TH": 45,
-    "IY2": 46,
-    "G": 47,
-    "ER1": 48,
-    "AW2": 49,
-    "AY2": 50,
-    "EH0": 51,
-    "UW0": 52,
-    "EY2": 53,
-    "AA2": 54,
-    "AA0": 55,
-    "UW2": 56,
-    "ZH": 57,
-    "AY0": 58,
-    "AE2": 59,
-    "AE0": 60,
-    "EY0": 61,
-    "AH2": 62,
-    "AO0": 63,
-    "AW0": 64,
-    "AO2": 65,
-    "UH2": 66,
-    "UH0": 67,
-    "ER2": 68,
-    "OY2": 69,
-    "OY0": 70,
-}
+with open(CHECKPOINT_PATH / "phonemes.json") as f:
+    PHONEMES_TO_IDS = json.load(f)
+    
+with open(CHECKPOINT_PATH / "speakers.json") as f:
+    SPEAKER_TO_IDS = json.load(f)
+    
 N_PHONEMES = len(PHONEMES_TO_IDS)
 
 
@@ -115,22 +51,26 @@ def text_to_file(user_query: str) -> None:
 
 def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> List[int]:
     with open(g2p_path, "r") as fin:
-        phonemes_ids = []
+        phonemes_ids = [PHONEMES_TO_IDS["<PAD>"]]
         for line in fin:
             _, word_to_phones = line.rstrip().split("\t", 1)
+            print(word_to_phones)
             phonemes_ids.extend(
                 [PHONEMES_TO_IDS[ph] for ph in word_to_phones.split(" ")]
             )
+        phonemes_ids.append(PHONEMES_TO_IDS["<PAD>"])
     return phonemes_ids
 
 
 def get_tacotron_batch(
-        phonemes_ids: List[int], speaker_id: int = 0, device: torch.device = DEVICE
+        phonemes_ids: List[int], reference: torch.Tensor, speaker_id: int = 0, device: torch.device = DEVICE
 ) -> Tuple[torch.Tensor, torch.LongTensor, torch.Tensor]:
     text_lengths_tensor = torch.LongTensor([len(phonemes_ids)])
+    reference = (reference - MELS_MEAN) / MELS_STD
+    reference = reference.permute(0, 2, 1).to(device)
     phonemes_ids_tensor = torch.LongTensor(phonemes_ids).unsqueeze(0).to(device)
     speaker_ids_tensor = torch.LongTensor([speaker_id]).to(device)
-    return phonemes_ids_tensor, text_lengths_tensor, speaker_ids_tensor
+    return phonemes_ids_tensor, text_lengths_tensor, speaker_ids_tensor, reference
 
 
 def inference_text_to_speech(
@@ -139,10 +79,12 @@ def inference_text_to_speech(
     audio_output_path: str,
     tacotron_model_path: str,
     hifi_config: HIFIParams,
+    reference_path: str
 ) -> None:
     text_to_file(input_text)
     phoneme_ids = parse_g2p()
-    batch = get_tacotron_batch(phoneme_ids, speaker_id, DEVICE)
+    reference = torch.load(reference_path)
+    batch = get_tacotron_batch(phoneme_ids, reference, speaker_id, DEVICE)
 
     tacotron = torch.load(tacotron_model_path, map_location=DEVICE)
     tacotron.eval()
@@ -163,9 +105,10 @@ def inference_text_to_speech(
 
 if __name__ == "__main__":
     inference_text_to_speech(
-        input_text="1 ring to rule tham all",
-        speaker_id=0,
+        input_text="How can I not",
+        speaker_id=SPEAKER_TO_IDS["F05"],
         audio_output_path=AUDIO_OUTPUT_PATH,
         tacotron_model_path=TACOTRON_MODEL_PATH,
         hifi_config=HIFI_PARAMS,
+        reference_path=REFERENCE_PATH
     )
