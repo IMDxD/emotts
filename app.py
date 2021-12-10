@@ -7,18 +7,17 @@ import uuid
 
 import streamlit as st
 
-from api import EMOTTS_API_ROUTE
 from inference_pipeline import inference_text_to_speech, CleanedTextIsEmptyStringError
 from src.web.streamlit_utils import hide_hamburger_menu, st_empty_block, st_header_centered
 from src.constants import Language, Emotion, SupportedLanguages, SupportedEmotions
 
 
 SELECTOR_TO_EMO = {
-    "😃": SupportedEmotions.very_happy,
-    "🙂": SupportedEmotions.happy,
-    "😐": SupportedEmotions.sad,
-    "😒": SupportedEmotions.angry,
-    "😡": SupportedEmotions.very_angry,
+    "😃 happy+": SupportedEmotions.very_happy,
+    "🙂 happy": SupportedEmotions.happy,
+    "😐 sad": SupportedEmotions.sad,
+    "😒 angry": SupportedEmotions.angry,
+    "😡 angry+": SupportedEmotions.very_angry,
 }
 
 SELECTOR_TO_LANG = {
@@ -41,10 +40,11 @@ class AppModes:
     standalone: str = "standalone"
 
 
-APP_MODE = AppModes.standalone
-HOST = "172.28.108.93"
+APP_MODE = AppModes.api_connector
+HOST = ""
 PORT = 8080
-EMOTTS_API_ENDPOINT = f"http://{HOST}:{PORT}{EMOTTS_API_ROUTE}"
+# EMOTTS_API_ENDPOINT = f"http://{HOST}:{PORT}{EMOTTS_API_ROUTE}"
+EMOTTS_API_ENDPOINT = "https://api-emotts.appspot.com/tts/emo/v1"  #GCP
 
 
 def run_in_api_connector_mode(language: Language, emotion: Emotion, input_text: str, audio_output_path: Path) -> None:

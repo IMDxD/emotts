@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Version 11-08
 #TACOTRON_ZIP_GDRIVE_FILEID=1gEpxOIT7hlKfUyBsTqogU3LPO7wa5Jo9
 
@@ -13,19 +14,22 @@ EN_TACOTRON_ZIP_GDRIVE_FILEID=1D8xWg70AsjSqaG3LAhtA-FUX9f_C6BxC
 ## 225000 naive phones russian
 #RU_TACOTRON_ZIP_GDRIVE_FILEID=1KRhsp6cKXHF02Jv24cCKOivoPtaBdord
 
-# 315000 naive phones russian
-RU_TACOTRON_ZIP_GDRIVE_FILEID=1mkFB0-UmR84WWM-tWFO-ZEIKeaarQjHc
+## 315000 naive phones russian
+#RU_TACOTRON_ZIP_GDRIVE_FILEID=1mkFB0-UmR84WWM-tWFO-ZEIKeaarQjHc
+
+# 380000 naive phones russian
+RU_TACOTRON_ZIP_GDRIVE_FILEID=1gx7Xbb4AnCByi1OPrq7fe90URfBWRrdj
 
 echo "Downloading Non-Attentive TacoTron model checkpoint (English)..."
 gdown --id $EN_TACOTRON_ZIP_GDRIVE_FILEID --output models/en/tacotron/zipped.zip
 echo "Extracting TacoTron model and configs... (English)"
-unzip -j models/en/tacotron/zipped.zip */feature_model.pth */phonemes.json */speakers.json -d models/en/tacotron
+unzip -j -o models/en/tacotron/zipped.zip */feature_model.pth */phonemes.json */speakers.json -d models/en/tacotron
 rm -rf models/en/tacotron/zipped.zip
 echo "[Finished] Non-Attentive Tacotron Setup (English)"
 
 echo "Downloading Non-Attentive TacoTron model checkpoint (Russian)..."
 gdown --id $RU_TACOTRON_ZIP_GDRIVE_FILEID --output models/ru/tacotron/zipped.zip
 echo "Extracting TacoTron model and configs... (Russian)"
-unzip -j models/ru/tacotron/zipped.zip */feature_model.pth */phonemes.json */speakers.json -d models/ru/tacotron
+unzip -j -o models/ru/tacotron/zipped.zip */feature_model.pth */phonemes.json */speakers.json -d models/ru/tacotron
 rm -rf models/ru/tacotron/zipped.zip
 echo "[Finished] Non-Attentive Tacotron Setup (Russian)"
