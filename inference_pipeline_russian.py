@@ -72,7 +72,7 @@ def phonemize(user_query: str) -> List[int]:
     with open(text_path, "w") as fout:
         fout.write(normalized_content)
     subprocess.call(
-        ["mfa", "g2p", G2P_MODEL_PATH, text_path.absolute(), G2P_OUTPUT_PATH]
+        ["mfa", "g2p", "-t", "tmp_g2p", G2P_MODEL_PATH, text_path.absolute(), G2P_OUTPUT_PATH]
     )
     text_path.unlink()
     word_to_phones = parse_g2p(G2P_OUTPUT_PATH)
@@ -126,16 +126,16 @@ def inference_text_to_speech(
 
 
 if __name__ == "__main__":
-    for emotion in EMO_TO_SPEAKER_ID.keys():
-        reference_path = f"reference/mels/{emotion}.pkl"
-        audio_output_path = f"predictions/{emotion}.wav"
-        speaker_id = EMO_TO_SPEAKER_ID[emotion]
-        inference_text_to_speech(
-            input_text="Быть или не быть? Вот в чем вопрос!",
-            speaker_id=speaker_id,
-            audio_output_path=audio_output_path,
-            tacotron_model_path=TACOTRON_MODEL_PATH,
-            hifi_config=HIFI_PARAMS,
-            reference_path=reference_path,
-            device=DEVICE,
-        )
+    emotion = "angry"
+    reference_path = f"reference/mels/{emotion}.pkl"
+    audio_output_path = f"predictions/{emotion}.wav"
+    speaker_id = EMO_TO_SPEAKER_ID[emotion]
+    inference_text_to_speech(
+        input_text="Быть или не быть? Вот в чем вопрос!",
+        speaker_id=speaker_id,
+        audio_output_path=audio_output_path,
+        tacotron_model_path=TACOTRON_MODEL_PATH,
+        hifi_config=HIFI_PARAMS,
+        reference_path=reference_path,
+        device=DEVICE,
+    )
