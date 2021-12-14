@@ -10,7 +10,6 @@ def main() -> None:
     )
     args = parser.parse_args()
     inferencer = Inferencer(args.config)
-    inferencer.feature_model.to("cuda")
     inferencer.proceed_data()
 
 

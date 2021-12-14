@@ -457,15 +457,15 @@ class NonAttentiveTacotron(nn.Module):
 
     def forward(
         self, batch: VCTKBatch
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         phonem_emb = self.phonem_embedding(batch.phonemes).transpose(1, 2)
         speaker_emb = self.speaker_embedding(batch.speaker_ids).unsqueeze(1)
         
         phonem_emb = self.encoder(phonem_emb, batch.num_phonemes)
-        style_emb = self.gst(batch.mels)
+        gst_emb = self.gst(batch.mels)
         
-        style_emb = torch.cat((style_emb, speaker_emb), dim=-1)
+        style_emb = torch.cat((gst_emb, speaker_emb), dim=-1)
         style_emb = torch.repeat_interleave(style_emb, phonem_emb.shape[1], dim=1)
         embeddings = torch.cat((phonem_emb, style_emb), dim=-1)
 
@@ -482,7 +482,7 @@ class NonAttentiveTacotron(nn.Module):
         mel_outputs_postnet[mask] = 0
         mel_outputs[mask] = 0
 
-        return durations, mel_outputs_postnet, mel_outputs
+        return durations, mel_outputs_postnet, mel_outputs, gst_emb.squeeze(1), speaker_emb.squeeze(1)
 
     def inference(
         self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]

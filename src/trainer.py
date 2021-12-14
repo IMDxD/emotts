@@ -1,10 +1,12 @@
 import json
 import os
+from itertools import chain
 from pathlib import Path
 from typing import Dict, OrderedDict, Tuple
 
 import numpy as np
 import torch
+from torch import nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
@@ -40,6 +42,7 @@ class Trainer:
         self.device = torch.device(self.config.device)
         self.mels_weight = self.config.loss.mels_weight
         self.duration_weight = self.config.loss.duration_weight
+        self.adversarial_weight = self.config.loss.adversarial_weight
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
         self.start_epoch = 0
@@ -53,10 +56,15 @@ class Trainer:
             n_speakers=len(self.speakers_to_id),
             config=self.config.model,
         ).to(self.device)
+        self.style_fc = nn.Sequential(
+            nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id)),
+            nn.Softmax()
+        )
+        self.style_fc = self.style_fc.to(self.device)
 
         self.vocoder: Generator = load_hifi(self.config.hifi, self.device)
         self.optimizer = Adam(
-            self.feature_model.parameters(),
+            chain(self.feature_model.parameters(), self.style_fc.parameters()),
             lr=self.config.optimizer.learning_rate,
             weight_decay=self.config.optimizer.reg_weight,
             betas=(self.config.optimizer.adam_beta1, self.config.optimizer.adam_beta2),
@@ -70,6 +78,7 @@ class Trainer:
         self.criterion = NonAttentiveTacotronLoss(
             sample_rate=self.config.sample_rate, hop_size=self.config.hop_size
         )
+        self.adversatial_criterion = nn.NLLLoss()
 
         self.upload_checkpoints()
 
@@ -220,8 +229,8 @@ class Trainer:
                 global_step = epoch * len(self.train_loader) + i
                 batch = self.batch_to_device(batch)
                 self.optimizer.zero_grad()
-                durations, mel_outputs_postnet, mel_outputs = self.feature_model(batch)
-
+                durations, mel_outputs_postnet, mel_outputs, style_emb, speaker_emb = self.feature_model(batch)
+                
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
                     mel_outputs_postnet,
@@ -229,13 +238,27 @@ class Trainer:
                     batch.durations,
                     batch.mels,
                 )
+                style_speaker_false = self.style_fc(style_emb)
+                style_speaker_true = self.style_fc(speaker_emb)
+                log_adversarial_speaker_false = torch.log(1 - style_speaker_false)
+                log_adversarial_speaker_true = torch.log(style_speaker_true)
+                loss_adversarial_false = self.adversatial_criterion(
+                    log_adversarial_speaker_false,
+                    batch.speaker_ids
+                )
+                loss_adversarial_true = self.adversatial_criterion(
+                    log_adversarial_speaker_true,
+                    batch.speaker_ids
+                )
 
                 loss_mel = self.mels_weight * (loss_prenet + loss_postnet)
                 loss_durations = self.duration_weight * loss_durations
 
                 loss = loss_mel + loss_durations
 
-                loss.backward()
+                loss_full = loss + self.adversarial_weight * (loss_adversarial_false + loss_adversarial_true)
+
+                loss_full.backward()
 
                 torch.nn.utils.clip_grad_norm_(
                     self.feature_model.parameters(), self.config.grad_clip_thresh
@@ -284,7 +307,7 @@ class Trainer:
             val_loss_durations = 0.0
             for batch in self.valid_loader:
                 batch = self.batch_to_device(batch)
-                durations, mel_outputs_postnet, mel_outputs = self.feature_model(batch)
+                durations, mel_outputs_postnet, mel_outputs, _, _ = self.feature_model(batch)
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
                     mel_outputs_postnet,

@@ -19,8 +19,6 @@ from src.train_config import load_config
 
 class Inferencer:
 
-    PAUSE_TOKEN = "<SIL>"
-    MFA_PAUSE_TOKEN = ""
     PAD_TOKEN = "<PAD>"
     PHONES_TIER = "phones"
     LEXICON_OOV_TOKEN = "spn"
@@ -42,7 +40,7 @@ class Inferencer:
         self.hop_size = config.hop_size
         self.device = torch.device(config.device)
         self.feature_model: NonAttentiveTacotron = torch.load(
-            checkpoint_path / FEATURE_MODEL_FILENAME, map_location=self.device
+            checkpoint_path / FEATURE_MODEL_FILENAME, map_location=config.device
         )
         self._mels_dir = Path(config.data.mels_dir)
         self._text_dir = Path(config.data.text_dir)
@@ -65,6 +63,7 @@ class Inferencer:
         }
         samples = list(mels_set & texts_set)
         for sample in tqdm(samples):
+
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
             text_grid = tgt.read_textgrid(tg_path)
 
@@ -88,8 +87,6 @@ class Inferencer:
 
             phoneme_ids = []
             for phoneme in phonemes:
-                if phoneme == self.MFA_PAUSE_TOKEN:
-                    phoneme = self.PAUSE_TOKEN
                 phoneme_ids.append(self.phonemes_to_idx[phoneme])
 
             durations = np.array(
@@ -109,7 +106,7 @@ class Inferencer:
                 durations[-1] += pad_size
                 assert durations[-1] >= 0
             if pad_size > 0:
-                phoneme_ids.append(self.phonemes_to_idx[self.PAUSE_TOKEN])
+                phoneme_ids.append(self.phonemes_to_idx[self.PAD_TOKEN])
                 np.append(durations, pad_size)
 
             with torch.no_grad():
@@ -120,7 +117,7 @@ class Inferencer:
                     durations=torch.FloatTensor([durations]).to(self.device),
                     mels=torch.FloatTensor(mels.permute(0, 2, 1)).to(self.device)
                 )
-                _, output, _ = self.feature_model(batch)
+                _, output, _, _, _ = self.feature_model(batch)
                 output = output.permute(0, 2, 1).squeeze(0)
                 output = output * MELS_STD.to(self.device) + MELS_MEAN.to(self.device)
 
