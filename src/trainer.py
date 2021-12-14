@@ -14,10 +14,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from src.constants import (
     CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, LOG_DIR, PHONEMES_FILENAME,
-    SPEAKERS_FILENAME,
+    SPEAKERS_FILENAME, MELS_MEAN_FILENAME, MELS_STD_FILENAME
 )
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
-from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
 from src.models.hifi_gan import Generator, load_model as load_hifi
 from src.train_config import TrainParams, load_config
@@ -161,12 +160,15 @@ class Trainer:
         torch.save(self.feature_model, self.checkpoint_path / FEATURE_MODEL_FILENAME)
         torch.save(self.optimizer.state_dict(), self.checkpoint_path / self.OPTIMIZER_FILENAME)
         torch.save(self.scheduler, self.checkpoint_path / self.SCHEDULER_FILENAME)
+        torch.save(self.train_loader.dataset.mels_mean, self.checkpoint_path / MELS_MEAN_FILENAME)
+        torch.save(self.train_loader.dataset.mels_std, self.checkpoint_path / MELS_STD_FILENAME)
 
     def prepare_loaders(self) -> Tuple[DataLoader[VCTKBatch], DataLoader[VCTKBatch]]:
 
         factory = VCTKFactory(
             sample_rate=self.config.sample_rate,
             hop_size=self.config.hop_size,
+            n_mels=self.config.n_mels,
             config=self.config.data,
             phonemes_to_id=self.phonemes_to_id,
             speakers_to_id=self.speakers_to_id,
@@ -342,6 +344,8 @@ class Trainer:
         global_step: int,
     ) -> None:
         valid_dataset: VCTKDataset = self.valid_loader.dataset  # type: ignore
+        mels_mean = valid_dataset.mels_mean
+        mels_std = valid_dataset.mels_std
         idx: np.ndarray = np.random.choice(
             np.arange(len(valid_dataset)), self.SAMPLE_SIZE, replace=False
         )
@@ -355,7 +359,7 @@ class Trainer:
             )
             output = self.feature_model.inference(batch)
             output = output.permute(0, 2, 1).squeeze(0)
-            output = output * MELS_STD.to(self.device) + MELS_MEAN.to(self.device)
+            output = output * mels_std.to(self.device) + mels_mean.to(self.device)
             audio = self.vocoder_inference(output)
             self.writer.add_audio(
                 f"Audio/Val/{i}",

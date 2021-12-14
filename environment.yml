@@ -1,0 +1,33 @@
+name: emotts
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+  - pypi
+dependencies:
+  - click
+  - cpuonly
+  - enum34
+  - fastapi=0.70.0
+  - gdown
+  - git
+  - inflect
+  - librosa
+  - marshmallow
+  - marshmallow-dataclass
+  - matplotlib
+  - montreal-forced-aligner=2.0.0b4
+  - numpy
+  - pip
+  - python=3.8
+  - pytorch=1.10.0
+  - scipy
+  - streamlit=1.2.0
+  - tensorboard
+  - torchaudio=0.10.0
+  - tqdm
+  - unidecode
+  - unzip
+  - uvicorn
+  - pip:
+      - tgt

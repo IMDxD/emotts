@@ -1,8 +1,9 @@
 import re
-import torch
-from string import printable, punctuation
-from tqdm import tqdm
 import warnings
+from string import printable, punctuation
+
+import torch
+from tqdm import tqdm
 
 
 class Normalizer:

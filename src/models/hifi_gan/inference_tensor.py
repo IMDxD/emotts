@@ -1,11 +1,13 @@
 import json
+from pathlib import Path
 
 import torch
 
-from src.constants import MODEL_DIR
 from src.models.hifi_gan.env import AttrDict
 from src.models.hifi_gan.hifi_config import HIFIParams
 from src.models.hifi_gan.models import Generator
+
+MODEL_DIR = Path("models")
 
 
 def load_model(hifi_config: HIFIParams, device: torch.device) -> Generator:

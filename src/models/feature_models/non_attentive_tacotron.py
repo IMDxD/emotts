@@ -7,17 +7,14 @@ from torch import nn
 from torch.nn import functional as f
 
 from src.data_process import VCTKBatch
+
 from .config import (
     DecoderParams, DurationParams, EncoderParams, GaussianUpsampleParams,
     ModelParams, PostNetParams, RangeParams,
 )
-from .layers import (
-    Conv1DNorm, LinearWithActivation, PositionalEncoding,
-)
-from .utils import (
-    get_mask_from_lengths, norm_emb_layer,
-)
 from .gst import GST
+from .layers import Conv1DNorm, LinearWithActivation, PositionalEncoding
+from .utils import get_mask_from_lengths, norm_emb_layer
 
 
 class Prenet(nn.Module):

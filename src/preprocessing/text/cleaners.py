@@ -17,7 +17,6 @@ from unidecode import unidecode
 
 from .numbers import normalize_numbers
 
-
 # Regular expression matching alphanumeric + cyrillic characters and whitespace
 RUSSIAN_NON_LETTERS_PATTERN = "[^A-Za-zА-я0-9 ]+"
 

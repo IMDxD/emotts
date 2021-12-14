@@ -9,10 +9,9 @@ from tqdm import tqdm
 
 from src.constants import (
     CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, PHONEMES_FILENAME,
-    SPEAKERS_FILENAME,
+    SPEAKERS_FILENAME, MELS_MEAN_FILENAME, MELS_STD_FILENAME
 )
 from src.data_process import VCTKBatch
-from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models.feature_models import NonAttentiveTacotron
 from src.train_config import load_config
 
@@ -48,6 +47,8 @@ class Inferencer:
         self._mels_ext = config.data.mels_ext
         self.feature_model_mels_path = data_path / self.TACOTRON_DIR
         self.feature_model_mels_path.mkdir(parents=True, exist_ok=True)
+        self.mels_mean = torch.load(checkpoint_path / MELS_MEAN_FILENAME)
+        self.mels_std = torch.load(checkpoint_path / MELS_STD_FILENAME)
 
     def seconds_to_frame(self, seconds: float) -> float:
         return seconds * self.sample_rate / self.hop_size
@@ -99,7 +100,7 @@ class Inferencer:
 
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
             mels: torch.Tensor = torch.load(mels_path)
-            mels = (mels - MELS_MEAN) / MELS_STD
+            mels = (mels - self.mels_mean) / self.mels_std
 
             pad_size = mels.shape[-1] - np.int64(durations.sum())
             if pad_size < 0:
@@ -119,6 +120,6 @@ class Inferencer:
                 )
                 _, output, _, _, _ = self.feature_model(batch)
                 output = output.permute(0, 2, 1).squeeze(0)
-                output = output * MELS_STD.to(self.device) + MELS_MEAN.to(self.device)
+                output = output * self.mels_std.to(self.device) + self.mels_mean.to(self.device)
 
             torch.save(output, filepath)
