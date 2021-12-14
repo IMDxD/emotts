@@ -18,6 +18,7 @@ ARG_TO_LANGUAGE = {
 ARG_TO_EMOTION = {
     "angry": SupportedEmotions.angry,
     "happy": SupportedEmotions.happy,
+    "neutral": SupportedEmotions.neutral,
     "sad": SupportedEmotions.sad,
     "veryangry": SupportedEmotions.very_angry,
     "veryhappy": SupportedEmotions.very_happy,

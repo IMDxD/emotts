@@ -15,7 +15,8 @@ from src.constants import Language, Emotion, SupportedLanguages, SupportedEmotio
 SELECTOR_TO_EMO = {
     "😃 happy+": SupportedEmotions.very_happy,
     "🙂 happy": SupportedEmotions.happy,
-    "😐 sad": SupportedEmotions.sad,
+    "😐 neutral": SupportedEmotions.neutral,
+    "😞 sad": SupportedEmotions.sad,
     "😒 angry": SupportedEmotions.angry,
     "😡 angry+": SupportedEmotions.very_angry,
 }
@@ -40,7 +41,7 @@ class AppModes:
     standalone: str = "standalone"
 
 
-APP_MODE = AppModes.api_connector
+APP_MODE = AppModes.standalone
 HOST = ""
 PORT = 8080
 # EMOTTS_API_ENDPOINT = f"http://{HOST}:{PORT}{EMOTTS_API_ROUTE}"
