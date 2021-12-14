@@ -18,12 +18,12 @@ SAMPLING_RATE = 22050
 N_SPEAKERS = 109
 MEL_CHANNELS = 80
 DEVICE = torch.device("cuda:3") if torch.cuda.is_available() else torch.device("cpu")
-CHECKPOINT_PATH = pathlib.Path("checkpoints/adversarial_gst_3_frame_6_head_01_adv")
+CHECKPOINT_PATH = pathlib.Path("checkpoints/adversarial_gst_3_frame_6_head_03_adv_esd")
 G2P_OUTPUT_PATH = "predictions/to_g2p.txt"
-AUDIO_OUTPUT_PATH = "predictions/generated.wav"
+AUDIO_OUTPUT_PATH = "predictions/happy.wav"
 G2P_MODEL_PATH = "models/g2p/english_g2p.zip"
 TACOTRON_MODEL_PATH = CHECKPOINT_PATH / "feature_model.pth"
-REFERENCE_PATH = "data/full/mels/F05/F05_S01_H_000.pkl"
+REFERENCE_PATH = "data/esd_speaker_emo/mels/0016Happy/0016Happy_000764.pkl"
 HIFI_PARAMS = HIFIParams(
     dir_path="hifi", config_name="config.json", model_name="generator_v1"
 )
@@ -54,7 +54,6 @@ def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> List[int]:
         phonemes_ids = [PHONEMES_TO_IDS["<PAD>"]]
         for line in fin:
             _, word_to_phones = line.rstrip().split("\t", 1)
-            print(word_to_phones)
             phonemes_ids.extend(
                 [PHONEMES_TO_IDS[ph] for ph in word_to_phones.split(" ")]
             )
@@ -105,8 +104,8 @@ def inference_text_to_speech(
 
 if __name__ == "__main__":
     inference_text_to_speech(
-        input_text="How can I not",
-        speaker_id=SPEAKER_TO_IDS["F05"],
+        input_text="One ring to rule them all",
+        speaker_id=SPEAKER_TO_IDS["0016"],
         audio_output_path=AUDIO_OUTPUT_PATH,
         tacotron_model_path=TACOTRON_MODEL_PATH,
         hifi_config=HIFI_PARAMS,
