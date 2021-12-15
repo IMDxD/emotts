@@ -10,7 +10,7 @@ import streamlit as st
 from api import EMOTTS_API_ROUTE
 from inference_pipeline import inference_text_to_speech, CleanedTextIsEmptyStringError, SpeakerNotFoundError
 from src.web.streamlit_utils import hide_hamburger_menu, st_empty_block, st_header_centered
-from src.constants import Language, Emotion, SupportedLanguages, SupportedEmotions
+from src.constants import Language, Emotion, SupportedLanguages
 
 
 SELECTOR_TO_LANG = {

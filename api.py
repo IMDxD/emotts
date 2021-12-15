@@ -20,7 +20,7 @@ ARG_TO_EMOTION = {
     SupportedEmotions.happy.api_name: SupportedEmotions.happy,
     SupportedEmotions.neutral.api_name: SupportedEmotions.neutral,
     SupportedEmotions.sad.api_name: SupportedEmotions.sad,
-    SupportedEmotions.surprized.api_name: SupportedEmotions.surprized,
+    SupportedEmotions.surprise.api_name: SupportedEmotions.surprise,
     SupportedEmotions.very_angry.api_name: SupportedEmotions.very_angry,
     SupportedEmotions.very_happy.api_name: SupportedEmotions.very_happy,
 }
