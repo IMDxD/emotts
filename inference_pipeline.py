@@ -86,6 +86,7 @@ def get_tacotron_batch(
 def inference_text_to_speech(
     language: Language,
     input_text: str,
+    speaker: str,
     emotion: Emotion,
     audio_output_path: pathlib.Path,
     device: torch.device = DEVICE,
@@ -107,12 +108,11 @@ def inference_text_to_speech(
     mels_std_path = language.tacotron_checkpoint.path / language.tacotron_checkpoint.mels_std_filename
     mels_std = torch.load(mels_std_path)
 
-    if language == SupportedLanguages.english:
-        speaker_id = emotion.en_speaker_id
-    elif language == SupportedLanguages.russian:
+    if language == SupportedLanguages.russian:
         speaker_id = emotion.ru_speaker_id
-    else:
-        raise NotImplementedError
+    elif language == SupportedLanguages.english:
+        speaker_id = speakers_to_ids.get(speaker)
+
     phoneme_ids = phonemize(input_text, language, phonemes_to_ids)
     reference_path = language.emo_reference_dir / emotion.reference_mels_path
     reference = torch.load(reference_path)
@@ -140,6 +140,7 @@ if __name__ == "__main__":
     inference_text_to_speech(
         language=SupportedLanguages.english,
         input_text="Two months after receiving his doctorate, Pauli completed the article, which came to 237 pages",
+        speaker="",
         emotion=SupportedEmotions.happy,
         audio_output_path=pathlib.Path("predictions/generated.wav"),
         device=DEVICE,

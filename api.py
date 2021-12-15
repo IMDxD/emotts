@@ -50,7 +50,7 @@ async def audio():
 
 
 @app.get(EMOTTS_API_ROUTE, response_class=FileResponse)
-async def tts(lang: str, emo: str, text: str, bg_tasks: BackgroundTasks):
+async def tts(lang: str, emo: str, speaker: str, text: str, bg_tasks: BackgroundTasks):
     language = ARG_TO_LANGUAGE.get(lang)
     emotion = ARG_TO_EMOTION.get(emo)
     if not language or not emotion:
@@ -59,6 +59,7 @@ async def tts(lang: str, emo: str, text: str, bg_tasks: BackgroundTasks):
     inference_text_to_speech(
         language=language,
         input_text=text,
+        speaker=speaker,
         emotion=emotion,
         audio_output_path=generated_audio_path,
         device=DEVICE,
