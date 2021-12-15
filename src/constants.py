@@ -16,6 +16,7 @@ CHECKPOINT_DIR = Path("checkpoints")
 DATA_DIR = Path("checkpoints")
 LOG_DIR = Path("logs")
 MODEL_DIR = Path("models")
+
 RUSSIAN_SPEAKERS = {0: "Игорина"}
 try:
     with open("models/en/tacotron/speakers.json", "r") as json_file:
@@ -40,19 +41,17 @@ class Emotion:
     api_name: str
     reference_mels_path: PATHLIKE
     ru_speaker_id: int
-    en_speaker_id: int
 
 
 @dataclass
 class SupportedEmotions:
-    angry: Emotion = Emotion(name="angry", api_name="angry", reference_mels_path="mels/angry.pkl", ru_speaker_id=10, en_speaker_id=0)
-    happy: Emotion = Emotion(name="happy", api_name="happy", reference_mels_path="mels/happy.pkl", ru_speaker_id=21, en_speaker_id=0)
-    neutral: Emotion = Emotion(name="neutral", api_name="neutral", reference_mels_path="mels/neutral.pkl", ru_speaker_id=13, en_speaker_id=0)
-    sad: Emotion = Emotion(name="sad", api_name="sad",reference_mels_path="mels/sad.pkl", ru_speaker_id=40, en_speaker_id=0)
-    surprized: Emotion = Emotion(name="surprized", api_name="surprized", reference_mels_path="mels/surprized", ru_speaker_id=0, en_speaker_id=0)
-    very_angry: Emotion = Emotion(name="very_angry", api_name="veryangry", reference_mels_path="mels/very_angry.pkl", ru_speaker_id=41, en_speaker_id=0)
-    very_happy: Emotion = Emotion(name="very_happy", api_name="veryhappy", reference_mels_path="mels/very_happy.pkl", ru_speaker_id=12, en_speaker_id=0)
-    banana: Emotion = Emotion(name="very_happy", api_name="veryhappy", reference_mels_path="mels/very_happy.pkl",ru_speaker_id=12, en_speaker_id=0)
+    angry: Emotion = Emotion(name="angry", api_name="angry", reference_mels_path="Angry.pkl", ru_speaker_id=10)
+    happy: Emotion = Emotion(name="happy", api_name="happy", reference_mels_path="Happy.pkl", ru_speaker_id=21)
+    neutral: Emotion = Emotion(name="neutral", api_name="neutral", reference_mels_path="Neutral.pkl", ru_speaker_id=13)
+    sad: Emotion = Emotion(name="sad", api_name="sad",reference_mels_path="Sad.pkl", ru_speaker_id=40)
+    surprized: Emotion = Emotion(name="surprized", api_name="surprized", reference_mels_path="Surprized.pkl", ru_speaker_id=0)
+    very_angry: Emotion = Emotion(name="very_angry", api_name="veryangry", reference_mels_path="Very_angry.pkl", ru_speaker_id=41)
+    very_happy: Emotion = Emotion(name="very_happy", api_name="veryhappy", reference_mels_path="Very_happy.pkl", ru_speaker_id=12)
 
 
 @dataclass
@@ -73,7 +72,7 @@ class SupportedLanguages:
     english: Language = Language(
         name="English (en-EN)",
         api_name="en",
-        emo_reference_dir=Path("models/ru/emo_reference"),
+        emo_reference_dir=Path("models/en/emo_reference"),
         emo_selector = {
             "🙂 happy": SupportedEmotions.happy,
             "😲 surprized": SupportedEmotions.surprized,
@@ -90,7 +89,7 @@ class SupportedLanguages:
     russian: Language = Language(
         name="Russian (ru-RU)",
         api_name="ru",
-        emo_reference_dir=Path("models/ru/emo_reference"),
+        emo_reference_dir=Path("models/ru/emo_reference/mels"),
         emo_selector={
             "😃 happy+": SupportedEmotions.very_happy,
             "🙂 happy": SupportedEmotions.happy,

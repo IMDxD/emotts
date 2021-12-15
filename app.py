@@ -7,7 +7,8 @@ import uuid
 
 import streamlit as st
 
-from inference_pipeline import inference_text_to_speech, CleanedTextIsEmptyStringError
+from api import EMOTTS_API_ROUTE
+from inference_pipeline import inference_text_to_speech, CleanedTextIsEmptyStringError, SpeakerNotFoundError
 from src.web.streamlit_utils import hide_hamburger_menu, st_empty_block, st_header_centered
 from src.constants import Language, Emotion, SupportedLanguages, SupportedEmotions
 
@@ -30,8 +31,8 @@ class AppModes:
     standalone: str = "standalone"
 
 
-APP_MODE = AppModes.standalone
-HOST = ""
+APP_MODE = AppModes.api_connector
+HOST = "localhost"
 PORT = 8080
 # EMOTTS_API_ENDPOINT = f"http://{HOST}:{PORT}{EMOTTS_API_ROUTE}"
 EMOTTS_API_ENDPOINT = "https://api-emotts.appspot.com/tts/emo/v1"  #GCP
@@ -110,6 +111,9 @@ def layout_app() -> None:
             audio_output_path.unlink()
         except CleanedTextIsEmptyStringError:
             st.warning("😔 Looks like input text can not be pronounced")
+            st.stop()
+        except SpeakerNotFoundError:
+            st.warning("🔍 This combination of speaker, language and emotion is not supported")
             st.stop()
         # except Exception:
         #     st.error("Oops! Forget about it and hit F5 🙈")

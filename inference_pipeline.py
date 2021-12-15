@@ -23,6 +23,11 @@ class CleanedTextIsEmptyStringError(Exception):
     pass
 
 
+class SpeakerNotFoundError(Exception):
+    """Raised when app was unable to found proper reference for language-spaker pair"""
+    pass
+
+
 def parse_g2p(g2p_path: pathlib.Path, phonemes_to_ids: Dict[str, int]) -> Dict[str, list]:
     word_to_phones = {}
     with open(g2p_path.absolute(), "r") as fin:
@@ -107,13 +112,19 @@ def inference_text_to_speech(
     mels_std_path = language.tacotron_checkpoint.path / language.tacotron_checkpoint.mels_std_filename
     mels_std = torch.load(mels_std_path)
 
-    if language == SupportedLanguages.russian:
-        speaker_id = emotion.ru_speaker_id
-    elif language == SupportedLanguages.english:
-        speaker_id = speakers_to_ids.get(speaker)
+    try:
+        if language == SupportedLanguages.russian:
+            speaker_id = emotion.ru_speaker_id
+            reference_path = language.emo_reference_dir / emotion.reference_mels_path
+        elif language == SupportedLanguages.english:
+            speaker_id = speakers_to_ids.get(speaker)
+            reference_path = language.emo_reference_dir / speaker / emotion.reference_mels_path
+        else:
+            raise NotImplementedError
+    except FileNotFoundError:
+        raise SpeakerNotFoundError
 
     phoneme_ids = phonemize(input_text, language, phonemes_to_ids)
-    reference_path = language.emo_reference_dir / emotion.reference_mels_path
     reference = torch.load(reference_path)
     batch = get_tacotron_batch(phoneme_ids, reference, speaker_id, mels_mean, mels_std, device)
 

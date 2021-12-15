@@ -16,12 +16,13 @@ ARG_TO_LANGUAGE = {
     "en": SupportedLanguages.english,
 }
 ARG_TO_EMOTION = {
-    "angry": SupportedEmotions.angry,
-    "happy": SupportedEmotions.happy,
-    "neutral": SupportedEmotions.neutral,
-    "sad": SupportedEmotions.sad,
-    "veryangry": SupportedEmotions.very_angry,
-    "veryhappy": SupportedEmotions.very_happy,
+    SupportedEmotions.angry.api_name: SupportedEmotions.angry,
+    SupportedEmotions.happy.api_name: SupportedEmotions.happy,
+    SupportedEmotions.neutral.api_name: SupportedEmotions.neutral,
+    SupportedEmotions.sad.api_name: SupportedEmotions.sad,
+    SupportedEmotions.surprized.api_name: SupportedEmotions.surprized,
+    SupportedEmotions.very_angry.api_name: SupportedEmotions.very_angry,
+    SupportedEmotions.very_happy.api_name: SupportedEmotions.very_happy,
 }
 
 
