@@ -6,7 +6,7 @@ import subprocess
 from typing import Dict, List, Tuple
 
 import torch
-from scipy.io.wavfile import write as wav_write
+import torchaudio.backend.sox_io_backend
 
 from src.constants import SupportedLanguages, SupportedEmotions, Emotion, Language
 from src.models.hifi_gan import load_model as load_hifi
@@ -16,7 +16,6 @@ from src.preprocessing.text.cleaners import english_cleaners, russian_cleaners
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 SAMPLING_RATE = 22050
-MAX_WAV_VALUE = 32768.0
 
 
 class CleanedTextIsEmptyStringError(Exception):
@@ -130,10 +129,9 @@ def inference_text_to_speech(
     generator.eval()
     with torch.no_grad():
         audio = hifi_inference(generator, mels, device)
-        audio = audio * MAX_WAV_VALUE
-        audio = audio.type(torch.int16).detach().cpu().numpy()
+        audio = audio.unsqueeze(0)
 
-    wav_write(audio_output_path, SAMPLING_RATE, audio)
+    torchaudio.save(audio_output_path, audio, SAMPLING_RATE)
 
 
 if __name__ == "__main__":
