@@ -13,6 +13,7 @@ from src.web.streamlit_utils import hide_hamburger_menu, st_empty_block, st_head
 from src.constants import Language, Emotion, SupportedLanguages
 
 
+BROKEN_SPEAKERS = ["0019"]
 SELECTOR_TO_LANG = {
     "🇷🇺 Russian (ru-RU)": SupportedLanguages.russian,
     "🇺🇸 English (en-EN)": SupportedLanguages.english,
@@ -77,7 +78,10 @@ def layout_app() -> None:
     with st.form(key="input_form"):
         col1, col2 = st.columns(2)
         with col1:
-            speaker = st.selectbox(label="🗣 Speaker", options=language.speaker_selector.keys())
+            speaker_selector = language.speaker_selector
+            for broken_speaker in BROKEN_SPEAKERS:
+                speaker_selector.pop(broken_speaker, None)
+            speaker = st.selectbox(label="🗣 Speaker", options=speaker_selector.keys())
         with col2:
             emotion_name = st.select_slider(label="🎨 Emotion", options=language.emo_selector.keys())
             emotion = language.emo_selector.get(emotion_name)

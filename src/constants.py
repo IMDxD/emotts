@@ -78,7 +78,7 @@ class SupportedLanguages:
             "😲 surprise": SupportedEmotions.surprise,
             "😐 neutral": SupportedEmotions.neutral,
             "😞 sad": SupportedEmotions.sad,
-            "😒 angry": SupportedEmotions.angry,
+            "😡 angry": SupportedEmotions.angry,
         },
         speaker_selector=ENGLISH_SPEAKERS,
         g2p_model_path=Path("models/en/g2p/english_g2p.zip"),

@@ -142,7 +142,7 @@ def inference_text_to_speech(
         audio = hifi_inference(generator, mels, device)
         audio = audio.unsqueeze(0)
 
-    torchaudio.save(audio_output_path, audio, SAMPLING_RATE)
+    torchaudio.save(audio_output_path, audio.cpu(), SAMPLING_RATE)
 
 
 if __name__ == "__main__":
