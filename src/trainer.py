@@ -130,8 +130,10 @@ class Trainer:
 
     def upload_checkpoints(self) -> None:
         if self.checkpoint_is_exist():
+            model_pathes = list(self.checkpoint_path.rglob(f"*_{FEATURE_MODEL_FILENAME}"))
+            last_model_path = max(model_pathes, key=lambda x: int(x.name.split("_")[0]))
             feature_model: NonAttentiveTacotron = torch.load(
-                self.checkpoint_path / FEATURE_MODEL_FILENAME, map_location=self.device
+                last_model_path, map_location=self.device
             )
             optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
                 self.checkpoint_path / self.OPTIMIZER_FILENAME, map_location=self.device
@@ -157,7 +159,7 @@ class Trainer:
                 self.EPOCH_NAME: epoch,
                 self.ITERATION_NAME: iteration
             }, f)
-        torch.save(self.feature_model, self.checkpoint_path / FEATURE_MODEL_FILENAME)
+        torch.save(self.feature_model, self.checkpoint_path / f"{iteration}_{FEATURE_MODEL_FILENAME}")
         torch.save(self.optimizer.state_dict(), self.checkpoint_path / self.OPTIMIZER_FILENAME)
         torch.save(self.scheduler, self.checkpoint_path / self.SCHEDULER_FILENAME)
         torch.save(self.train_loader.dataset.mels_mean, self.checkpoint_path / MELS_MEAN_FILENAME)
