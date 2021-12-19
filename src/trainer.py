@@ -357,12 +357,12 @@ class Trainer:
                 torch.LongTensor([sample.phonemes]).to(self.device),
                 torch.LongTensor([sample.num_phonemes]),
                 torch.LongTensor([sample.speaker_id]).to(self.device),
-                torch.FloatTensor(sample.mels).to(self.device).permute(0, 2, 1),
+                sample.mels.float().to(self.device).permute(0, 2, 1),
             )
             output = self.feature_model.inference(batch)
             output = output.permute(0, 2, 1).squeeze(0)
             output = output * mels_std.to(self.device) + mels_mean.to(self.device)
-            audio = self.vocoder_inference(output)
+            audio = self.vocoder_inference(output.float())
             self.writer.add_audio(
                 f"Audio/Val/{i}",
                 audio,
