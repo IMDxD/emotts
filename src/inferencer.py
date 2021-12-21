@@ -116,10 +116,10 @@ class Inferencer:
                     num_phonemes=torch.LongTensor([len(phoneme_ids)]),
                     speaker_ids=torch.LongTensor([speaker_id]).to(self.device),
                     durations=torch.FloatTensor([durations]).to(self.device),
-                    mels=torch.FloatTensor(mels.permute(0, 2, 1)).to(self.device)
+                    mels=mels.permute(0, 2, 1).float().to(self.device)
                 )
                 _, output, _, _, _ = self.feature_model(batch)
                 output = output.permute(0, 2, 1).squeeze(0)
                 output = output * self.mels_std.to(self.device) + self.mels_mean.to(self.device)
 
-            torch.save(output, filepath)
+            torch.save(output.float(), filepath)
