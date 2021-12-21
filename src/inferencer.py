@@ -38,8 +38,10 @@ class Inferencer:
         self.sample_rate = config.sample_rate
         self.hop_size = config.hop_size
         self.device = torch.device(config.device)
+        model_pathes = list(checkpoint_path.rglob(f"*_{FEATURE_MODEL_FILENAME}"))
+        last_model_path = max(model_pathes, key=lambda x: int(x.name.split("_")[0]))
         self.feature_model: NonAttentiveTacotron = torch.load(
-            checkpoint_path / FEATURE_MODEL_FILENAME, map_location=config.device
+            last_model_path, map_location=config.device
         )
         self._mels_dir = Path(config.data.mels_dir)
         self._text_dir = Path(config.data.text_dir)
