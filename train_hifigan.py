@@ -29,7 +29,7 @@ torch.backends.cudnn.benchmark = True
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
-def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noqa: C901, CCR001, CFQ001
+def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:
     if h.num_gpus > 1:
         init_process_group(backend=h.dist_config["dist_backend"], init_method=h.dist_config["dist_url"],
                            world_size=h.dist_config["world_size"] * h.num_gpus, rank=rank)
@@ -42,9 +42,7 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noq
     msd: Union[DistributedDataParallel, MultiScaleDiscriminator] = MultiScaleDiscriminator().to(device)
 
     if rank == 0:
-        # print(generator)
         os.makedirs(arguments.checkpoint_path, exist_ok=True)
-        # print("checkpoints directory : ", arguments.checkpoint_path)
 
     if os.path.isdir(arguments.checkpoint_path):
         cp_g = scan_checkpoint(arguments.checkpoint_path, "g_")
@@ -256,7 +254,7 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:  # noq
 
                     generator.train()
 
-            steps += 1  # noqa: SIM113
+            steps += 1
 
         scheduler_g.step()
         scheduler_d.step()
@@ -271,10 +269,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--group_name", default=None)
-    parser.add_argument("--input_wavs_dir", default="LJSpeech-1.1/wavs")
-    parser.add_argument("--input_mels_dir", default="ft_dataset")
-    parser.add_argument("--input_training_file", default="LJSpeech-1.1/training.txt")
-    parser.add_argument("--input_validation_file", default="LJSpeech-1.1/validation.txt")
+    parser.add_argument("--input_wavs_dir", default="wavs")
+    parser.add_argument("--input_mels_dir", default="mels")
     parser.add_argument("--checkpoint_path", default="cp_hifigan")
     parser.add_argument("--config", default="")
     parser.add_argument("--training_epochs", default=3100, type=int)
@@ -306,7 +302,6 @@ def main() -> None:
         mp.spawn(train, nprocs=h.num_gpus, args=(a, h))
     else:
         mp.spawn(train, nprocs=1, args=(a, h,))
-        # train(0, a, h)
 
 
 if __name__ == "__main__":

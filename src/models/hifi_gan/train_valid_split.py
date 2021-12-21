@@ -10,7 +10,7 @@ SPLIT_LOG_PATH = "logs/hifi-split.txt"
 def get_mel_file_path(full_wav_name: str, mels_dir: str):
     return Path(
             mels_dir,
-            Path(*list(Path(full_wav_name).parts[1:])).with_suffix(".pth")
+            Path(*list(Path(full_wav_name).parts[-2:])).with_suffix(".pth")
             )
 
 
@@ -36,6 +36,7 @@ def split_vctk_data(wavs_dir: str, mels_dir: str):
                         validation_files.append(full_wav_name)
 
     # Save  train and val filenames for sanity check
+    Path(SPLIT_LOG_PATH.parts[-1:]).mkdir(parents=True, exist_ok=True)
     with open(SPLIT_LOG_PATH, "w") as log_file:
         log_file.write("train:")
         log_file.writelines(training_files)

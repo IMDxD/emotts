@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import AvgPool1d, Conv1d, Conv2d, ConvTranspose1d
-from torch.nn.utils import remove_weight_norm, spectral_norm, weight_norm
+from torch.nn.utils import remove_weight_norm as torch_remove_weight_norm, \
+    spectral_norm, weight_norm as torch_weight_norm
 
 from src.models.hifi_gan.env import AttrDict
 from src.models.hifi_gan.utils import get_padding, init_weights
@@ -22,15 +23,15 @@ class ResBlock1(torch.nn.Module):
         super(ResBlock1, self).__init__()
         self.h = h
         self.convs1 = nn.ModuleList([
-            weight_norm(Conv1d(
+            torch_weight_norm(Conv1d(
                 channels, channels, (kernel_size,), (1,), dilation=(dilation[0],),
                 padding=(get_padding(kernel_size, dilation[0]),)
             )),
-            weight_norm(Conv1d(
+            torch_weight_norm(Conv1d(
                 channels, channels, (kernel_size,), (1,), dilation=(dilation[1],),
                 padding=(get_padding(kernel_size, dilation[1]),)
             )),
-            weight_norm(Conv1d(
+            torch_weight_norm(Conv1d(
                 channels, channels, (kernel_size,), (1,), dilation=(dilation[2],),
                 padding=(get_padding(kernel_size, dilation[2]),)
             ))
@@ -38,15 +39,15 @@ class ResBlock1(torch.nn.Module):
         self.convs1.apply(init_weights)
 
         self.convs2 = nn.ModuleList([
-            weight_norm(Conv1d(
+            torch_weight_norm(Conv1d(
                 channels, channels, (kernel_size,), (1,), dilation=(1,),
                 padding=(get_padding(kernel_size, 1),)
             )),
-            weight_norm(Conv1d(
+            torch_weight_norm(Conv1d(
                 channels, channels, (kernel_size,), (1,), dilation=(1,),
                 padding=(get_padding(kernel_size, 1),)
             )),
-            weight_norm(Conv1d(
+            torch_weight_norm(Conv1d(
                 channels, channels, (kernel_size,), (1,), dilation=(1,),
                 padding=(get_padding(kernel_size, 1),)
             ))
@@ -64,9 +65,9 @@ class ResBlock1(torch.nn.Module):
 
     def remove_weight_norm(self) -> None:
         for layer in self.convs1:
-            remove_weight_norm(layer)
+            torch_remove_weight_norm(layer)
         for layer in self.convs2:
-            remove_weight_norm(layer)
+            torch_remove_weight_norm(layer)
 
 
 class ResBlock2(torch.nn.Module):
@@ -77,11 +78,11 @@ class ResBlock2(torch.nn.Module):
         super(ResBlock2, self).__init__()
         self.h = h
         self.convs = nn.ModuleList([
-            weight_norm(Conv1d(
+            torch_weight_norm(Conv1d(
                 channels, channels, (kernel_size,), (1,), dilation=(dilation[0],),
                 padding=(get_padding(kernel_size, dilation[0]),)
             )),
-            weight_norm(Conv1d(
+            torch_weight_norm(Conv1d(
                 channels, channels, (kernel_size,), (1,), dilation=(dilation[1],),
                 padding=(get_padding(kernel_size, dilation[1]),)
             ))
@@ -97,7 +98,7 @@ class ResBlock2(torch.nn.Module):
 
     def remove_weight_norm(self) -> None:
         for layer in self.convs:
-            remove_weight_norm(layer)
+            torch_remove_weight_norm(layer)
 
 
 class Generator(torch.nn.Module):
@@ -106,12 +107,12 @@ class Generator(torch.nn.Module):
         self.h = h
         self.num_kernels = len(h.resblock_kernel_sizes)
         self.num_upsamples = len(h.upsample_rates)
-        self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, (7,), (1,), padding=(3,)))
+        self.conv_pre = torch_weight_norm(Conv1d(h.num_mels, h.upsample_initial_channel, (7,), (1,), padding=(3,)))
         resblock = ResBlock1 if h.resblock == "1" else ResBlock2
 
         self.ups = nn.ModuleList()
         for i, (u, k) in enumerate(zip(h.upsample_rates, h.upsample_kernel_sizes)):
-            self.ups.append(weight_norm(
+            self.ups.append(torch_weight_norm(
                 ConvTranspose1d(h.upsample_initial_channel // (2 ** i),
                                 h.upsample_initial_channel // (2 ** (i + 1)),
                                 k, u, padding=(k - u) // 2)))
@@ -122,23 +123,26 @@ class Generator(torch.nn.Module):
             for _, (k, d) in enumerate(zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)):
                 self.resblocks.append(resblock(h, ch, k, d))
 
-        self.conv_post = weight_norm(Conv1d(ch, 1, (7,), (1,), padding=(3,)))
+        self.conv_post = torch_weight_norm(Conv1d(ch, 1, (7,), (1,), padding=(3,)))
         self.ups.apply(init_weights)
         self.conv_post.apply(init_weights)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x = [batch, mels, frames]
         x = self.conv_pre(x)
+        # x = [batch, h.upsample_initial_channels, frames]
         for i in range(self.num_upsamples):
             x = F.leaky_relu(x, LRELU_SLOPE)
             x = self.ups[i](x)
-            # do the first iteration
+            # [batch, ups[i]_output_channels, frames * ups[i]_stride]
             xs: torch.Tensor = self.resblocks[i * self.num_kernels](x)
-            # do the rest iterations
             for j in range(1, self.num_kernels):
                 xs += self.resblocks[i * self.num_kernels + j](x)
             x = xs / self.num_kernels
+        # x = [batch, ch, h.segment_size]
         x = F.leaky_relu(x)
         x = self.conv_post(x)
+        # x = [batch, 1, h.segment_size]
         x = torch.tanh(x)
 
         return x
@@ -146,18 +150,18 @@ class Generator(torch.nn.Module):
     def remove_weight_norm(self) -> None:
         print("Removing weight norm...")
         for layer in self.ups:
-            remove_weight_norm(layer)
+            torch_remove_weight_norm(layer)
         for layer in self.resblocks:
             layer.remove_weight_norm()
-        remove_weight_norm(self.conv_pre)
-        remove_weight_norm(self.conv_post)
+        torch_remove_weight_norm(self.conv_pre)
+        torch_remove_weight_norm(self.conv_post)
 
 
 class DiscriminatorP(torch.nn.Module):
     def __init__(self, period: int, kernel_size: int = 5, stride: int = 3, use_spectral_norm: bool = False) -> None:
         super(DiscriminatorP, self).__init__()
         self.period = period
-        norm_f: Any = weight_norm if not use_spectral_norm else spectral_norm
+        norm_f: Any = torch_weight_norm if not use_spectral_norm else spectral_norm
         self.convs = nn.ModuleList([
             norm_f(Conv2d(1, 32, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
             norm_f(Conv2d(32, 128, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
@@ -224,7 +228,7 @@ class MultiPeriodDiscriminator(torch.nn.Module):
 class DiscriminatorS(torch.nn.Module):
     def __init__(self, use_spectral_norm: bool = False) -> None:
         super(DiscriminatorS, self).__init__()
-        norm_f: Any = weight_norm if not use_spectral_norm else spectral_norm
+        norm_f: Any = torch_weight_norm if not use_spectral_norm else spectral_norm
         self.convs = nn.ModuleList([
             norm_f(Conv1d(1, 128, (15,), (1,), padding=(7,))),
             norm_f(Conv1d(128, 128, (41,), (2,), groups=4, padding=(20,))),

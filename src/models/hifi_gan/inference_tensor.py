@@ -21,7 +21,7 @@ def load_model(hifi_config: HIFIParams, device: torch.device) -> Generator:
     generator.load_state_dict(state_dict["generator"])
     generator.remove_weight_norm()
     generator.eval()
-    return generator
+    return generator, config.sampling_rate
 
 
 def inference(generator: Generator, tensor: torch.Tensor, device: torch.device) -> torch.Tensor:

@@ -167,7 +167,7 @@ class MelDataset(
         self.fine_tuning = fine_tuning
         self.base_mels_path = base_mels_path
 
-    def __getitem__(  # noqa: CCR001
+    def __getitem__(
         self, index: int
     ) -> Tuple[torch.Tensor, torch.Tensor, str, torch.Tensor]:
         filename = self.audio_files[index]

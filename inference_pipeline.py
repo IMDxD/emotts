@@ -15,7 +15,6 @@ from src.preprocessing.text.cleaners import english_cleaners, russian_cleaners
 
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-SAMPLING_RATE = 22050
 
 
 class CleanedTextIsEmptyStringError(Exception):
@@ -136,13 +135,13 @@ def inference_text_to_speech(
         mels = mels.permute(0, 2, 1).squeeze(0)
         mels = mels * mels_std.to(device) + mels_mean.to(device)
 
-    generator = load_hifi(hifi_config, device)
+    generator, sampling_rate = load_hifi(hifi_config, device)
     generator.eval()
     with torch.no_grad():
         audio = hifi_inference(generator, mels, device)
         audio = audio.unsqueeze(0)
 
-    torchaudio.save(audio_output_path, audio.cpu(), SAMPLING_RATE)
+    torchaudio.save(audio_output_path, audio.cpu(), sampling_rate)
 
 
 if __name__ == "__main__":
