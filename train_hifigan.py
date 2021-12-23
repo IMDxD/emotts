@@ -15,17 +15,15 @@ from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from src.models.hifi_gan.env import AttrDict, build_env
-from src.models.hifi_gan.meldataset import (
-    MelDataset, mel_spectrogram,
-)
+from src.models.hifi_gan.meldataset import MelDataset, mel_spectrogram
 from src.models.hifi_gan.models import (
     Generator, MultiPeriodDiscriminator, MultiScaleDiscriminator,
     discriminator_loss, feature_loss, generator_loss,
 )
+from src.models.hifi_gan.train_valid_split import split_vctk_data
 from src.models.hifi_gan.utils import (
     load_checkpoint, plot_spectrogram, save_checkpoint, scan_checkpoint,
 )
-from src.models.hifi_gan.train_valid_split import split_vctk_data
 
 torch.backends.cudnn.benchmark = True
 warnings.simplefilter(action="ignore", category=FutureWarning)

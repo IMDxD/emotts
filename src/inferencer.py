@@ -9,18 +9,15 @@ from tqdm import tqdm
 
 from src.constants import (
     CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, PHONEMES_FILENAME,
-    SPEAKERS_FILENAME,
+    SPEAKERS_FILENAME, MELS_MEAN_FILENAME, MELS_STD_FILENAME
 )
 from src.data_process import VCTKBatch
-from src.data_process.constanst import MELS_MEAN, MELS_STD
 from src.models.feature_models import NonAttentiveTacotron
 from src.train_config import load_config
 
 
 class Inferencer:
 
-    PAUSE_TOKEN = "<SIL>"
-    MFA_PAUSE_TOKEN = ""
     PAD_TOKEN = "<PAD>"
     PHONES_TIER = "phones"
     LEXICON_OOV_TOKEN = "spn"
@@ -41,8 +38,10 @@ class Inferencer:
         self.sample_rate = config.sample_rate
         self.hop_size = config.hop_size
         self.device = torch.device(config.device)
+        model_pathes = list(checkpoint_path.rglob(f"*_{FEATURE_MODEL_FILENAME}"))
+        last_model_path = max(model_pathes, key=lambda x: int(x.name.split("_")[0]))
         self.feature_model: NonAttentiveTacotron = torch.load(
-            checkpoint_path / FEATURE_MODEL_FILENAME, map_location=self.device
+            last_model_path, map_location=config.device
         )
         self._mels_dir = Path(config.data.mels_dir)
         self._text_dir = Path(config.data.text_dir)
@@ -50,6 +49,8 @@ class Inferencer:
         self._mels_ext = config.data.mels_ext
         self.feature_model_mels_path = data_path / self.TACOTRON_DIR
         self.feature_model_mels_path.mkdir(parents=True, exist_ok=True)
+        self.mels_mean = torch.load(checkpoint_path / MELS_MEAN_FILENAME)
+        self.mels_std = torch.load(checkpoint_path / MELS_STD_FILENAME)
 
     def seconds_to_frame(self, seconds: float) -> float:
         return seconds * self.sample_rate / self.hop_size
@@ -65,6 +66,7 @@ class Inferencer:
         }
         samples = list(mels_set & texts_set)
         for sample in tqdm(samples):
+
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
             text_grid = tgt.read_textgrid(tg_path)
 
@@ -88,8 +90,6 @@ class Inferencer:
 
             phoneme_ids = []
             for phoneme in phonemes:
-                if phoneme == self.MFA_PAUSE_TOKEN:
-                    phoneme = self.PAUSE_TOKEN
                 phoneme_ids.append(self.phonemes_to_idx[phoneme])
 
             durations = np.array(
@@ -102,14 +102,14 @@ class Inferencer:
 
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
             mels: torch.Tensor = torch.load(mels_path)
-            mels = (mels - MELS_MEAN) / MELS_STD
+            mels = (mels - self.mels_mean) / self.mels_std
 
             pad_size = mels.shape[-1] - np.int64(durations.sum())
             if pad_size < 0:
                 durations[-1] += pad_size
                 assert durations[-1] >= 0
             if pad_size > 0:
-                phoneme_ids.append(self.phonemes_to_idx[self.PAUSE_TOKEN])
+                phoneme_ids.append(self.phonemes_to_idx[self.PAD_TOKEN])
                 np.append(durations, pad_size)
 
             with torch.no_grad():
@@ -118,10 +118,10 @@ class Inferencer:
                     num_phonemes=torch.LongTensor([len(phoneme_ids)]),
                     speaker_ids=torch.LongTensor([speaker_id]).to(self.device),
                     durations=torch.FloatTensor([durations]).to(self.device),
-                    mels=torch.FloatTensor(mels.permute(0, 2, 1)).to(self.device)
+                    mels=mels.permute(0, 2, 1).float().to(self.device)
                 )
-                _, output, _ = self.feature_model(batch)
+                _, output, _, _, _ = self.feature_model(batch)
                 output = output.permute(0, 2, 1).squeeze(0)
-                output = output * MELS_STD.to(self.device) + MELS_MEAN.to(self.device)
+                output = output * self.mels_std.to(self.device) + self.mels_mean.to(self.device)
 
-            torch.save(output, filepath)
+            torch.save(output.float(), filepath)

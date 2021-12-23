@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
-import torch.nn.init as init
 import torch.nn.functional as F
+import torch.nn.init as init
 
-from .layers import Conv2DNorm
 from .config import GSTParams
+from .layers import Conv2DNorm
 
 
 class GST(nn.Module):

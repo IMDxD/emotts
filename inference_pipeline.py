@@ -1,160 +1,135 @@
+import json
 import pathlib
+import uuid
 import re
 import subprocess
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import torch
 from scipy.io.wavfile import write as wav_write
 
-from src.data_process.constanst import MELS_MEAN, MELS_STD
+from src.constants import SupportedLanguages, SupportedEmotions, Emotion, Language
 from src.models.hifi_gan import load_model as load_hifi
-from src.models.hifi_gan.hifi_config import HIFIParams
 from src.models.hifi_gan.inference_tensor import inference as hifi_inference
-from src.models.hifi_gan.meldataset import MAX_WAV_VALUE
-from src.preprocessing.text.cleaners import english_cleaners
+from src.preprocessing.text.cleaners import english_cleaners, russian_cleaners
 
-SAMPLING_RATE = 22050
-N_SPEAKERS = 109
-MEL_CHANNELS = 80
+
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-G2P_OUTPUT_PATH = "predictions/to_g2p.txt"
-AUDIO_OUTPUT_PATH = "predictions/generated.wav"
-G2P_MODEL_PATH = "models/g2p/english_g2p.zip"
-TACOTRON_MODEL_PATH = "models/tacotron/model_full.pth"
-HIFI_PARAMS = HIFIParams(
-    dir_path="hifi", config_name="config.json", model_name="generator_v1"
-)
-
-PHONEMES_TO_IDS = {
-    "<PAD>": 0,
-    "<SIL>": 1,
-    "IH1": 2,
-    "T": 3,
-    "W": 4,
-    "AH1": 5,
-    "Z": 6,
-    "AH0": 7,
-    "HH": 8,
-    "AY1": 9,
-    "AE1": 10,
-    "M": 11,
-    "JH": 12,
-    "IH0": 13,
-    "S": 14,
-    "R": 15,
-    "NG": 16,
-    "D": 17,
-    "UW1": 18,
-    "AA1": 19,
-    "B": 20,
-    "DH": 21,
-    "P": 22,
-    "AO1": 23,
-    "EH2": 24,
-    "L": 25,
-    "OW2": 26,
-    "EH1": 27,
-    "SH": 28,
-    "ER0": 29,
-    "N": 30,
-    "EY1": 31,
-    "IY0": 32,
-    "Y": 33,
-    "UH1": 34,
-    "K": 35,
-    "CH": 36,
-    "OY1": 37,
-    "V": 38,
-    "IY1": 39,
-    "OW1": 40,
-    "F": 41,
-    "AW1": 42,
-    "IH2": 43,
-    "OW0": 44,
-    "TH": 45,
-    "IY2": 46,
-    "G": 47,
-    "ER1": 48,
-    "AW2": 49,
-    "AY2": 50,
-    "EH0": 51,
-    "UW0": 52,
-    "EY2": 53,
-    "AA2": 54,
-    "AA0": 55,
-    "UW2": 56,
-    "ZH": 57,
-    "AY0": 58,
-    "AE2": 59,
-    "AE0": 60,
-    "EY0": 61,
-    "AH2": 62,
-    "AO0": 63,
-    "AW0": 64,
-    "AO2": 65,
-    "UH2": 66,
-    "UH0": 67,
-    "ER2": 68,
-    "OY2": 69,
-    "OY0": 70,
-}
-N_PHONEMES = len(PHONEMES_TO_IDS)
+SAMPLING_RATE = 22050
+MAX_WAV_VALUE = 32768.0
 
 
-def text_to_file(user_query: str) -> None:
-    text_path = pathlib.Path("tmp.txt")
-    with open(text_path, "w") as fout:
+class CleanedTextIsEmptyStringError(Exception):
+    """Raised when input text after cleaning is empty string"""
+    pass
+
+
+def parse_g2p(g2p_path: pathlib.Path, phonemes_to_ids: Dict[str, int]) -> Dict[str, list]:
+    word_to_phones = {}
+    with open(g2p_path.absolute(), "r") as fin:
+        for line in fin:
+            word, phones = line.rstrip().split("\t", 1)
+            word_to_phones[word] = [phonemes_to_ids[ph] for ph in phones.split(" ")]
+    return word_to_phones
+
+
+def phonemize(user_query: str, language: Language, phonemes_to_ids: Dict[str, int]) -> List[int]:
+    if language == SupportedLanguages.english:
         normalized_content = english_cleaners(user_query)
         normalized_content = " ".join(re.findall("[a-zA-Z]+", normalized_content))
+        pause_token = phonemes_to_ids.get("")
+    elif language == SupportedLanguages.russian:
+        normalized_content = russian_cleaners(user_query)
+        normalized_content = " ".join(re.findall("[а-яА-Я]+", normalized_content))
+        pause_token = phonemes_to_ids.get("")
+    else:
+        raise NotImplementedError
+    if len(normalized_content) < 1:
+        raise CleanedTextIsEmptyStringError
+
+    text_path = pathlib.Path(f"cleaned-text-{uuid.uuid4()}.txt")
+    g2p_output_path = pathlib.Path(f"g2p-{uuid.uuid4()}.txt")
+
+    with open(text_path, "w") as fout:
         fout.write(normalized_content)
     subprocess.call(
-        ["mfa", "g2p", G2P_MODEL_PATH, text_path.absolute(), G2P_OUTPUT_PATH]
+        ["mfa", "g2p", "-t", "g2p_tmp", language.g2p_model_path, text_path, g2p_output_path]
     )
+    word_to_phones = parse_g2p(g2p_output_path, phonemes_to_ids)
     text_path.unlink()
+    g2p_output_path.unlink()
 
+    phoneme_ids = []
+    for word in normalized_content.split(" "):
+        phoneme_ids.extend(word_to_phones[word])
+    phoneme_ids = [pause_token] + phoneme_ids + [pause_token]
 
-def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> List[int]:
-    with open(g2p_path, "r") as fin:
-        phonemes_ids = []
-        for line in fin:
-            _, word_to_phones = line.rstrip().split("\t", 1)
-            phonemes_ids.extend(
-                [PHONEMES_TO_IDS[ph] for ph in word_to_phones.split(" ")]
-            )
-    return phonemes_ids
+    return phoneme_ids
 
 
 def get_tacotron_batch(
-        phonemes_ids: List[int], speaker_id: int = 0, device: torch.device = DEVICE
-) -> Tuple[torch.Tensor, torch.LongTensor, torch.Tensor]:
+        phonemes_ids: List[int],
+        reference: torch.Tensor,
+        speaker_id: int,
+        mels_mean: torch.FloatTensor,
+        mels_std: torch.FloatTensor,
+        device: torch.device = DEVICE,
+) -> Tuple[torch.Tensor, torch.LongTensor, torch.Tensor, torch.Tensor]:
     text_lengths_tensor = torch.LongTensor([len(phonemes_ids)])
+    reference = (reference - mels_mean) / mels_std
+    reference = reference.permute(0, 2, 1).to(device)
     phonemes_ids_tensor = torch.LongTensor(phonemes_ids).unsqueeze(0).to(device)
     speaker_ids_tensor = torch.LongTensor([speaker_id]).to(device)
-    return phonemes_ids_tensor, text_lengths_tensor, speaker_ids_tensor
+    return phonemes_ids_tensor, text_lengths_tensor, speaker_ids_tensor, reference
 
 
 def inference_text_to_speech(
+    language: Language,
     input_text: str,
-    speaker_id: int,
-    audio_output_path: str,
-    tacotron_model_path: str,
-    hifi_config: HIFIParams,
+    emotion: Emotion,
+    audio_output_path: pathlib.Path,
+    device: torch.device = DEVICE,
 ) -> None:
-    text_to_file(input_text)
-    phoneme_ids = parse_g2p()
-    batch = get_tacotron_batch(phoneme_ids, speaker_id, DEVICE)
 
-    tacotron = torch.load(tacotron_model_path, map_location=DEVICE)
+    hifi_config = language.hifi_params
+    tacotron_model_path = language.tacotron_checkpoint.path / language.tacotron_checkpoint.model_file_name
+
+    phonemes_path = language.tacotron_checkpoint.path / language.tacotron_checkpoint.phonemes_file_name
+    with open(phonemes_path, "r") as json_file:
+        phonemes_to_ids = json.load(json_file)
+
+    speakers_path = language.tacotron_checkpoint.path / language.tacotron_checkpoint.speakers_file_name
+    with open(speakers_path, "r") as json_file:
+        speakers_to_ids = json.load(json_file)
+
+    mels_mean_path = language.tacotron_checkpoint.path / language.tacotron_checkpoint.mels_mean_filename
+    mels_mean = torch.load(mels_mean_path)
+    mels_std_path = language.tacotron_checkpoint.path / language.tacotron_checkpoint.mels_std_filename
+    mels_std = torch.load(mels_std_path)
+
+    if language == SupportedLanguages.english:
+        speaker_id = emotion.en_speaker_id
+    elif language == SupportedLanguages.russian:
+        speaker_id = emotion.ru_speaker_id
+    else:
+        raise NotImplementedError
+    phoneme_ids = phonemize(input_text, language, phonemes_to_ids)
+    reference_path = emotion.reference_mels_path
+    reference = torch.load(reference_path)
+    batch = get_tacotron_batch(phoneme_ids, reference, speaker_id, mels_mean, mels_std, device)
+
+    tacotron = torch.load(tacotron_model_path, map_location=device)
+    tacotron.to(device)
     tacotron.eval()
     with torch.no_grad():
         mels = tacotron.inference(batch)
         mels = mels.permute(0, 2, 1).squeeze(0)
-        mels = mels * MELS_STD.to(DEVICE) + MELS_MEAN.to(DEVICE)
+        mels = mels * mels_std.to(device) + mels_mean.to(device)
 
-    generator = load_hifi(hifi_config, DEVICE)
+    generator = load_hifi(hifi_config, device)
     generator.eval()
     with torch.no_grad():
-        audio = hifi_inference(generator, mels, DEVICE)
+        audio = hifi_inference(generator, mels, device)
         audio = audio * MAX_WAV_VALUE
         audio = audio.type(torch.int16).detach().cpu().numpy()
 
@@ -163,9 +138,9 @@ def inference_text_to_speech(
 
 if __name__ == "__main__":
     inference_text_to_speech(
-        input_text="1 ring to rule tham all",
-        speaker_id=0,
-        audio_output_path=AUDIO_OUTPUT_PATH,
-        tacotron_model_path=TACOTRON_MODEL_PATH,
-        hifi_config=HIFI_PARAMS,
+        language=SupportedLanguages.english,
+        input_text="Two months after receiving his doctorate, Pauli completed the article, which came to 237 pages",
+        emotion=SupportedEmotions.happy,
+        audio_output_path=pathlib.Path("predictions/generated.wav"),
+        device=DEVICE,
     )
