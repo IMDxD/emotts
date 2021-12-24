@@ -132,7 +132,7 @@ class RangePredictor(nn.Module):
             bidirectional=True,
         )
         self.dropout = config.dropout
-        self.projection = LinearWithActivation(config.lstm_hidden * 2, 1, activation=nn.ReLU())
+        self.projection = LinearWithActivation(config.lstm_hidden * 2, 1, activation=nn.Softplus())
 
     def forward(
         self, x: torch.Tensor, durations: torch.Tensor, input_lengths: torch.Tensor
