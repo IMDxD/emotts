@@ -4,7 +4,7 @@ import numpy as np
 
 NON_VALID_SPEAKERS = ["p315"]
 VALID_SIZE = 9
-SPLIT_LOG_PATH = "logs/hifi-split.txt"
+SPLIT_LOG_PATH = Path("logs/hifi-split.txt")
 
 
 def get_mel_file_path(full_wav_name: str, mels_dir: str):
@@ -36,7 +36,7 @@ def split_vctk_data(wavs_dir: str, mels_dir: str):
                         validation_files.append(full_wav_name)
 
     # Save  train and val filenames for sanity check
-    Path(SPLIT_LOG_PATH.parts[-1:]).mkdir(parents=True, exist_ok=True)
+    Path(*list(SPLIT_LOG_PATH.parts[:-1])).mkdir(parents=True, exist_ok=True)
     with open(SPLIT_LOG_PATH, "w") as log_file:
         log_file.write("train:")
         log_file.writelines(training_files)

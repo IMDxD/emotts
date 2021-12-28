@@ -3,7 +3,7 @@ from pathlib import Path
 
 import torch
 
-from src.models.hifi_gan.env import AttrDict
+from src.models.hifi_gan.env import TrainParamsHiFi
 from src.models.hifi_gan.hifi_config import HIFIParams
 from src.models.hifi_gan.models import Generator
 
@@ -15,7 +15,7 @@ def load_model(hifi_config: HIFIParams, device: torch.device) -> Generator:
     config_path = dir_path / hifi_config.config_name
     model_path = dir_path / hifi_config.model_name
     with open(config_path) as f:
-        config = AttrDict(**json.load(f))
+        config = TrainParamsHiFi(**json.load(f))
     generator = Generator(config).to(device)
     state_dict = torch.load(model_path, map_location=device)
     generator.load_state_dict(state_dict["generator"])

@@ -7,7 +7,7 @@ from torch.nn import AvgPool1d, Conv1d, Conv2d, ConvTranspose1d
 from torch.nn.utils import remove_weight_norm as torch_remove_weight_norm, \
     spectral_norm, weight_norm as torch_weight_norm
 
-from src.models.hifi_gan.env import AttrDict
+from src.models.hifi_gan.env import TrainParamsHiFi
 from src.models.hifi_gan.utils import get_padding, init_weights
 
 LRELU_SLOPE: float = 0.1
@@ -15,7 +15,7 @@ LRELU_SLOPE: float = 0.1
 
 class ResBlock1(torch.nn.Module):
     def __init__(
-            self, h: AttrDict,
+            self, h: TrainParamsHiFi,
             channels: int,
             kernel_size: int = 3,
             dilation: Tuple[int, int, int] = (1, 3, 5)
@@ -71,7 +71,7 @@ class ResBlock1(torch.nn.Module):
 
 
 class ResBlock2(torch.nn.Module):
-    def __init__(self, h: AttrDict,
+    def __init__(self, h: TrainParamsHiFi,
                  channels: int,
                  kernel_size: int = 3,
                  dilation: Tuple[int, int] = (1, 3)) -> None:
@@ -102,7 +102,7 @@ class ResBlock2(torch.nn.Module):
 
 
 class Generator(torch.nn.Module):
-    def __init__(self, h: AttrDict) -> None:
+    def __init__(self, h: TrainParamsHiFi) -> None:
         super(Generator, self).__init__()
         self.h = h
         self.num_kernels = len(h.resblock_kernel_sizes)

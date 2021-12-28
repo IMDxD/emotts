@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 
 @dataclass
-class AttrDict:
+class TrainParamsHiFi:
     resblock: str
     num_gpus: int
     batch_size: int

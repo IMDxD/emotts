@@ -14,7 +14,7 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from src.models.hifi_gan.env import AttrDict, build_env
+from src.models.hifi_gan.env import TrainParamsHiFi, build_env
 from src.models.hifi_gan.meldataset import MelDataset, mel_spectrogram
 from src.models.hifi_gan.models import (
     Generator, MultiPeriodDiscriminator, MultiScaleDiscriminator,
@@ -29,7 +29,7 @@ torch.backends.cudnn.benchmark = True
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
-def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:
+def train(rank: int, arguments: argparse.Namespace, h: TrainParamsHiFi) -> None:  # noqa: C901, CCR001, CFQ001
     if h.num_gpus > 1:
         init_process_group(backend=h.dist_config["dist_backend"], init_method=h.dist_config["dist_url"],
                            world_size=h.dist_config["world_size"] * h.num_gpus, rank=rank)
@@ -144,9 +144,9 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:
             if rank == 0:
                 start_b = time.time()
             x, y, _, y_mel = batch
-            x = torch.autograd.Variable(x.to(device, non_blocking=True))
-            y = torch.autograd.Variable(y.to(device, non_blocking=True))
-            y_mel = torch.autograd.Variable(y_mel.to(device, non_blocking=True))
+            x = x.to(device, non_blocking=True)
+            y = y.to(device, non_blocking=True)
+            y_mel = y_mel.to(device, non_blocking=True)
             y = y.unsqueeze(1)
 
             y_g_hat = generator(x)
@@ -187,7 +187,6 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:
             optim_g.step()
 
             if rank == 0:
-                # STDOUT logging
                 if steps % arguments.stdout_interval == 0:
                     with torch.no_grad():
                         mel_error = F.l1_loss(y_mel, y_g_hat_mel).item()
@@ -223,7 +222,7 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:
                     sw.add_scalar("training/mel_spec_error", mel_error, steps)
 
                 # Validation
-                if steps % arguments.validation_interval == 0:  # and steps != 0:
+                if steps % arguments.validation_interval == 0:
                     generator.eval()
                     torch.cuda.empty_cache()
                     val_err_tot = 0.0
@@ -231,7 +230,7 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:
                         for j, batch_val in enumerate(validation_loader):
                             x, y, _, y_mel = batch_val
                             y_g_hat = generator(x.to(device))
-                            y_mel = torch.autograd.Variable(y_mel.to(device, non_blocking=True))
+                            y_mel = y_mel.to(device, non_blocking=True)
                             y_g_hat_mel = mel_spectrogram(y_g_hat.squeeze(1), h.n_fft, h.num_mels, h.sampling_rate,
                                                           h.hop_size, h.win_size,
                                                           h.fmin, h.fmax_loss)
@@ -254,7 +253,7 @@ def train(rank: int, arguments: argparse.Namespace, h: AttrDict) -> None:
 
                     generator.train()
 
-            steps += 1
+            steps += 1  # noqa: SIM113
 
         scheduler_g.step()
         scheduler_d.step()
@@ -280,28 +279,27 @@ def main() -> None:
     parser.add_argument("--validation_interval", default=1000, type=int)
     parser.add_argument("--fine_tuning", default=False, type=bool)
 
-    a = parser.parse_args()
+    args = parser.parse_args()
 
-    with open(a.config) as f:
+    with open(args.config) as f:
         data = f.read()
 
-    json_config = json.loads(data)
-    h = AttrDict(**json_config)
-    build_env(a.config, "config.json", a.checkpoint_path)
+    train_config = TrainParamsHiFi(**json.loads(data))
+    build_env(args.config, "config.json", args.checkpoint_path)
 
-    torch.manual_seed(h.seed)
+    torch.manual_seed(train_config.seed)
     if torch.cuda.is_available():
-        torch.cuda.manual_seed(h.seed)
-        h.num_gpus = torch.cuda.device_count()
-        h.batch_size = int(h.batch_size / h.num_gpus)
-        print(f"Batch size per GPU: {h.batch_size}")
+        torch.cuda.manual_seed(train_config.seed)
+        train_config.num_gpus = torch.cuda.device_count()
+        train_config.batch_size = int(train_config.batch_size / train_config.num_gpus)
+        print(f"Batch size per GPU: {train_config.batch_size}")
     else:
         pass
 
-    if h.num_gpus > 1:
-        mp.spawn(train, nprocs=h.num_gpus, args=(a, h))
+    if train_config.num_gpus > 1:
+        mp.spawn(train, nprocs=train_config.num_gpus, args=(args, train_config))
     else:
-        mp.spawn(train, nprocs=1, args=(a, h,))
+        mp.spawn(train, nprocs=1, args=(args, train_config,))
 
 
 if __name__ == "__main__":
