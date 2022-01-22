@@ -13,8 +13,13 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from src.constants import (
-    CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, LOG_DIR, PHONEMES_FILENAME,
-    SPEAKERS_FILENAME, MELS_MEAN_FILENAME, MELS_STD_FILENAME
+    CHECKPOINT_DIR,
+    FEATURE_MODEL_FILENAME,
+    LOG_DIR,
+    PHONEMES_FILENAME,
+    SPEAKERS_FILENAME,
+    MELS_MEAN_FILENAME,
+    MELS_STD_FILENAME,
 )
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
 from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
@@ -39,13 +44,12 @@ class Trainer:
         self.phonemes_to_id: Dict[str, int] = {}
         self.speakers_to_id: Dict[str, int] = {}
         self.device = torch.device(self.config.device)
-        self.mels_weight = self.config.loss.mels_weight
-        self.duration_weight = self.config.loss.duration_weight
-        self.adversarial_weight = self.config.loss.adversarial_weight
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
         self.start_epoch = 0
         self.iteration_step = 1
+        self.best_val_loss = 1e6
+        self.worse_steps = 0
         self.upload_mapping()
         self.train_loader, self.valid_loader = self.prepare_loaders()
 
@@ -55,9 +59,10 @@ class Trainer:
             n_speakers=len(self.speakers_to_id),
             config=self.config.model,
         ).to(self.device)
+
         self.style_fc = nn.Sequential(
             nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id)),
-            nn.Softmax()
+            nn.Softmax(),
         )
         self.style_fc = self.style_fc.to(self.device)
 
@@ -75,7 +80,9 @@ class Trainer:
             gamma=self.config.scheduler.decay_rate,
         )
         self.criterion = NonAttentiveTacotronLoss(
-            sample_rate=self.config.sample_rate, hop_size=self.config.hop_size
+            sample_rate=self.config.sample_rate,
+            hop_size=self.config.hop_size,
+            config=self.config.loss,
         )
         self.adversatial_criterion = nn.NLLLoss()
 
@@ -130,10 +137,8 @@ class Trainer:
 
     def upload_checkpoints(self) -> None:
         if self.checkpoint_is_exist():
-            model_pathes = list(self.checkpoint_path.rglob(f"*_{FEATURE_MODEL_FILENAME}"))
-            last_model_path = max(model_pathes, key=lambda x: int(x.name.split("_")[0]))
             feature_model: NonAttentiveTacotron = torch.load(
-                last_model_path, map_location=self.device
+                self.checkpoint_path / FEATURE_MODEL_FILENAME, map_location=self.device
             )
             optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
                 self.checkpoint_path / self.OPTIMIZER_FILENAME, map_location=self.device
@@ -155,15 +160,19 @@ class Trainer:
         with open(self.checkpoint_path / PHONEMES_FILENAME, "w") as f:
             json.dump(self.phonemes_to_id, f)
         with open(self.checkpoint_path / self.ITERATION_FILENAME, "w") as f:
-            json.dump({
-                self.EPOCH_NAME: epoch,
-                self.ITERATION_NAME: iteration
-            }, f)
-        torch.save(self.feature_model, self.checkpoint_path / f"{iteration}_{FEATURE_MODEL_FILENAME}")
-        torch.save(self.optimizer.state_dict(), self.checkpoint_path / self.OPTIMIZER_FILENAME)
+            json.dump({self.EPOCH_NAME: epoch, self.ITERATION_NAME: iteration}, f)
+        torch.save(self.feature_model, self.checkpoint_path / FEATURE_MODEL_FILENAME)
+        torch.save(
+            self.optimizer.state_dict(), self.checkpoint_path / self.OPTIMIZER_FILENAME
+        )
         torch.save(self.scheduler, self.checkpoint_path / self.SCHEDULER_FILENAME)
-        torch.save(self.train_loader.dataset.mels_mean, self.checkpoint_path / MELS_MEAN_FILENAME)
-        torch.save(self.train_loader.dataset.mels_std, self.checkpoint_path / MELS_STD_FILENAME)
+        torch.save(
+            self.train_loader.dataset.mels_mean,
+            self.checkpoint_path / MELS_MEAN_FILENAME,
+        )
+        torch.save(
+            self.train_loader.dataset.mels_std, self.checkpoint_path / MELS_STD_FILENAME
+        )
 
     def prepare_loaders(self) -> Tuple[DataLoader[VCTKBatch], DataLoader[VCTKBatch]]:
 
@@ -222,6 +231,23 @@ class Trainer:
             audio = y_g_hat.squeeze()
         return audio
 
+    def calc_gst_loss(
+        self, style_emb: torch.Tensor, speaker_emb: torch.Tensor, batch: VCTKBatch
+    ) -> torch.Tensor:
+        style_speaker_false = self.style_fc(style_emb)
+        style_speaker_true = self.style_fc(speaker_emb)
+        log_adversarial_speaker_false = torch.log(1 - style_speaker_false)
+        log_adversarial_speaker_true = torch.log(style_speaker_true)
+        loss_adversarial_false = self.adversatial_criterion(
+            log_adversarial_speaker_false, batch.speaker_ids
+        )
+        loss_adversarial_true = self.adversatial_criterion(
+            log_adversarial_speaker_true, batch.speaker_ids
+        )
+        return self.config.loss.adversarial_weight * (
+            loss_adversarial_false + loss_adversarial_true
+        )
+
     def train(self) -> None:
         torch.manual_seed(self.config.seed)
         torch.cuda.manual_seed(self.config.seed)
@@ -233,8 +259,14 @@ class Trainer:
                 global_step = epoch * len(self.train_loader) + i
                 batch = self.batch_to_device(batch)
                 self.optimizer.zero_grad()
-                durations, mel_outputs_postnet, mel_outputs, style_emb, speaker_emb = self.feature_model(batch)
-                
+                (
+                    durations,
+                    mel_outputs_postnet,
+                    mel_outputs,
+                    style_emb,
+                    speaker_emb,
+                ) = self.feature_model(batch)
+
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
                     mel_outputs_postnet,
@@ -242,26 +274,9 @@ class Trainer:
                     batch.durations,
                     batch.mels,
                 )
-                style_speaker_false = self.style_fc(style_emb)
-                style_speaker_true = self.style_fc(speaker_emb)
-                log_adversarial_speaker_false = torch.log(1 - style_speaker_false)
-                log_adversarial_speaker_true = torch.log(style_speaker_true)
-                loss_adversarial_false = self.adversatial_criterion(
-                    log_adversarial_speaker_false,
-                    batch.speaker_ids
-                )
-                loss_adversarial_true = self.adversatial_criterion(
-                    log_adversarial_speaker_true,
-                    batch.speaker_ids
-                )
-
-                loss_mel = self.mels_weight * (loss_prenet + loss_postnet)
-                loss_durations = self.duration_weight * loss_durations
-
-                loss = loss_mel + loss_durations
-
-                loss_full = loss + self.adversarial_weight * (loss_adversarial_false + loss_adversarial_true)
-
+                loss_adversarial = self.calc_gst_loss(style_emb, speaker_emb, batch)
+                loss = loss_prenet + loss_postnet + loss_durations
+                loss_full = loss + loss_adversarial
                 loss_full.backward()
 
                 torch.nn.utils.clip_grad_norm_(
@@ -288,22 +303,36 @@ class Trainer:
 
                 if global_step % self.config.iters_per_checkpoint == 0:
                     self.feature_model.eval()
-                    self.validate(
+                    valid_loss = self.validate(
                         global_step=global_step,
                     )
                     self.generate_samples(
                         global_step=global_step,
                     )
-                    self.save_checkpoint(
-                        epoch=epoch,
-                        iteration=i,
-                    )
+                    to_stop = self.check_early_stopping(epoch, i, valid_loss)
+                    if to_stop:
+                        return
                     self.feature_model.train()
 
             self.iteration_step = 1
         self.writer.close()
 
-    def validate(self, global_step: int) -> None:
+    def check_early_stopping(self, epoch, iteration, valid_loss):
+        if valid_loss < self.best_val_loss:
+            self.best_val_loss = valid_loss
+            self.worse_steps = 0
+            self.save_checkpoint(
+                epoch=epoch,
+                iteration=iteration,
+            )
+        else:
+            self.worse_steps += 1
+            if self.worse_steps > self.config.early_stopping_rounds:
+                self.writer.close()
+                return True
+        return False
+
+    def validate(self, global_step: int) -> float:
         with torch.no_grad():
             val_loss = 0.0
             val_loss_prenet = 0.0
@@ -311,7 +340,9 @@ class Trainer:
             val_loss_durations = 0.0
             for batch in self.valid_loader:
                 batch = self.batch_to_device(batch)
-                durations, mel_outputs_postnet, mel_outputs, _, _ = self.feature_model(batch)
+                durations, mel_outputs_postnet, mel_outputs, _, _ = self.feature_model(
+                    batch
+                )
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
                     mel_outputs_postnet,
@@ -319,10 +350,7 @@ class Trainer:
                     batch.durations,
                     batch.mels,
                 )
-                loss_mel = self.mels_weight * (loss_prenet + loss_postnet)
-                loss_durations = self.duration_weight * loss_durations
-
-                loss = loss_mel + loss_durations
+                loss = loss_prenet + loss_postnet + loss_durations
                 val_loss += loss.item()
                 val_loss_prenet += loss_prenet.item()
                 val_loss_postnet += loss_postnet.item()
@@ -340,6 +368,7 @@ class Trainer:
                 val_loss_durations,
                 global_step,
             )
+        return val_loss
 
     def generate_samples(
         self,
