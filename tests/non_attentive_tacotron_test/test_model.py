@@ -108,20 +108,15 @@ def test_duration_layer() -> None:
 def test_range_layer() -> None:
     expected_shape = (16, 50, 1)
     layer = RangePredictor(EMBEDDING_DIM, config=RANGE_CONFIG)
-    zero_value = layer.projection.linear_layer.bias
-    if zero_value is None:
-        zero_value = 0
+    zero_value = layer.EPS + max(layer.projection.linear_layer.bias, 0)
     out = layer(EMBEDDING, INPUT_DURATIONS.unsqueeze(2), INPUT_LENGTH)
     assert (
         out.shape == expected_shape
     ), f"Wrong shape, expected {expected_shape}, got: {out.shape}"
     for idx, length in enumerate(INPUT_LENGTH):
         assert (
-            out[idx, length:] == zero_value
-        ).all(), "All values of tensor higher sequence length must be zero"
-        assert (
-            out[idx, length - 1] != zero_value
-        ).any(), f"Wrong zero vector for id = {idx}"
+            torch.allclose(out[idx, length:], torch.Tensor([zero_value]))
+        ), "All values of tensor higher sequence length must be zero"
 
 
 @pytest.mark.parametrize(
