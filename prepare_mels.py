@@ -1,6 +1,6 @@
 import argparse
 
-from src import Inferencer
+from src.inferencer import Inferencer
 
 
 def main() -> None:

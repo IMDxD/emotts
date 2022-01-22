@@ -25,7 +25,7 @@ class Prenet(nn.Module):
         self.layers = nn.ModuleList(
             [
                 LinearWithActivation(
-                    in_size, out_size, bias=False, activation=nn.Softplus()
+                    in_size, out_size, bias=False, activation=nn.ReLU(),
                 )
                 for (in_size, out_size) in zip(in_sizes, sizes)
             ]
@@ -119,8 +119,6 @@ class DurationPredictor(nn.Module):
 
 class RangePredictor(nn.Module):
 
-    EPS = 1e-8
-
     def __init__(self, embedding_dim: int, config: RangeParams):
         super().__init__()
 
@@ -147,7 +145,7 @@ class RangePredictor(nn.Module):
         outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
         outputs = f.dropout(outputs, self.dropout, self.training)
         outputs = self.projection(outputs)
-        return outputs + self.EPS
+        return outputs
 
 
 class Attention(nn.Module):

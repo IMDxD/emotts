@@ -43,14 +43,18 @@ class SupportedLanguages:
         api_name="en",
         g2p_model_path=Path("models/en/g2p/english_g2p.zip"),
         tacotron_checkpoint=TacoTronCheckpoint(path=Path("models/en/tacotron")),
-        hifi_params=HIFIParams(dir_path="en/hifi", config_name="config.json", model_name="generator.hifi"),
+        hifi_params=HIFIParams(
+            dir_path="en/hifi", config_name="config.json", model_name="generator.hifi"
+        ),
     )
     russian: Language = Language(
         name="Russian (ru-RU)",
         api_name="ru",
         g2p_model_path=Path("models/ru/g2p/russian_g2p.zip"),
         tacotron_checkpoint=TacoTronCheckpoint(path=Path("models/ru/tacotron")),
-        hifi_params=HIFIParams(dir_path="ru/hifi", config_name="config.json", model_name="generator.hifi"),
+        hifi_params=HIFIParams(
+            dir_path="ru/hifi", config_name="config.json", model_name="generator.hifi"
+        ),
     )
 
 
@@ -65,8 +69,38 @@ class Emotion:
 
 @dataclass
 class SupportedEmotions:
-    angry: Emotion = Emotion(name="angry", api_name="angry", reference_mels_path="models/ru/emo_reference/mels/angry.pkl", ru_speaker_id=10, en_speaker_id=0)
-    happy: Emotion = Emotion(name="happy", api_name="happy", reference_mels_path="models/ru/emo_reference/mels/happy.pkl", ru_speaker_id=21, en_speaker_id=0)
-    sad: Emotion = Emotion(name="sad", api_name="sad",reference_mels_path="models/ru/emo_reference/mels/sad.pkl", ru_speaker_id=40, en_speaker_id=0)
-    very_angry: Emotion = Emotion(name="very_angry", api_name="veryangry", reference_mels_path="models/ru/emo_reference/mels/very_angry.pkl", ru_speaker_id=41, en_speaker_id=0)
-    very_happy: Emotion = Emotion(name="very_happy", api_name="veryhappy", reference_mels_path="models/ru/emo_reference/mels/very_happy.pkl", ru_speaker_id=12, en_speaker_id=0)
+    angry: Emotion = Emotion(
+        name="angry",
+        api_name="angry",
+        reference_mels_path="models/ru/emo_reference/mels/angry.pkl",
+        ru_speaker_id=10,
+        en_speaker_id=0,
+    )
+    happy: Emotion = Emotion(
+        name="happy",
+        api_name="happy",
+        reference_mels_path="models/ru/emo_reference/mels/happy.pkl",
+        ru_speaker_id=21,
+        en_speaker_id=0,
+    )
+    sad: Emotion = Emotion(
+        name="sad",
+        api_name="sad",
+        reference_mels_path="models/ru/emo_reference/mels/sad.pkl",
+        ru_speaker_id=40,
+        en_speaker_id=0,
+    )
+    very_angry: Emotion = Emotion(
+        name="very_angry",
+        api_name="veryangry",
+        reference_mels_path="models/ru/emo_reference/mels/very_angry.pkl",
+        ru_speaker_id=41,
+        en_speaker_id=0,
+    )
+    very_happy: Emotion = Emotion(
+        name="very_happy",
+        api_name="veryhappy",
+        reference_mels_path="models/ru/emo_reference/mels/very_happy.pkl",
+        ru_speaker_id=12,
+        en_speaker_id=0,
+    )
