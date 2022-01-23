@@ -168,7 +168,9 @@ class HIFITrainer:
                 # Validation
                 if self.steps % self.config.train_hifi.checkpoint_interval == 0:
                     val_loss = self.validation()
-                    self.check_early_stopping(val_loss, epoch)
+                    to_break = self.check_early_stopping(val_loss, epoch)
+                    if to_break:
+                        return
 
                 self.steps += 1  # noqa: SIM113
 
@@ -222,5 +224,6 @@ class HIFITrainer:
         else:
             self.early_stopping_rounds += 1
             if self.early_stopping_rounds > self.config.train_hifi.early_stopping:
+                self.writer.close()
                 return True
         return False
