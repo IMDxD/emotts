@@ -8,11 +8,11 @@ import torch
 from tqdm import tqdm
 
 from src.constants import (
-    CHECKPOINT_DIR, FEATURE_MODEL_FILENAME, PHONEMES_FILENAME,
+    CHECKPOINT_DIR, FEATURE_CHECKPOINT_NAME, FEATURE_MODEL_FILENAME, PHONEMES_FILENAME,
     SPEAKERS_FILENAME, MELS_MEAN_FILENAME, MELS_STD_FILENAME
 )
 from src.data_process import VCTKBatch
-from src.models.feature_models import NonAttentiveTacotron
+from src.models.feature_models.non_attentive_tacotron import NonAttentiveTacotron
 from src.train_config import load_config
 
 
@@ -22,13 +22,12 @@ class Inferencer:
     PHONES_TIER = "phones"
     LEXICON_OOV_TOKEN = "spn"
     MEL_EXT = "pth"
-    TACOTRON_DIR = "feature_output"
 
     def __init__(
         self, config_path: str
     ):
         config = load_config(config_path)
-        checkpoint_path = CHECKPOINT_DIR / config.checkpoint_name
+        checkpoint_path = CHECKPOINT_DIR / config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         text_data_path = Path(config.data.text_dir)
         data_path = text_data_path.parent
         with open(checkpoint_path / PHONEMES_FILENAME) as f:
@@ -38,16 +37,14 @@ class Inferencer:
         self.sample_rate = config.sample_rate
         self.hop_size = config.hop_size
         self.device = torch.device(config.device)
-        model_pathes = list(checkpoint_path.rglob(f"*_{FEATURE_MODEL_FILENAME}"))
-        last_model_path = max(model_pathes, key=lambda x: int(x.name.split("_")[0]))
         self.feature_model: NonAttentiveTacotron = torch.load(
-            last_model_path, map_location=config.device
+            checkpoint_path / FEATURE_MODEL_FILENAME, map_location=config.device
         )
         self._mels_dir = Path(config.data.mels_dir)
         self._text_dir = Path(config.data.text_dir)
         self._text_ext = config.data.text_ext
         self._mels_ext = config.data.mels_ext
-        self.feature_model_mels_path = data_path / self.TACOTRON_DIR
+        self.feature_model_mels_path = data_path / config.data.feature_dir
         self.feature_model_mels_path.mkdir(parents=True, exist_ok=True)
         self.mels_mean = torch.load(checkpoint_path / MELS_MEAN_FILENAME)
         self.mels_std = torch.load(checkpoint_path / MELS_STD_FILENAME)

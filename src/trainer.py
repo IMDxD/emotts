@@ -14,6 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from src.constants import (
     CHECKPOINT_DIR,
+    FEATURE_CHECKPOINT_NAME,
     FEATURE_MODEL_FILENAME,
     LOG_DIR,
     PHONEMES_FILENAME,
@@ -22,8 +23,9 @@ from src.constants import (
     MELS_STD_FILENAME,
 )
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
-from src.models import NonAttentiveTacotron, NonAttentiveTacotronLoss
-from src.models.hifi_gan import Generator, load_model as load_hifi
+from src.models.feature_models import NonAttentiveTacotron, NonAttentiveTacotronLoss
+from src.models.hifi_gan import Generator
+from src.models.hifi_gan.utils import load_model as load_hifi
 from src.train_config import TrainParams, load_config
 
 
@@ -38,8 +40,10 @@ class Trainer:
 
     def __init__(self, config_path: Path):
         self.config: TrainParams = load_config(config_path)
-        self.checkpoint_path = CHECKPOINT_DIR / self.config.checkpoint_name
-        self.log_dir = LOG_DIR / self.config.checkpoint_name
+        self.checkpoint_path = (
+            CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
+        )
+        self.log_dir = LOG_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         self.create_dirs()
         self.phonemes_to_id: Dict[str, int] = {}
         self.speakers_to_id: Dict[str, int] = {}
@@ -66,7 +70,12 @@ class Trainer:
         )
         self.style_fc = self.style_fc.to(self.device)
 
-        self.vocoder: Generator = load_hifi(self.config.hifi, self.device)
+        self.vocoder: Generator = load_hifi(
+            model_path=self.config.pretrained_hifi,
+            hifi_config=self.config.train_hifi.model_param,
+            num_mels=self.config.n_mels,
+            device=self.device,
+        )
         self.optimizer = Adam(
             chain(self.feature_model.parameters(), self.style_fc.parameters()),
             lr=self.config.optimizer.learning_rate,

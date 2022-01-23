@@ -13,6 +13,8 @@ MELS_STD_FILENAME = "mels_std.pth"
 PHONEMES_FILENAME = "phonemes.json"
 SPEAKERS_FILENAME = "speakers.json"
 CHECKPOINT_DIR = Path("checkpoints")
+HIFI_CHECKPOINT_NAME = "hifi"
+FEATURE_CHECKPOINT_NAME = "feature"
 DATA_DIR = Path("checkpoints")
 LOG_DIR = Path("logs")
 MODEL_DIR = Path("models")
@@ -45,13 +47,45 @@ class Emotion:
 
 @dataclass
 class SupportedEmotions:
-    angry: Emotion = Emotion(name="angry", api_name="angry", reference_mels_path="Angry.pkl", ru_speaker_id=10)
-    happy: Emotion = Emotion(name="happy", api_name="happy", reference_mels_path="Happy.pkl", ru_speaker_id=21)
-    neutral: Emotion = Emotion(name="neutral", api_name="neutral", reference_mels_path="Neutral.pkl", ru_speaker_id=13)
-    sad: Emotion = Emotion(name="sad", api_name="sad",reference_mels_path="Sad.pkl", ru_speaker_id=40)
-    surprise: Emotion = Emotion(name="surprise", api_name="surprise", reference_mels_path="Surprise.pkl", ru_speaker_id=0)
-    very_angry: Emotion = Emotion(name="very_angry", api_name="veryangry", reference_mels_path="Very_angry.pkl", ru_speaker_id=41)
-    very_happy: Emotion = Emotion(name="very_happy", api_name="veryhappy", reference_mels_path="Very_happy.pkl", ru_speaker_id=12)
+    angry: Emotion = Emotion(
+        name="angry",
+        api_name="angry",
+        reference_mels_path="Angry.pkl",
+        ru_speaker_id=10,
+    )
+    happy: Emotion = Emotion(
+        name="happy",
+        api_name="happy",
+        reference_mels_path="Happy.pkl",
+        ru_speaker_id=21,
+    )
+    neutral: Emotion = Emotion(
+        name="neutral",
+        api_name="neutral",
+        reference_mels_path="Neutral.pkl",
+        ru_speaker_id=13,
+    )
+    sad: Emotion = Emotion(
+        name="sad", api_name="sad", reference_mels_path="Sad.pkl", ru_speaker_id=40
+    )
+    surprise: Emotion = Emotion(
+        name="surprise",
+        api_name="surprise",
+        reference_mels_path="Surprise.pkl",
+        ru_speaker_id=0,
+    )
+    very_angry: Emotion = Emotion(
+        name="very_angry",
+        api_name="veryangry",
+        reference_mels_path="Very_angry.pkl",
+        ru_speaker_id=41,
+    )
+    very_happy: Emotion = Emotion(
+        name="very_happy",
+        api_name="veryhappy",
+        reference_mels_path="Very_happy.pkl",
+        ru_speaker_id=12,
+    )
 
 
 @dataclass
@@ -73,7 +107,7 @@ class SupportedLanguages:
         name="English (en-EN)",
         api_name="en",
         emo_reference_dir=Path("models/en/emo_reference"),
-        emo_selector = {
+        emo_selector={
             "🙂 happy": SupportedEmotions.happy,
             "😲 surprise": SupportedEmotions.surprise,
             "😐 neutral": SupportedEmotions.neutral,
@@ -83,7 +117,9 @@ class SupportedLanguages:
         speaker_selector=ENGLISH_SPEAKERS,
         g2p_model_path=Path("models/en/g2p/english_g2p.zip"),
         tacotron_checkpoint=TacoTronCheckpoint(path=Path("models/en/tacotron")),
-        hifi_params=HIFIParams(dir_path="en/hifi", config_name="config.json", model_name="generator.hifi"),
+        hifi_params=HIFIParams(
+            dir_path="en/hifi", config_name="config.json", model_name="generator.hifi"
+        ),
         test_phrase="How to fit linear regression?",
     )
     russian: Language = Language(
@@ -101,6 +137,8 @@ class SupportedLanguages:
         speaker_selector=RUSSIAN_SPEAKERS,
         g2p_model_path=Path("models/ru/g2p/russian_g2p.zip"),
         tacotron_checkpoint=TacoTronCheckpoint(path=Path("models/ru/tacotron")),
-        hifi_params=HIFIParams(dir_path="ru/hifi", config_name="config.json", model_name="generator.hifi"),
+        hifi_params=HIFIParams(
+            dir_path="ru/hifi", config_name="config.json", model_name="generator.hifi"
+        ),
         test_phrase="Я усиленно обогреваю серверную в эти холодные зимние дни",
     )

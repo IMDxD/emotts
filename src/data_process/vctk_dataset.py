@@ -240,8 +240,8 @@ class VCTKFactory:
         return dataset
 
     def _get_mean_and_std(self) -> Tuple[torch.Tensor, torch.Tensor]:
-        mel_sum = torch.zeros((self.n_mels), dtype=torch.float64)
-        mel_squared_sum = torch.zeros((self.n_mels), dtype=torch.float64)
+        mel_sum = torch.zeros(self.n_mels, dtype=torch.float64)
+        mel_squared_sum = torch.zeros(self.n_mels, dtype=torch.float64)
         counts = 0
 
         for info in tqdm(self._dataset, desc="Computing mels mean and std"):

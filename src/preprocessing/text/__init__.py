@@ -62,8 +62,8 @@ def _clean_text(text: str, cleaner_names: List[str]) -> str:
     return text
 
 
-def _symbols_to_sequence(symbols: Union[str, List[str]]) -> List[int]:
-    return [_symbol_to_id[s] for s in symbols if _should_keep_symbol(s)]
+def _symbols_to_sequence(chars: Union[str, List[str]]) -> List[int]:
+    return [_symbol_to_id[s] for s in chars if _should_keep_symbol(s)]
 
 
 def _arpabet_to_sequence(text: str) -> List[int]:

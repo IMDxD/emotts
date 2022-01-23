@@ -1,21 +1,23 @@
 import glob
 import os
-from typing import Any, Dict, Union
+from typing import Optional, Union
 
 import matplotlib
 import matplotlib.pylab as plt
 import numpy as np
 import torch
 
+from .hifi_config import HiFiGeneratorParam
+from .models import Generator
+
 matplotlib.use("Agg")
 
 
 def plot_spectrogram(
-        spectrogram: Union[np.ndarray, torch.Tensor]
+    spectrogram: Union[np.ndarray, torch.Tensor]
 ) -> matplotlib.figure.Figure:
     fig, ax = plt.subplots(figsize=(10, 2))
-    im = ax.imshow(spectrogram, aspect="auto", origin="lower",
-                   interpolation="none")
+    im = ax.imshow(spectrogram, aspect="auto", origin="lower", interpolation="none")
     plt.colorbar(im, ax=ax)
 
     fig.canvas.draw()
@@ -34,23 +36,25 @@ def get_padding(kernel_size: int, dilation: int = 1) -> int:
     return int((kernel_size * dilation - dilation) / 2)
 
 
-def load_checkpoint(filepath: str, device: torch.device) -> Dict[str, Any]:
-    assert os.path.isfile(filepath)
-    print(f"Loading '{filepath}'")
-    checkpoint_dict: Dict[str, Any] = torch.load(filepath, map_location=device)
-    print("Complete.")
-    return checkpoint_dict
-
-
-def save_checkpoint(filepath: str, obj: Dict[str, Union[int, Dict[str, torch.Tensor]]]) -> None:
-    print(f"Saving checkpoint to {filepath}")
-    torch.save(obj, filepath)
-    print("Complete.")
-
-
-def scan_checkpoint(cp_dir: str, prefix: str) -> str:
+def scan_checkpoint(cp_dir: str, prefix: str) -> Optional[str]:
     pattern = os.path.join(cp_dir, prefix + "*")
     cp_list = glob.glob(pattern)
     if len(cp_list) == 0:
         return None
     return sorted(cp_list)[-1]
+
+
+def load_model(
+    model_path: str,
+    hifi_config: HiFiGeneratorParam,
+    num_mels: int,
+    device: torch.device,
+) -> Generator:
+
+    cp_g = scan_checkpoint(model_path, "g_")
+    generator = Generator(config=hifi_config, num_mels=num_mels).to(device)
+    state_dict = torch.load(cp_g, map_location=device)
+    generator.load_state_dict(state_dict["generator"])
+    generator.remove_weight_norm()
+    generator.eval()
+    return generator
