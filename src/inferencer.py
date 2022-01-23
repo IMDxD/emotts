@@ -38,8 +38,10 @@ class Inferencer:
         self.sample_rate = config.sample_rate
         self.hop_size = config.hop_size
         self.device = torch.device(config.device)
+        model_pathes = list(checkpoint_path.rglob(f"*_{FEATURE_MODEL_FILENAME}"))
+        last_model_path = max(model_pathes, key=lambda x: int(x.name.split("_")[0]))
         self.feature_model: NonAttentiveTacotron = torch.load(
-            checkpoint_path / FEATURE_MODEL_FILENAME, map_location=config.device
+            last_model_path, map_location=config.device
         )
         self._mels_dir = Path(config.data.mels_dir)
         self._text_dir = Path(config.data.text_dir)
@@ -116,10 +118,10 @@ class Inferencer:
                     num_phonemes=torch.LongTensor([len(phoneme_ids)]),
                     speaker_ids=torch.LongTensor([speaker_id]).to(self.device),
                     durations=torch.FloatTensor([durations]).to(self.device),
-                    mels=torch.FloatTensor(mels.permute(0, 2, 1)).to(self.device)
+                    mels=mels.permute(0, 2, 1).float().to(self.device)
                 )
                 _, output, _, _, _ = self.feature_model(batch)
                 output = output.permute(0, 2, 1).squeeze(0)
                 output = output * self.mels_std.to(self.device) + self.mels_mean.to(self.device)
 
-            torch.save(output, filepath)
+            torch.save(output.float(), filepath)

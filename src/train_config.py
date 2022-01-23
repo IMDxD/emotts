@@ -45,6 +45,7 @@ class TrainParams:
     checkpoint_name: str
     hifi: HIFIParams
     iters_per_checkpoint: int = field(default=10000)
+    early_stopping_rounds: int = field(default=5)
     log_steps: int = field(default=1000)
     epochs: int = field(default=2500)
     batch_size: int = field(default=16)

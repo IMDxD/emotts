@@ -242,20 +242,19 @@ class VCTKFactory:
     def _get_mean_and_std(self) -> Tuple[torch.Tensor, torch.Tensor]:
         mel_sum = torch.zeros((self.n_mels), dtype=torch.float64)
         mel_squared_sum = torch.zeros((self.n_mels), dtype=torch.float64)
-
-        print(torch.load(self._dataset[0].mel_path).shape)
+        counts = 0
 
         for info in tqdm(self._dataset, desc="Computing mels mean and std"):
             mels: torch.Tensor = torch.load(info.mel_path)
-            mels_mean: torch.Tensor = mels.mean(dim=-1).squeeze(0)
-            mel_sum += mels_mean
-            mel_squared_sum += mels_mean.pow(2)
-
-        mels_mean: torch.Tensor = mel_sum / len(self._dataset)
-        mels_std: torch.Tensor = (
-            mel_squared_sum - mel_sum * mel_sum / len(self._dataset)
-        ) / len(self._dataset)
-
+            mel_sum += mels.sum(dim=-1).squeeze(0)
+            mel_squared_sum += (mels ** 2).sum(dim=-1).squeeze(0)
+            counts += mels.shape[-1]
+            
+        mels_mean: torch.Tensor = mel_sum / counts
+        mels_std: torch.Tensor = torch.sqrt((
+            mel_squared_sum - mel_sum * mel_sum / counts
+        ) / counts)
+        
         return mels_mean.view(-1, 1), mels_std.view(-1, 1)
 
 
