@@ -8,7 +8,9 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from src.constants import CHECKPOINT_DIR, HIFI_CHECKPOINT_NAME, LOG_DIR, PATHLIKE
+from src.constants import (
+    CHECKPOINT_DIR, HIFI_CHECKPOINT_NAME, LOG_DIR, PATHLIKE,
+)
 from src.models.hifi_gan.meldataset import MelDataset, mel_spectrogram
 from src.models.hifi_gan.models import (
     Generator, MultiPeriodDiscriminator, MultiScaleDiscriminator,

@@ -5,8 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import AvgPool1d, Conv1d, Conv2d, ConvTranspose1d
 from torch.nn.utils import (
-    remove_weight_norm as torch_remove_weight_norm,
-    spectral_norm,
+    remove_weight_norm as torch_remove_weight_norm, spectral_norm,
     weight_norm as torch_weight_norm,
 )
 

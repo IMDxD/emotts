@@ -1,17 +1,21 @@
 # flake8: noqa
+import random
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
-import random
-import requests
-import uuid
 
+import requests
 import streamlit as st
 
 from api import EMOTTS_API_ROUTE
-from inference_pipeline import inference_text_to_speech, CleanedTextIsEmptyStringError, SpeakerNotFoundError
-from src.web.streamlit_utils import hide_hamburger_menu, st_empty_block, st_header_centered
-from src.constants import Language, Emotion, SupportedLanguages
-
+from inference_pipeline import (
+    CleanedTextIsEmptyStringError, SpeakerNotFoundError,
+    inference_text_to_speech,
+)
+from src.constants import Emotion, Language, SupportedLanguages
+from src.web.streamlit_utils import (
+    hide_hamburger_menu, st_empty_block, st_header_centered,
+)
 
 BROKEN_SPEAKERS = ["0019"]
 SELECTOR_TO_LANG = {

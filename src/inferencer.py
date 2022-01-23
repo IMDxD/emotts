@@ -8,11 +8,13 @@ import torch
 from tqdm import tqdm
 
 from src.constants import (
-    CHECKPOINT_DIR, FEATURE_CHECKPOINT_NAME, FEATURE_MODEL_FILENAME, PHONEMES_FILENAME,
-    SPEAKERS_FILENAME, MELS_MEAN_FILENAME, MELS_STD_FILENAME
+    CHECKPOINT_DIR, FEATURE_CHECKPOINT_NAME, FEATURE_MODEL_FILENAME,
+    MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, SPEAKERS_FILENAME,
 )
 from src.data_process import VCTKBatch
-from src.models.feature_models.non_attentive_tacotron import NonAttentiveTacotron
+from src.models.feature_models.non_attentive_tacotron import (
+    NonAttentiveTacotron,
+)
 from src.train_config import load_config
 
 

@@ -6,8 +6,7 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTasks
 
 from inference_pipeline import DEVICE, inference_text_to_speech
-from src.constants import SupportedLanguages, SupportedEmotions
-
+from src.constants import SupportedEmotions, SupportedLanguages
 
 EMOTTS_API_ROUTE = "/tts/emo/v1"
 TEST_AUDIO_PATH = "data/testaudio-gs-16b-1c-44100hz.wav"

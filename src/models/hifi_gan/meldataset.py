@@ -14,8 +14,8 @@ from librosa.util import normalize
 from scipy.io.wavfile import read
 from torchaudio.transforms import Resample
 
-from src.train_config import TrainParams
 from src.models.hifi_gan.train_valid_split import get_mel_file_path
+from src.train_config import TrainParams
 
 AudioData = np.ndarray
 

@@ -1,7 +1,7 @@
 import argparse
 
-from src.trainer_feature import Trainer
 from src.inferencer import Inferencer
+from src.trainer_feature import Trainer
 from src.trainer_hifi import HIFITrainer
 
 

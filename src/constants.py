@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 
-
 PATHLIKE = Union[str, Path]
 FEATURE_MODEL_FILENAME = "feature_model.pth"
 MELS_MEAN_FILENAME = "mels_mean.pth"

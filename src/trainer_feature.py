@@ -13,17 +13,13 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from src.constants import (
-    CHECKPOINT_DIR,
-    FEATURE_CHECKPOINT_NAME,
-    FEATURE_MODEL_FILENAME,
-    LOG_DIR,
-    PHONEMES_FILENAME,
-    SPEAKERS_FILENAME,
-    MELS_MEAN_FILENAME,
-    MELS_STD_FILENAME,
+    CHECKPOINT_DIR, FEATURE_CHECKPOINT_NAME, FEATURE_MODEL_FILENAME, LOG_DIR,
+    MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, SPEAKERS_FILENAME,
 )
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
-from src.models.feature_models import NonAttentiveTacotron, NonAttentiveTacotronLoss
+from src.models.feature_models import (
+    NonAttentiveTacotron, NonAttentiveTacotronLoss,
+)
 from src.models.hifi_gan import Generator
 from src.models.hifi_gan.utils import load_model as load_hifi
 from src.train_config import TrainParams, load_config

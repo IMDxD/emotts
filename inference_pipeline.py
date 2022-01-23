@@ -1,18 +1,19 @@
 import json
 import pathlib
-import uuid
 import re
 import subprocess
+import uuid
 from typing import Dict, List, Tuple
 
 import torch
 import torchaudio.backend.sox_io_backend
 
-from src.constants import SupportedLanguages, SupportedEmotions, Emotion, Language
+from src.constants import (
+    Emotion, Language, SupportedEmotions, SupportedLanguages,
+)
 from src.models.hifi_gan import load_model as load_hifi
 from src.models.hifi_gan.inference_tensor import inference as hifi_inference
 from src.preprocessing.text.cleaners import english_cleaners, russian_cleaners
-
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
