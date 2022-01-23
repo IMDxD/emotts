@@ -203,7 +203,7 @@ class MelDataset(
                         ),
                     )
                     mel_start = random.randint(0, frame_max)
-                    mel = mel[:, :, mel_start : mel_start + frames_per_seg]
+                    mel = mel[:, :, mel_start: mel_start + frames_per_seg]
                     audio = audio[
                         :,
                         mel_start

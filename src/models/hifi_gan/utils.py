@@ -13,19 +13,6 @@ from .models import Generator
 matplotlib.use("Agg")
 
 
-def plot_spectrogram(
-    spectrogram: Union[np.ndarray, torch.Tensor]
-) -> matplotlib.figure.Figure:
-    fig, ax = plt.subplots(figsize=(10, 2))
-    im = ax.imshow(spectrogram, aspect="auto", origin="lower", interpolation="none")
-    plt.colorbar(im, ax=ax)
-
-    fig.canvas.draw()
-    plt.close()
-
-    return fig
-
-
 def init_weights(m: torch.nn.Module, mean: float = 0.0, std: float = 0.01) -> None:
     classname = m.__class__.__name__
     if classname.find("Conv") != -1:

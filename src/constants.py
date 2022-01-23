@@ -3,8 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 
-from src.models.hifi_gan.hifi_config import HIFIParams
-
 
 PATHLIKE = Union[str, Path]
 FEATURE_MODEL_FILENAME = "feature_model.pth"

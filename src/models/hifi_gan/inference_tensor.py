@@ -1,9 +1,7 @@
-import json
 from pathlib import Path
 
 import torch
 
-from .hifi_config import HIFIParams, TrainParamsHiFi
 from .models import Generator
 
 MODEL_DIR = Path("models")

@@ -30,10 +30,3 @@ class TrainParamsHiFi:
     summary_interval: int = field(default=1000)
     fine_tuning: bool = field(default=True)
     split_data: bool = field(default=True)
-
-
-@dataclass
-class HIFIParams:
-
-
-    config_name: str

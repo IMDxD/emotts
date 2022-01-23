@@ -6,7 +6,7 @@ from marshmallow_dataclass import class_schema
 from src.constants import PATHLIKE
 from src.data_process.config import VCTKDatasetParams
 from src.models.feature_models.config import ModelParams
-from src.models.hifi_gan.hifi_config import HIFIParams, TrainParamsHiFi
+from src.models.hifi_gan.hifi_config import TrainParamsHiFi
 
 
 @dataclass
