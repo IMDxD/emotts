@@ -1,10 +1,8 @@
 import glob
 import os
-from typing import Optional, Union
+from typing import Optional
 
 import matplotlib
-import matplotlib.pylab as plt
-import numpy as np
 import torch
 
 from .hifi_config import HiFiGeneratorParam

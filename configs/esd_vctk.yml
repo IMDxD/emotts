@@ -6,11 +6,9 @@ win_size: 1024
 n_fft: 1024
 n_mels: 80
 checkpoint_name: adversarial_gst_3_frame_6_head_03_adv_esd_vctk
-hifi:
-  dir_path: hifi
-  model_name: generator_v1
+pretrained_hifi: models/hifi
 train_hifi:
-  split: true
+  split_data: true
   training_epochs: 1000
   logging_interval: 5
   checkpoint_interval: 5000
@@ -22,7 +20,6 @@ train_hifi:
   adam_b1: 0.8
   adam_b2: 0.99
   lr_decay: 0.999
-  seed: 1234
   model_param:
     resblock: "1"
     upsample_rates:

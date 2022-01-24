@@ -17,10 +17,9 @@ from src.constants import (
     MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, SPEAKERS_FILENAME,
 )
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
-from src.models.feature_models import (
-    NonAttentiveTacotron, NonAttentiveTacotronLoss,
-)
-from src.models.hifi_gan import Generator
+from src.models.feature_models import NonAttentiveTacotron
+from src.models.feature_models.loss_function import NonAttentiveTacotronLoss
+from src.models.hifi_gan.models import Generator
 from src.models.hifi_gan.utils import load_model as load_hifi
 from src.train_config import TrainParams, load_config
 
