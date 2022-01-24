@@ -5,7 +5,7 @@ f_max: 8000
 win_size: 1024
 n_fft: 1024
 n_mels: 80
-checkpoint_name: adversarial_gst_3_frame_6_head_03_adv_esd_vctk
+checkpoint_name: esd_vctk_full
 pretrained_hifi: models/hifi
 train_hifi:
   split_data: true
