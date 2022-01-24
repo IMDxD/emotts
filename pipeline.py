@@ -1,4 +1,5 @@
 import argparse
+from shutil import rmtree
 
 from src.inferencer import Inferencer
 from src.trainer_feature import Trainer
@@ -15,6 +16,7 @@ def main() -> None:
     inferencer_feature = Inferencer(args.config)
     trainer_hifi = HIFITrainer(args.config)
     trainer_feature.train()
+    rmtree(inferencer_feature.feature_model_mels_path)
     inferencer_feature.proceed_data()
     trainer_hifi.train()
 
