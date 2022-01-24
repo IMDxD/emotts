@@ -10,7 +10,7 @@ from torch.nn.utils import (
 )
 
 from src.models.hifi_gan.hifi_config import HiFiGeneratorParam
-from src.models.hifi_gan.utils import get_padding, init_weights
+from src.models.hifi_gan.utils import get_padding, init_weights, scan_checkpoint
 
 LRELU_SLOPE: float = 0.1
 
@@ -443,3 +443,19 @@ def generator_loss(
         loss += cur_loss
 
     return loss, gen_losses
+
+
+def load_model(
+    model_path: str,
+    hifi_config: HiFiGeneratorParam,
+    num_mels: int,
+    device: torch.device,
+) -> Generator:
+
+    cp_g = scan_checkpoint(model_path, "g_")
+    generator = Generator(config=hifi_config, num_mels=num_mels).to(device)
+    state_dict = torch.load(cp_g, map_location=device)
+    generator.load_state_dict(state_dict["generator"])
+    generator.remove_weight_norm()
+    generator.eval()
+    return generator
