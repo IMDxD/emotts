@@ -1,6 +1,6 @@
-from cmath import exp
 import json
 import os
+from dataclasses import asdict
 from itertools import chain
 from pathlib import Path
 from typing import Dict, OrderedDict, Tuple
@@ -8,6 +8,7 @@ from typing import Dict, OrderedDict, Tuple
 import mlflow
 import numpy as np
 import torch
+from pandas import json_normalize
 from torch import nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
@@ -58,7 +59,7 @@ class Trainer:
 
         self.iteration_step = 1
         self.best_val_loss = 1e6
-        self,best_run_id = ""
+        self.best_run_id = ""
         self.upload_mapping()
         self.train_loader, self.valid_loader = self.prepare_loaders()
 
@@ -137,8 +138,6 @@ class Trainer:
             return False
         if not os.path.isfile(self.checkpoint_path / self.OPTIMIZER_FILENAME):
             return False
-        if not os.path.isfile(self.checkpoint_path / self.SCHEDULER_FILENAME):
-            return False
         if not os.path.isfile(self.checkpoint_path / self.ITERATION_FILENAME):
             return False
         else:
@@ -195,7 +194,7 @@ class Trainer:
         torch.save(
             self.train_loader.dataset.mels_std, self.checkpoint_path / MELS_STD_FILENAME
         )
-        mlflow.pytorch.log_model(self.feature_model)
+        mlflow.pytorch.log_model(self.feature_model, artifact_path=str(self.checkpoint_path / FEATURE_MODEL_FILENAME))
 
     def prepare_loaders(self) -> Tuple[DataLoader[VCTKBatch], DataLoader[VCTKBatch]]:
 
@@ -323,7 +322,10 @@ class Trainer:
 
                 if self.iteration_step % self.config.iters_per_checkpoint == 0:
                     with mlflow.start_run(experiment_id=self.experiment_id) as run:
-                        
+                        config_dict = json_normalize(
+                            asdict(self.config)
+                        ).to_dict(orient='records')[0]
+                        mlflow.log_params(config_dict)
                         self.feature_model.eval()
                         valid_loss = self.validate()
                         self.generate_samples()
@@ -334,9 +336,10 @@ class Trainer:
                 self.iteration_step += 1
                 if self.iteration_step >= self.config.total_iterations:
                     break
-
-        with mlflow.start_run(self.best_run_id):
-            mlflow.set_tags("is_best", True)
+        
+        if self.best_run_id:
+            with mlflow.start_run(self.best_run_id):
+                mlflow.set_tags("is_best", True)
         self.writer.close()
 
     def update_early_stopping(self, valid_loss, run_id):
@@ -392,9 +395,12 @@ class Trainer:
         valid_dataset: VCTKDataset = self.valid_loader.dataset  # type: ignore
         mels_mean = valid_dataset.mels_mean
         mels_std = valid_dataset.mels_std
-        phonemes = [self.speakers_to_id[p] for p in self.GENERATED_PHONEMES]
+        phonemes = [
+            self.phonemes_to_id[p] if p in self.phonemes_to_id else 0 
+            for p in self.GENERATED_PHONEMES
+        ]
         phonemes_tensor = torch.LongTensor([phonemes]).to(self.device)
-        num_phonemes_tensor = torch.LongTensor([len(phonemes)]).to(self.device)
+        num_phonemes_tensor = torch.IntTensor([len(phonemes)])
         audio_folder = self.checkpoint_path / f"{self.iteration_step}"
         audio_folder.mkdir(exist_ok=True, parents=True)
         with torch.no_grad():
@@ -415,7 +421,7 @@ class Trainer:
                 audio = self.vocoder_inference(output.float())
                 audio_numpy = audio.squeeze().cpu().numpy()
 
-                name = f"{speaker} / {reference.stem}"
+                name = f"{speaker}_{reference_path.stem}"
                 self.writer.add_audio(
                     f"Audio/Val/{name}",
                     audio,
@@ -423,6 +429,6 @@ class Trainer:
                     global_step=self.iteration_step,
                 )
 
-                audio_filepath = audio_folder / name
+                audio_filepath = audio_folder / f"{name}.wav"
                 wav_write(str(audio_filepath), self.config.sample_rate, audio_numpy)
                 mlflow.log_artifact(str(audio_filepath))
