@@ -30,8 +30,6 @@ class Inferencer:
     ):
         config = load_config(config_path)
         checkpoint_path = CHECKPOINT_DIR / config.checkpoint_name / FEATURE_CHECKPOINT_NAME
-        text_data_path = Path(config.data.text_dir)
-        data_path = text_data_path.parent
         with open(checkpoint_path / PHONEMES_FILENAME) as f:
             self.phonemes_to_idx: Dict[str, int] = json.load(f)
         with open(checkpoint_path / SPEAKERS_FILENAME) as f:
@@ -46,7 +44,7 @@ class Inferencer:
         self._text_dir = Path(config.data.text_dir)
         self._text_ext = config.data.text_ext
         self._mels_ext = config.data.mels_ext
-        self.feature_model_mels_path = data_path / config.data.feature_dir
+        self.feature_model_mels_path = Path(config.data.feature_dir)
         self.feature_model_mels_path.mkdir(parents=True, exist_ok=True)
         self.mels_mean = torch.load(checkpoint_path / MELS_MEAN_FILENAME)
         self.mels_std = torch.load(checkpoint_path / MELS_STD_FILENAME)
