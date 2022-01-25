@@ -7,9 +7,9 @@ from typing import List, Tuple
 import torch
 from scipy.io.wavfile import write as wav_write
 
+from src.train_config import load_config, TrainParams
 from src.data_process.constanst import MELS_MEAN, MELS_STD
-from src.models.hifi_gan import load_model as load_hifi
-from src.models.hifi_gan.hifi_config import HIFIParams
+from src.models.hifi_gan.models import load_model as load_hifi
 from src.models.hifi_gan.inference_tensor import inference as hifi_inference
 from src.preprocessing.text.cleaners import english_cleaners
 
@@ -23,9 +23,7 @@ AUDIO_OUTPUT_PATH = "predictions/happy_out.wav"
 G2P_MODEL_PATH = "models/g2p/english_g2p.zip"
 TACOTRON_MODEL_PATH = CHECKPOINT_PATH / "1716_feature_model.pth"
 REFERENCE_PATH = "data/msp_full/processed/mels/F05/F05_S13_H_000.pkl"
-HIFI_PARAMS = HIFIParams(
-    dir_path="cp_hifigan", config_name="config.json", model_name="g_02520000"
-)
+TRAIN_PARAMS = load_config("configs/esd_vctk.yml")
 
 with open(CHECKPOINT_PATH / "phonemes.json") as f:
     PHONEMES_TO_IDS = json.load(f)
@@ -51,8 +49,10 @@ def text_to_file(user_query: str) -> None:
 def parse_g2p(g2p_path: str = G2P_OUTPUT_PATH) -> List[int]:
     with open(g2p_path, "r") as fin:
         phonemes_ids = [PHONEMES_TO_IDS["<PAD>"]]
+        phonemes = []
         for line in fin:
             _, word_to_phones = line.rstrip().split("\t", 1)
+            phonemes.extend(word_to_phones.split(" "))
             phonemes_ids.extend(
                 [PHONEMES_TO_IDS[ph] for ph in word_to_phones.split(" ")]
             )
@@ -76,7 +76,7 @@ def inference_text_to_speech(
     speaker_id: int,
     audio_output_path: str,
     tacotron_model_path: str,
-    hifi_config: HIFIParams,
+    config: TrainParams,
     reference_path: str
 ) -> None:
     text_to_file(input_text)
@@ -91,7 +91,7 @@ def inference_text_to_speech(
         mels = mels.permute(0, 2, 1).squeeze(0)
         mels = mels * MELS_STD.to(DEVICE) + MELS_MEAN.to(DEVICE)
 
-    generator = load_hifi(hifi_config, DEVICE)
+    generator = load_hifi(config.pretrained_hifi, config.train_hifi.model_param, config.n_mels, DEVICE)
     generator.eval()
     with torch.no_grad():
         audio = hifi_inference(generator, mels, DEVICE)
@@ -108,6 +108,6 @@ if __name__ == "__main__":
         speaker_id=SPEAKER_TO_IDS["0016"],
         audio_output_path=AUDIO_OUTPUT_PATH,
         tacotron_model_path=TACOTRON_MODEL_PATH,
-        hifi_config=HIFI_PARAMS,
+        config=TrainParams,
         reference_path=REFERENCE_PATH
     )

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 
+
 PATHLIKE = Union[str, Path]
 FEATURE_MODEL_FILENAME = "feature_model.pth"
 MELS_MEAN_FILENAME = "mels_mean.pth"
@@ -15,6 +16,7 @@ FEATURE_CHECKPOINT_NAME = "feature"
 DATA_DIR = Path("checkpoints")
 LOG_DIR = Path("logs")
 MODEL_DIR = Path("models")
+REFERENCE_PATH = Path("references")
 
 RUSSIAN_SPEAKERS = {0: "Игорина"}
 try:

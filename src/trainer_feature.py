@@ -1,9 +1,11 @@
+from cmath import exp
 import json
 import os
 from itertools import chain
 from pathlib import Path
 from typing import Dict, OrderedDict, Tuple
 
+import mlflow
 import numpy as np
 import torch
 from torch import nn
@@ -11,10 +13,12 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from scipy.io.wavfile import write as wav_write
 
 from src.constants import (
     CHECKPOINT_DIR, FEATURE_CHECKPOINT_NAME, FEATURE_MODEL_FILENAME, LOG_DIR,
-    MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, SPEAKERS_FILENAME,
+    MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, REFERENCE_PATH,
+    SPEAKERS_FILENAME,
 )
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
 from src.models.feature_models import NonAttentiveTacotron
@@ -25,8 +29,14 @@ from src.train_config import TrainParams, load_config
 
 class Trainer:
 
+    GENERATED_PHONEMES = [
+        "HH", "AW1", 
+        "T", "OW0", 
+        "F", "IH1", "T", 
+        "L", "IH1", "N", "IY0", "ER0", 
+        "R", "IH0", "G", "R", "EH1", "SH", "AH0", "N"
+    ]
     OPTIMIZER_FILENAME = "optimizer.pth"
-    SCHEDULER_FILENAME = "scheduler.pth"
     ITERATION_FILENAME = "iter.json"
     ITERATION_NAME = "iteration"
     EPOCH_NAME = "epoch"
@@ -38,16 +48,17 @@ class Trainer:
             CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         )
         self.log_dir = LOG_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
+        self.references = REFERENCE_PATH.rglob("*.pkl")
         self.create_dirs()
+        self.experiment_id = self.create_experiment()
         self.phonemes_to_id: Dict[str, int] = {}
         self.speakers_to_id: Dict[str, int] = {}
         self.device = torch.device(self.config.device)
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
-        self.start_epoch = 0
         self.iteration_step = 1
         self.best_val_loss = 1e6
-        self.worse_steps = 0
+        self,best_run_id = ""
         self.upload_mapping()
         self.train_loader, self.valid_loader = self.prepare_loaders()
 
@@ -105,6 +116,15 @@ class Trainer:
         self.checkpoint_path.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
+    def create_experiment(self) -> None:
+        name = self.config.checkpoint_name
+        experiment = mlflow.get_experiment_by_name(name)
+        if experiment is None:
+            experiment_id = mlflow.create_experiment(name)
+        else:
+            experiment_id = experiment.experiment_id
+        return experiment_id
+
     def mapping_is_exist(self) -> bool:
         if not os.path.isfile(self.checkpoint_path / SPEAKERS_FILENAME):
             return False
@@ -146,29 +166,28 @@ class Trainer:
             optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
                 self.checkpoint_path / self.OPTIMIZER_FILENAME, map_location=self.device
             )
-            scheduler: StepLR = torch.load(
-                self.checkpoint_path / self.SCHEDULER_FILENAME, map_location=self.device
-            )
             with open(self.checkpoint_path / self.ITERATION_FILENAME) as f:
                 iteration_dict: Dict[str, int] = json.load(f)
             self.feature_model = feature_model
             self.optimizer.load_state_dict(optimizer_state_dict)
-            self.scheduler = scheduler
-            self.start_epoch = iteration_dict[self.EPOCH_NAME]
+            self.scheduler = StepLR(
+                optimizer=self.optimizer,
+                step_size=self.config.scheduler.decay_steps,
+                gamma=self.config.scheduler.decay_rate,
+            )
             self.iteration_step = iteration_dict[self.ITERATION_NAME]
 
-    def save_checkpoint(self, epoch: int, iteration: int) -> None:
+    def save_checkpoint(self) -> None:
         with open(self.checkpoint_path / SPEAKERS_FILENAME, "w") as f:
             json.dump(self.speakers_to_id, f)
         with open(self.checkpoint_path / PHONEMES_FILENAME, "w") as f:
             json.dump(self.phonemes_to_id, f)
         with open(self.checkpoint_path / self.ITERATION_FILENAME, "w") as f:
-            json.dump({self.EPOCH_NAME: epoch, self.ITERATION_NAME: iteration}, f)
+            json.dump({self.ITERATION_NAME: self.iteration_step}, f)
         torch.save(self.feature_model, self.checkpoint_path / FEATURE_MODEL_FILENAME)
         torch.save(
             self.optimizer.state_dict(), self.checkpoint_path / self.OPTIMIZER_FILENAME
         )
-        torch.save(self.scheduler, self.checkpoint_path / self.SCHEDULER_FILENAME)
         torch.save(
             self.train_loader.dataset.mels_mean,
             self.checkpoint_path / MELS_MEAN_FILENAME,
@@ -176,6 +195,7 @@ class Trainer:
         torch.save(
             self.train_loader.dataset.mels_std, self.checkpoint_path / MELS_STD_FILENAME
         )
+        mlflow.pytorch.log_model(self.feature_model)
 
     def prepare_loaders(self) -> Tuple[DataLoader[VCTKBatch], DataLoader[VCTKBatch]]:
 
@@ -214,17 +234,16 @@ class Trainer:
         prenet_loss: float,
         postnet_loss: float,
         durations_loss: float,
-        global_step: int,
     ) -> None:
-        self.writer.add_scalar(f"Loss/{tag}/total", total_loss, global_step=global_step)
+        self.writer.add_scalar(f"Loss/{tag}/total", total_loss, global_step=self.iteration_step)
         self.writer.add_scalar(
-            f"Loss/{tag}/prenet", prenet_loss, global_step=global_step
+            f"Loss/{tag}/prenet", prenet_loss, global_step=self.iteration_step
         )
         self.writer.add_scalar(
-            f"Loss/{tag}/postnet", postnet_loss, global_step=global_step
+            f"Loss/{tag}/postnet", postnet_loss, global_step=self.iteration_step
         )
         self.writer.add_scalar(
-            f"Loss/{tag}/durations", durations_loss, global_step=global_step
+            f"Loss/{tag}/durations", durations_loss, global_step=self.iteration_step
         )
 
     def vocoder_inference(self, tensor: torch.Tensor) -> torch.Tensor:
@@ -257,9 +276,8 @@ class Trainer:
 
         self.feature_model.train()
 
-        for epoch in range(self.start_epoch, self.config.epochs):
-            for i, batch in enumerate(self.train_loader, start=self.iteration_step):
-                global_step = epoch * len(self.train_loader) + i
+        while self.iteration_step < self.config.total_iterations:
+            for batch in self.train_loader:
                 batch = self.batch_to_device(batch)
                 self.optimizer.zero_grad()
                 (
@@ -289,53 +307,45 @@ class Trainer:
                 self.optimizer.step()
                 if (
                     self.config.scheduler.start_decay
-                    <= global_step
+                    <= self.iteration_step
                     <= self.config.scheduler.last_epoch
                 ):
                     self.scheduler.step()
 
-                if global_step % self.config.log_steps == 0:
+                if self.iteration_step % self.config.log_steps == 0:
                     self.write_losses(
                         "train",
                         loss,
                         loss_prenet,
                         loss_postnet,
                         loss_durations,
-                        global_step,
                     )
 
-                if global_step % self.config.iters_per_checkpoint == 0:
-                    self.feature_model.eval()
-                    valid_loss = self.validate(
-                        global_step=global_step,
-                    )
-                    self.generate_samples(
-                        global_step=global_step,
-                    )
-                    to_stop = self.check_early_stopping(epoch, i, valid_loss)
-                    if to_stop:
-                        return
-                    self.feature_model.train()
+                if self.iteration_step % self.config.iters_per_checkpoint == 0:
+                    with mlflow.start_run(experiment_id=self.experiment_id) as run:
+                        
+                        self.feature_model.eval()
+                        valid_loss = self.validate()
+                        self.generate_samples()
+                        self.save_checkpoint()
+                        self.update_early_stopping(valid_loss, run.info.run_id)
+                        self.feature_model.train()
 
-            self.iteration_step = 1
+                self.iteration_step += 1
+                if self.iteration_step >= self.config.total_iterations:
+                    break
+
+        with mlflow.start_run(self.best_run_id):
+            mlflow.set_tags("is_best", True)
         self.writer.close()
 
-    def check_early_stopping(self, epoch, iteration, valid_loss):
+    def update_early_stopping(self, valid_loss, run_id):
         if valid_loss < self.best_val_loss:
             self.best_val_loss = valid_loss
-            self.worse_steps = 0
-            self.save_checkpoint(
-                epoch=epoch,
-                iteration=iteration,
-            )
-        else:
-            self.worse_steps += 1
-            if self.worse_steps > self.config.early_stopping_rounds:
-                self.writer.close()
-                return True
-        return False
+            self.best_run_id = run_id
+            
 
-    def validate(self, global_step: int) -> float:
+    def validate(self) -> float:
         with torch.no_grad():
             val_loss = 0.0
             val_loss_prenet = 0.0
@@ -369,35 +379,50 @@ class Trainer:
                 val_loss_prenet,
                 val_loss_postnet,
                 val_loss_durations,
-                global_step,
             )
+            mlflow.log_metrics({
+                "val_loss_total": val_loss,
+                "val_loss_prenet": val_loss_prenet,
+                "val_loss_postnet": val_loss_postnet,
+                "val_loss_durations": val_loss_durations,
+            })
         return val_loss
 
-    def generate_samples(
-        self,
-        global_step: int,
-    ) -> None:
+    def generate_samples(self) -> None:
         valid_dataset: VCTKDataset = self.valid_loader.dataset  # type: ignore
         mels_mean = valid_dataset.mels_mean
         mels_std = valid_dataset.mels_std
-        idx: np.ndarray = np.random.choice(
-            np.arange(len(valid_dataset)), self.SAMPLE_SIZE, replace=False
-        )
-        for i in range(len(idx)):
-            sample = valid_dataset[idx[i]]
-            batch = (
-                torch.LongTensor([sample.phonemes]).to(self.device),
-                torch.LongTensor([sample.num_phonemes]),
-                torch.LongTensor([sample.speaker_id]).to(self.device),
-                sample.mels.float().to(self.device).permute(0, 2, 1),
-            )
-            output = self.feature_model.inference(batch)
-            output = output.permute(0, 2, 1).squeeze(0)
-            output = output * mels_std.to(self.device) + mels_mean.to(self.device)
-            audio = self.vocoder_inference(output.float())
-            self.writer.add_audio(
-                f"Audio/Val/{i}",
-                audio,
-                sample_rate=self.config.sample_rate,
-                global_step=global_step,
-            )
+        phonemes = [self.speakers_to_id[p] for p in self.GENERATED_PHONEMES]
+        phonemes_tensor = torch.LongTensor([phonemes]).to(self.device)
+        num_phonemes_tensor = torch.LongTensor([len(phonemes)]).to(self.device)
+        audio_folder = self.checkpoint_path / f"{self.iteration_step}"
+        audio_folder.mkdir(exist_ok=True, parents=True)
+        with torch.no_grad():
+            for reference_path in self.references:
+                
+                speaker = reference_path.parent.name
+                speaker_id = self.speakers_to_id[speaker]
+                reference = torch.load(reference_path)
+                batch = (
+                    phonemes_tensor,
+                    num_phonemes_tensor,
+                    torch.LongTensor([speaker_id]).to(self.device),
+                    reference.to(self.device).permute(0, 2, 1),
+                )
+                output = self.feature_model.inference(batch)
+                output = output.permute(0, 2, 1).squeeze(0)
+                output = output * mels_std.to(self.device) + mels_mean.to(self.device)
+                audio = self.vocoder_inference(output.float())
+                audio_numpy = audio.squeeze().cpu().numpy()
+
+                name = f"{speaker} / {reference.stem}"
+                self.writer.add_audio(
+                    f"Audio/Val/{name}",
+                    audio,
+                    sample_rate=self.config.sample_rate,
+                    global_step=self.iteration_step,
+                )
+
+                audio_filepath = audio_folder / name
+                wav_write(str(audio_filepath), self.config.sample_rate, audio_numpy)
+                mlflow.log_artifact(str(audio_filepath))

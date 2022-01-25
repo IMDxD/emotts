@@ -48,7 +48,7 @@ class TrainParams:
     iters_per_checkpoint: int = field(default=10000)
     early_stopping_rounds: int = field(default=5)
     log_steps: int = field(default=1000)
-    epochs: int = field(default=2500)
+    total_iterations: int = field(default=390_000)
     batch_size: int = field(default=16)
     seed: int = field(default=42)
     sample_rate: int = field(default=22050)
