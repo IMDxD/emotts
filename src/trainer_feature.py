@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Dict, OrderedDict, Tuple
 
 import mlflow
-import numpy as np
 import torch
 from pandas import json_normalize
 from torch import nn
@@ -117,7 +116,7 @@ class Trainer:
         self.checkpoint_path.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-    def create_experiment(self) -> None:
+    def create_experiment(self) -> str:
         name = self.config.checkpoint_name
         experiment = mlflow.get_experiment_by_name(name)
         if experiment is None:
@@ -339,14 +338,13 @@ class Trainer:
         
         if self.best_run_id:
             with mlflow.start_run(self.best_run_id):
-                mlflow.set_tags("is_best", True)
+                mlflow.set_tags({"is_best": True})
         self.writer.close()
 
     def update_early_stopping(self, valid_loss, run_id):
         if valid_loss < self.best_val_loss:
             self.best_val_loss = valid_loss
             self.best_run_id = run_id
-            
 
     def validate(self) -> float:
         with torch.no_grad():
