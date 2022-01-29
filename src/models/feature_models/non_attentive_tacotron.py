@@ -175,8 +175,8 @@ class Attention(nn.Module):
         duration_cumsum = durations.cumsum(dim=1).float()
         max_duration = duration_cumsum[:, -1, :].max().long()
         mu = duration_cumsum - 0.5 * durations
-        distr = Normal(mu, ranges)
         ranges = torch.maximum(ranges, self.EPS.to(ranges.device))
+        distr = Normal(mu, ranges)
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(ranges.device)
 
         weights: torch.Tensor = torch.exp(distr.log_prob(t))
