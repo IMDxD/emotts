@@ -48,7 +48,7 @@ class Trainer:
             CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         )
         self.log_dir = LOG_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
-        self.references = REFERENCE_PATH.rglob("*.pkl")
+        self.references = list(REFERENCE_PATH.rglob("*.pkl"))
         self.create_dirs()
         self.experiment_id = self.create_experiment()
         self.phonemes_to_id: Dict[str, int] = {}
