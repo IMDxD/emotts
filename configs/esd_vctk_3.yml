@@ -12,13 +12,13 @@ log_steps: 1000
 iters_per_checkpoint: 30000
 total_iterations: 390000
 test_size: 0.2
-device: cuda:1
-checkpoint_name: esd_vctk_15
+device: cuda:3
+checkpoint_name: esd_vctk_3
 data:
-  text_dir: data/esd_vctk/mfa_outputs
-  mels_dir: data/esd_vctk/mels
-  wav_dir: data/esd_vctk/resampled
-  feature_dir: data/esd_vctk/feature_output
+  text_dir: data/esd_vctk_3/mfa_outputs
+  mels_dir: data/esd_vctk_3/mels
+  wav_dir: data/esd_vctk_3/resampled
+  feature_dir: data/esd_vctk_3/feature_output
 pretrained_hifi: models/hifi
 train_hifi:
   split_data: true
