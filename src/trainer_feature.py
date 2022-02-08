@@ -388,8 +388,8 @@ class Trainer:
 
     def generate_samples(self) -> None:
         valid_dataset: VCTKDataset = self.valid_loader.dataset  # type: ignore
-        mels_mean = valid_dataset.mels_mean
-        mels_std = valid_dataset.mels_std
+        mels_mean = valid_dataset.mels_mean.float()
+        mels_std = valid_dataset.mels_std.float()
         phonemes = [
             [self.phonemes_to_id.get(p, 0) for p in sequence]
             for sequence in GENERATED_PHONEMES
@@ -404,7 +404,7 @@ class Trainer:
                     num_phonemes_tensor = torch.IntTensor([len(sequence)])
                     speaker = reference_path.parent.name
                     speaker_id = self.speakers_to_id[speaker]
-                    reference = (torch.load(reference_path) - mels_mean.to(self.device)) / mels_std.to(self.device)
+                    reference = (torch.load(reference_path) - mels_mean) / mels_std
                     batch = (
                         phonemes_tensor,
                         num_phonemes_tensor,
