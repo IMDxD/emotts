@@ -18,7 +18,7 @@ from scipy.io.wavfile import write as wav_write
 from src.constants import (
     CHECKPOINT_DIR, FEATURE_CHECKPOINT_NAME, FEATURE_MODEL_FILENAME, LOG_DIR,
     MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, REFERENCE_PATH,
-    SPEAKERS_FILENAME,
+    SPEAKERS_FILENAME, GENERATED_PHONEMES
 )
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
 from src.models.feature_models import NonAttentiveTacotron
@@ -29,13 +29,6 @@ from src.train_config import TrainParams, load_config
 
 class Trainer:
 
-    GENERATED_PHONEMES = [
-        "HH", "AW1", 
-        "T", "OW0", 
-        "F", "IH1", "T", 
-        "L", "IH1", "N", "IY0", "ER0", 
-        "R", "IH0", "G", "R", "EH1", "SH", "AH0", "N"
-    ]
     OPTIMIZER_FILENAME = "optimizer.pth"
     ITERATION_FILENAME = "iter.json"
     ITERATION_NAME = "iteration"
@@ -320,7 +313,10 @@ class Trainer:
                     )
 
                 if self.iteration_step % self.config.iters_per_checkpoint == 0:
-                    with mlflow.start_run(experiment_id=self.experiment_id) as run:
+                    with mlflow.start_run(
+                            experiment_id=self.experiment_id,
+                            run_name=f"{self.iteration_step}"
+                    ) as run:
                         config_dict = json_normalize(
                             asdict(self.config)
                         ).to_dict(orient='records')[0]
@@ -394,39 +390,40 @@ class Trainer:
         mels_mean = valid_dataset.mels_mean
         mels_std = valid_dataset.mels_std
         phonemes = [
-            self.phonemes_to_id[p] if p in self.phonemes_to_id else 0 
-            for p in self.GENERATED_PHONEMES
+            [self.phonemes_to_id.get(p, 0) for p in sequence]
+            for sequence in GENERATED_PHONEMES
         ]
-        phonemes_tensor = torch.LongTensor([phonemes]).to(self.device)
-        num_phonemes_tensor = torch.IntTensor([len(phonemes)])
         audio_folder = self.checkpoint_path / f"{self.iteration_step}"
         audio_folder.mkdir(exist_ok=True, parents=True)
         with torch.no_grad():
+
             for reference_path in self.references:
-                
-                speaker = reference_path.parent.name
-                speaker_id = self.speakers_to_id[speaker]
-                reference = torch.load(reference_path)
-                batch = (
-                    phonemes_tensor,
-                    num_phonemes_tensor,
-                    torch.LongTensor([speaker_id]).to(self.device),
-                    reference.to(self.device).permute(0, 2, 1),
-                )
-                output = self.feature_model.inference(batch)
-                output = output.permute(0, 2, 1).squeeze(0)
-                output = output * mels_std.to(self.device) + mels_mean.to(self.device)
-                audio = self.vocoder_inference(output.float())
-                audio_numpy = audio.squeeze().cpu().numpy()
+                for i, sequence in enumerate(phonemes):
+                    phonemes_tensor = torch.LongTensor([sequence]).to(self.device)
+                    num_phonemes_tensor = torch.IntTensor([len(sequence)])
+                    speaker = reference_path.parent.name
+                    speaker_id = self.speakers_to_id[speaker]
+                    reference = torch.load(reference_path)
+                    batch = (
+                        phonemes_tensor,
+                        num_phonemes_tensor,
+                        torch.LongTensor([speaker_id]).to(self.device),
+                        reference.to(self.device).permute(0, 2, 1),
+                    )
+                    output = self.feature_model.inference(batch)
+                    output = output.permute(0, 2, 1).squeeze(0)
+                    output = output * mels_std.to(self.device) + mels_mean.to(self.device)
+                    audio = self.vocoder_inference(output.float())
+                    audio_numpy = audio.squeeze().cpu().numpy()
 
-                name = f"{speaker}_{reference_path.stem}"
-                self.writer.add_audio(
-                    f"Audio/Val/{name}",
-                    audio,
-                    sample_rate=self.config.sample_rate,
-                    global_step=self.iteration_step,
-                )
+                    name = f"{speaker}_{reference_path.stem}_{i}"
+                    self.writer.add_audio(
+                        f"Audio/Val/{name}",
+                        audio,
+                        sample_rate=self.config.sample_rate,
+                        global_step=self.iteration_step,
+                    )
 
-                audio_filepath = audio_folder / f"{name}.wav"
-                wav_write(str(audio_filepath), self.config.sample_rate, audio_numpy)
-                mlflow.log_artifact(str(audio_filepath))
+                    audio_filepath = audio_folder / f"{name}.wav"
+                    wav_write(str(audio_filepath), self.config.sample_rate, audio_numpy)
+                    mlflow.log_artifact(str(audio_filepath))

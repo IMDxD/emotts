@@ -18,6 +18,71 @@ LOG_DIR = Path("logs")
 MODEL_DIR = Path("models")
 REFERENCE_PATH = Path("references")
 
+GENERATED_PHONEMES = [
+    [
+        "AY1",
+        "K", "AE1", "N",
+        "T",
+        "B", "IH0", "L", "IY1", "V",
+        "HH",
+        "D", "IH0", "D",
+        "IH0 T",
+    ],
+    [
+        "HH",
+        "HH", "AE1", "Z",
+        "AH0", "B", "AE1", "N", "D", "AH0", "N", "D",
+        "AH0", "L",
+        "TH",
+        "T", "R", "AH0", "D", "IH1", "SH", "AH0", "N", "Z",
+        "HH", "IH1", "R",
+    ],
+    [
+        "AY1",
+        "M", "IY1", "N",
+        "K", "AE1", "N",
+        "Y", "UW1",
+        "IH0", "M", "AE1", "JH", "AH0", "N",
+        "EH1", "N", "IY0", "TH", "IH2", "NG",
+        "M", "AO0", "R",
+        "IH2", "N", "AH0", "P", "R", "OW1", "P", "R", "IY0", "AH0", "T",
+    ],
+    [
+        "DH", "AE1", "T",
+        "EH1", "S",
+        "HH", "W", "AH1", "T",
+        "TH",
+        "K", "R", "AW1", "D",
+        "N", "EH1", "V", "ER0",
+        "IH0", "K", "S", "P", "EH1", "K", "T", "IH0", "D",
+        "AH0", "L",
+        "AA1", "F",
+        "Y", "UW1", "EH1", "S",
+        "W", "ER1",
+        "AH0", "S", "T", "AA1", "N", "IH0", "SH", "T",
+        "T", "OW0",
+        "S", "IY1",
+        "IH0", "T",
+    ],
+    [
+        "N", "OW0",
+        "HH",
+        "W", "AH1", "N", "D", "ER0", "Z",
+        "W", "AY1",
+        "P", "IY1", "P", "AH0", "L",
+        "TH", "IH1", "NG", "K",
+        "IH1", "S",
+        "AH0",
+        "B", "IH1", "T",
+        "AA1", "D",
+    ],
+    [
+        "DH", "AE1", "T"
+        "IH1", "S",
+        "IH0", "N", "S", "EY1", "N",
+    ]
+]
+
 RUSSIAN_SPEAKERS = {0: "Игорина"}
 try:
     with open("models/en/tacotron/speakers.json", "r") as json_file:
