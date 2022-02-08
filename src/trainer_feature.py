@@ -197,6 +197,7 @@ class Trainer:
             config=self.config.data,
             phonemes_to_id=self.phonemes_to_id,
             speakers_to_id=self.speakers_to_id,
+            ignore_speakers=self.config.data.ignore_speakers
         )
         self.phonemes_to_id = factory.phoneme_to_id
         self.speakers_to_id = factory.speaker_to_id
@@ -403,7 +404,7 @@ class Trainer:
                     num_phonemes_tensor = torch.IntTensor([len(sequence)])
                     speaker = reference_path.parent.name
                     speaker_id = self.speakers_to_id[speaker]
-                    reference = torch.load(reference_path)
+                    reference = (torch.load(reference_path) - mels_mean.to(self.device)) / mels_std.to(self.device)
                     batch = (
                         phonemes_tensor,
                         num_phonemes_tensor,
