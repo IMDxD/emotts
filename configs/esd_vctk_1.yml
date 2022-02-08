@@ -20,11 +20,11 @@ data:
   wav_dir: data/esd_vctk_1/resampled
   feature_dir: data/esd_vctk_1/feature_output
   ignore_speakers:
-    - 0011
-    - 0012
-    - 0013
-    - 0014
-    - 0020
+    - "0011"
+    - "0012"
+    - "0013"
+    - "0014"
+    - "0020"
 pretrained_hifi: models/hifi
 train_hifi:
   split_data: true
