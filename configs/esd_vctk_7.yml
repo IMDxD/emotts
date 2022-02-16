@@ -19,6 +19,12 @@ data:
   mels_dir: data/esd_vctk_7/mels
   wav_dir: data/esd_vctk_7/resampled
   feature_dir: data/esd_vctk_7/feature_output
+  ignore_speakers:
+    - "0011"
+    - "0012"
+    - "0013"
+    - "0014"
+    - "0020"
 pretrained_hifi: models/hifi
 train_hifi:
   split_data: true
