@@ -177,7 +177,7 @@ class Attention(nn.Module):
         distr = Normal(mu, ranges)
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(ranges.device)
 
-        weights: torch.Tensor = f.softmax(distr.log_prob(t))
+        weights: torch.Tensor = f.softmax(distr.log_prob(t), dim=1)
 
         return weights
 
