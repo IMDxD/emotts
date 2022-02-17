@@ -12,13 +12,13 @@ log_steps: 1000
 iters_per_checkpoint: 60000
 total_iterations: 360001
 test_size: 0.05
-device: cuda:2
-checkpoint_name: esd_vctk_2
+device: cuda:3
+checkpoint_name: esd_vctk_15
 data:
-  text_dir: data/esd_vctk_2/mfa_outputs
-  mels_dir: data/esd_vctk_2/mels
-  wav_dir: data/esd_vctk_2/resampled
-  feature_dir: data/esd_vctk_2/feature_output
+  text_dir: data/esd_vctk/mfa_outputs
+  mels_dir: data/esd_vctk/mels
+  wav_dir: data/esd_vctk/resampled
+  feature_dir: data/esd_vctk/feature_output
   ignore_speakers:
     - "0011"
     - "0012"
