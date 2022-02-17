@@ -150,8 +150,6 @@ class RangePredictor(nn.Module):
 
 class Attention(nn.Module):
 
-    EPS = torch.Tensor([1e-6])
-
     def __init__(
         self, embedding_dim: int, config: GaussianUpsampleParams
     ):
@@ -175,13 +173,11 @@ class Attention(nn.Module):
         duration_cumsum = durations.cumsum(dim=1).float()
         max_duration = duration_cumsum[:, -1, :].max().long()
         mu = duration_cumsum - 0.5 * durations
-        ranges = torch.maximum(ranges, self.EPS.to(ranges.device))
+        ranges = torch.maximum(ranges, self.eps)
         distr = Normal(mu, ranges)
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(ranges.device)
 
-        weights: torch.Tensor = torch.exp(distr.log_prob(t))
-        weights_norm = torch.sum(weights, dim=1, keepdim=True) + self.eps
-        weights = weights / weights_norm
+        weights: torch.Tensor = f.softmax(distr.log_prob(t))
 
         return weights
 
