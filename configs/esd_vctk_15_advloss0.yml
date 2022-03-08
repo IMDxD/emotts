@@ -13,12 +13,12 @@ iters_per_checkpoint: 60000
 total_iterations: 360001
 test_size: 0.05
 device: cuda:5
-checkpoint_name: esd_vctk_15
+checkpoint_name: esd_vctk_15_advloss0
 data:
   text_dir: data/esd_vctk/mfa_outputs
   mels_dir: data/esd_vctk/mels
   wav_dir: data/esd_vctk/resampled
-  feature_dir: data/esd_vctk_15/feature_output
+  feature_dir: data/esd_vctk_15_advloss0/feature_output
   ignore_speakers:
     - "0011"
     - "0012"
@@ -65,7 +65,7 @@ train_hifi:
 loss:
   mels_weight: 1.0
   duration_weight: 2.0
-  adversarial_weight: 0.1
+  adversarial_weight: 0.0
 optimizer:
   learning_rate: 0.001
   adam_beta1: 0.9
