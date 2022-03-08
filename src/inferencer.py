@@ -40,6 +40,8 @@ class Inferencer:
         self.feature_model: NonAttentiveTacotron = torch.load(
             checkpoint_path / FEATURE_MODEL_FILENAME, map_location=config.device
         )
+        if isinstance(self.feature_model.attention.eps, float):
+            self.feature_model.attention.eps = torch.Tensor([self.feature_model.attention.eps])
         self._mels_dir = Path(config.data.mels_dir)
         self._text_dir = Path(config.data.text_dir)
         self._text_ext = config.data.text_ext
