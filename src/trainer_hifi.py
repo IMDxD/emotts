@@ -169,10 +169,8 @@ class HIFITrainer:
 
                 # Validation
                 if self.steps % self.config.train_hifi.checkpoint_interval == 0:
-                    val_loss = self.validation()
-                    to_break = self.check_early_stopping(val_loss, epoch)
-                    if to_break:
-                        return
+                    self.validation()
+                    self.save(epoch)
 
                 self.steps += 1  # noqa: SIM113
 
@@ -198,12 +196,11 @@ class HIFITrainer:
             self.writer.add_scalar("validation/mel_spec_error", val_err, self.steps)
 
         self.generator.train()
-        return val_err
 
     def save(self, epoch: int) -> None:
         torch.save(
             {"generator": self.generator.state_dict()},
-            self.hifi_dir / "generator.pkl"
+            self.hifi_dir / f"g_{self.steps}.pkl"
         )
 
         torch.save(
@@ -215,17 +212,5 @@ class HIFITrainer:
                 "steps": self.steps,
                 "epoch": epoch
             },
-            self.hifi_dir / "discriminator.pkl"
+            self.hifi_dir / f"do_{self.steps}.pkl"
         )
-
-    def check_early_stopping(self, val_loss: float, epoch: int) -> bool:
-        if val_loss < self.best_loss:
-            self.best_loss = val_loss
-            self.early_stopping_rounds = 0
-            self.save(epoch)
-        else:
-            self.early_stopping_rounds += 1
-            if self.early_stopping_rounds > self.config.train_hifi.early_stopping:
-                self.writer.close()
-                return True
-        return False
