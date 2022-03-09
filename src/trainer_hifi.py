@@ -107,6 +107,7 @@ class HIFITrainer:
             training_files=validation_filelist,
             config=self.config,
             device=self.device,
+            split=False,
         )
         validation_loader = DataLoader(validset, shuffle=False, batch_size=1, pin_memory=True)
 

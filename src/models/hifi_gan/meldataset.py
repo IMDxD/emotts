@@ -131,6 +131,7 @@ class MelDataset(
         training_files: List[str],
         config: TrainParams,
         device: Optional[torch.device] = None,
+        split: bool = True
     ) -> None:
 
         self.audio_files = training_files
@@ -138,7 +139,7 @@ class MelDataset(
         self.base_mels_path = config.data.feature_dir
         self.segment_size = config.train_hifi.segment_size
         self.fine_tuning = config.train_hifi.fine_tuning
-        self.split = config.train_hifi.split_data
+        self.split = split
         self.device = device
 
     def __getitem__(  # noqa: CCR001

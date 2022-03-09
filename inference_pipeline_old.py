@@ -17,18 +17,18 @@ SAMPLING_RATE = 22050
 N_SPEAKERS = 109
 MEL_CHANNELS = 80
 DEVICE = torch.device("cuda:3") if torch.cuda.is_available() else torch.device("cpu")
-CHECKPOINT_PATH = pathlib.Path("checkpoints/adversarial_gst_3_frame_6_head_03_adv_esd_vctk")
+CHECKPOINT_PATH = pathlib.Path("checkpoints/esd_vctk_15")
 G2P_OUTPUT_PATH = "predictions/to_g2p.txt"
-AUDIO_OUTPUT_PATH = "predictions/happy_out.wav"
-G2P_MODEL_PATH = "models/g2p/english_g2p.zip"
-TACOTRON_MODEL_PATH = CHECKPOINT_PATH / "1716_feature_model.pth"
-REFERENCE_PATH = "data/msp_full/processed/mels/F05/F05_S13_H_000.pkl"
-TRAIN_PARAMS = load_config("configs/esd_vctk.yml")
+AUDIO_OUTPUT_PATH = "predictions/angry_out.wav"
+G2P_MODEL_PATH = "models/en/g2p/english_g2p.zip"
+TACOTRON_MODEL_PATH = CHECKPOINT_PATH / "feature" / "feature_model.pth"
+REFERENCE_PATH = "references/0016/sad.pkl"
+TRAIN_PARAMS = load_config("configs/esd_vctk_15.yml")
 
-with open(CHECKPOINT_PATH / "phonemes.json") as f:
+with open(CHECKPOINT_PATH / "feature" / "phonemes.json") as f:
     PHONEMES_TO_IDS = json.load(f)
     
-with open(CHECKPOINT_PATH / "speakers.json") as f:
+with open(CHECKPOINT_PATH / "feature" / "speakers.json") as f:
     SPEAKER_TO_IDS = json.load(f)
     
 N_PHONEMES = len(PHONEMES_TO_IDS)
@@ -91,7 +91,7 @@ def inference_text_to_speech(
         mels = mels.permute(0, 2, 1).squeeze(0)
         mels = mels * MELS_STD.to(DEVICE) + MELS_MEAN.to(DEVICE)
 
-    generator = load_hifi(config.pretrained_hifi, config.train_hifi.model_param, config.n_mels, DEVICE)
+    generator = load_hifi(CHECKPOINT_PATH / "hifi", config.train_hifi.model_param, config.n_mels, DEVICE)
     generator.eval()
     with torch.no_grad():
         audio = hifi_inference(generator, mels, DEVICE)
@@ -108,6 +108,6 @@ if __name__ == "__main__":
         speaker_id=SPEAKER_TO_IDS["0016"],
         audio_output_path=AUDIO_OUTPUT_PATH,
         tacotron_model_path=TACOTRON_MODEL_PATH,
-        config=TrainParams,
+        config=TRAIN_PARAMS,
         reference_path=REFERENCE_PATH
     )
