@@ -12,7 +12,7 @@ log_steps: 1000
 iters_per_checkpoint: 60000
 total_iterations: 360001
 test_size: 0.05
-device: cuda:5
+device: cuda:7
 checkpoint_name: esd_vctk_15_advloss0
 data:
   text_dir: data/esd_vctk/mfa_outputs
