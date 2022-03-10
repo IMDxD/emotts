@@ -13,11 +13,11 @@ def main() -> None:
     )
     args = parser.parse_args()
     trainer_feature = Trainer(args.config)
-    inferencer_feature = Inferencer(args.config)
-    trainer_hifi = HIFITrainer(args.config)
     trainer_feature.train()
+    inferencer_feature = Inferencer(args.config)
     rmtree(inferencer_feature.feature_model_mels_path)
     inferencer_feature.proceed_data()
+    trainer_hifi = HIFITrainer(args.config)
     trainer_hifi.train()
 
 
