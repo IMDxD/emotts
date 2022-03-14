@@ -25,6 +25,8 @@ data:
     - "0013"
     - "0014"
     - "0015"
+    - "0016"
+    - "0017"
     - "0020"
 pretrained_hifi: models/hifi
 train_hifi:
