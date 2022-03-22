@@ -100,7 +100,7 @@ class HIFITrainer:
 
         train_loader = DataLoader(
             trainset, shuffle=False, batch_size=self.config.train_hifi.batch_size,
-            pin_memory=True, drop_last=True
+            pin_memory=False, drop_last=True
         )
 
         validset = MelDataset(
@@ -109,7 +109,7 @@ class HIFITrainer:
             device=self.device,
             split=False,
         )
-        validation_loader = DataLoader(validset, shuffle=False, batch_size=1, pin_memory=True)
+        validation_loader = DataLoader(validset, shuffle=False, batch_size=1, pin_memory=False)
 
         return train_loader, validation_loader
 
