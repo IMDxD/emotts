@@ -7,10 +7,10 @@ VALID_SIZE = 9
 SPLIT_LOG_PATH = Path("logs/hifi-split.txt")
 
 
-def get_mel_file_path(full_wav_name: str, mels_dir: str):
+def get_mel_file_path(full_wav_name: str, mels_dir: str, suffix: str=".pth"):
     return Path(
             mels_dir,
-            Path(*list(Path(full_wav_name).parts[-2:])).with_suffix(".pth")
+            Path(*list(Path(full_wav_name).parts[-2:])).with_suffix(suffix)
             )
 
 

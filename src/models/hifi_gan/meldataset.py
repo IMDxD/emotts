@@ -137,6 +137,7 @@ class MelDataset(
         self.audio_files = training_files
         self.config = config
         self.base_mels_path = config.data.feature_dir
+        self.gold_mels_path = config.data.mels_dir
         self.segment_size = config.train_hifi.segment_size
         self.fine_tuning = config.train_hifi.fine_tuning
         self.split = split
@@ -163,12 +164,15 @@ class MelDataset(
             raw_audio = resampler(raw_audio)
 
         audio = torch.FloatTensor(raw_audio).unsqueeze(0)
+        frames_per_seg = math.ceil(self.segment_size / self.config.hop_size)
 
         if not self.fine_tuning:
+            mel_start = 0
             if self.split:
                 if audio.size(1) >= self.segment_size:
                     max_audio_start = audio.size(1) - self.segment_size
                     audio_start = random.randint(0, max_audio_start)
+                    mel_start = math.ceil(audio_start / self.config.hop_size)
                     audio = audio[:, audio_start: audio_start + self.segment_size]
                 else:
                     audio = F.pad(
@@ -189,7 +193,7 @@ class MelDataset(
                 mel = mel.unsqueeze(0)
 
             if self.split:
-                frames_per_seg = math.ceil(self.segment_size / self.config.hop_size)
+                
 
                 if audio.size(1) >= self.segment_size:
                     frame_max = max(
@@ -217,11 +221,13 @@ class MelDataset(
                         audio, (0, self.segment_size - audio.size(1)), "constant"
                     )
 
-        mel_loss = mel_spectrogram(
-            audio,
-            self.config,
-            center=False,
+        mel_filename = get_mel_file_path(
+            filename, 
+            self.gold_mels_path, 
+            suffix=self.config.data.mels_ext
         )
+        mel_loss = torch.load(mel_filename, map_location="cpu")
+        mel_loss = mel_loss[:, :, mel_start: mel_start + frames_per_seg]
 
         if mel_loss.shape[2] > mel.shape[2]:
             mel = F.pad(mel, (0, mel_loss.shape[2] - mel.shape[2]), 'constant')
