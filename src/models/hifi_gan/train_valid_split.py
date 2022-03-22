@@ -25,6 +25,8 @@ def split_vctk_data(wavs_dir: str, mels_dir: str):
     np.random.shuffle(speaker_ids)
     train_ids, valid_ids = speaker_ids[:-VALID_SIZE], speaker_ids[-VALID_SIZE:]
     train_ids.extend(esd_speakers)
+    print(f"Train speakers: {train_ids}")
+    print(f"Valid speakers: {valid_ids}")
     training_files, validation_files = [], []
     for folder in wavs_dir_path.iterdir():
         if folder.name in speaker_ids:
