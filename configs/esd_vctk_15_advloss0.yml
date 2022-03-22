@@ -30,7 +30,7 @@ train_hifi:
   split_data: true
   training_epochs: 1000
   logging_interval: 5
-  checkpoint_interval: 5000
+  checkpoint_interval: 15000
   summary_interval: 1000
   fine_tuning: true
   fmax_loss: null
@@ -128,3 +128,4 @@ model:
   mask_padding: true
   phonem_embedding_dim: 512
   speaker_embedding_dim: 256
+

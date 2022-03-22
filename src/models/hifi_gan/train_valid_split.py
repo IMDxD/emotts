@@ -17,7 +17,7 @@ def get_mel_file_path(full_wav_name: str, mels_dir: str):
 def split_vctk_data(wavs_dir: str, mels_dir: str):
     wavs_dir_path = Path(wavs_dir)
     speaker_ids = []
-    esd_speakers = [folder.name for folder in wavs_dir.iterdir() if folder.name.startswith("00")]
+    esd_speakers = [folder.name for folder in wavs_dir_path.iterdir() if folder.name.startswith("00")]
     for folder in wavs_dir_path.iterdir():
         if folder.is_dir() and folder.name not in NON_VALID_SPEAKERS and not folder.name.startswith("00"):
             speaker_ids.append(folder.name)
