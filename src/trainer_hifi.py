@@ -169,7 +169,7 @@ class HIFITrainer:
                     self.writer.add_scalar("training/mel_spec_error", loss_mel, self.steps)
 
                 # Validation
-                if self.steps % self.config.train_hifi.checkpoint_interval == 0:
+                if (self.steps + 1) % self.config.train_hifi.checkpoint_interval == 0:
                     self.validation()
                     self.save(epoch)
 
@@ -180,18 +180,18 @@ class HIFITrainer:
 
     def validation(self):
         self.generator.eval()
-        torch.cuda.empty_cache()
+
         val_err_tot = 0.0
         with torch.no_grad():
             for j, batch_val in enumerate(self.validation_loader):
                 x, y, _, y_mel = batch_val
                 y_g_hat = self.generator(x.to(self.device))
-                y_mel = y_mel.to(self.device, non_blocking=True)
+                y_mel = y_mel.to(self.device)
                 y_g_hat_mel = mel_spectrogram(y_g_hat.squeeze(1), self.config)
                 val_err_tot += F.l1_loss(y_mel, y_g_hat_mel).item()
 
                 if j <= 4:
-                    self.writer.add_audio(f"generated/y_hat_{j}", y_g_hat[0], self.steps, self.config.sample_rate)
+                    self.writer.add_audio(f"generated/y_hat_{j}", y_g_hat[0].cpu(), self.steps, self.config.sample_rate)
 
             val_err = val_err_tot / (j + 1)
             self.writer.add_scalar("validation/mel_spec_error", val_err, self.steps)

@@ -379,12 +379,11 @@ class Trainer:
                     output = output.permute(0, 2, 1).squeeze(0)
                     output = output * mels_std.to(self.device) + mels_mean.to(self.device)
                     audio = self.vocoder_inference(output.float())
-                    audio_numpy = audio.squeeze().cpu().numpy()
 
                     name = f"{speaker}_{reference_path.stem}_{i}"
                     self.writer.add_audio(
                         f"Audio/Val/{name}",
-                        audio,
+                        audio.cpu(),
                         sample_rate=self.config.sample_rate,
                         global_step=self.iteration_step,
                     )
