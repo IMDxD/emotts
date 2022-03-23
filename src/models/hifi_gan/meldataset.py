@@ -165,14 +165,18 @@ class MelDataset(
 
         audio = torch.FloatTensor(raw_audio).unsqueeze(0)
         frames_per_seg = math.ceil(self.segment_size / self.config.hop_size)
+        mel_filename = get_mel_file_path(
+            filename, 
+            self.gold_mels_path, 
+            suffix=self.config.data.mels_ext
+        )
+        mel_loss = torch.load(mel_filename, map_location="cpu")
 
         if not self.fine_tuning:
-            mel_start = 0
             if self.split:
                 if audio.size(1) >= self.segment_size:
                     max_audio_start = audio.size(1) - self.segment_size
                     audio_start = random.randint(0, max_audio_start)
-                    mel_start = math.ceil(audio_start / self.config.hop_size)
                     audio = audio[:, audio_start: audio_start + self.segment_size]
                 else:
                     audio = F.pad(
@@ -209,6 +213,7 @@ class MelDataset(
                     )
                     mel_start = random.randint(0, frame_max)
                     mel = mel[:, :, mel_start: mel_start + frames_per_seg]
+                    mel_loss = mel_loss[:, :, mel_start: mel_start + frames_per_seg]
                     audio = audio[
                         :,
                         mel_start
@@ -220,14 +225,6 @@ class MelDataset(
                     audio = F.pad(
                         audio, (0, self.segment_size - audio.size(1)), "constant"
                     )
-
-        mel_filename = get_mel_file_path(
-            filename, 
-            self.gold_mels_path, 
-            suffix=self.config.data.mels_ext
-        )
-        mel_loss = torch.load(mel_filename, map_location="cpu")
-        mel_loss = mel_loss[:, :, mel_start: mel_start + frames_per_seg]
 
         if mel_loss.shape[2] > mel.shape[2]:
             mel = F.pad(mel, (0, mel_loss.shape[2] - mel.shape[2]), 'constant')
