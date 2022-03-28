@@ -135,8 +135,9 @@ dmypy.json
 .vscode/
 
 # EMOTTS
-models/ru/
-models/en/
+models/
+mlruns/
+generated_hifi/
 logs/
 data/
 checkpoints/

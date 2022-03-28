@@ -35,7 +35,8 @@ def main(input_text_dir: Path, input_audio_dir: Path,
     name_prefixes = defaultdict(int)
     for audio_filepath in tqdm(audio_filepath_list):
         try:
-            _, _, sent_emo, speaker_id, subset_mode, _ = audio_filepath.stem.split("-")  # ["MSP", "IMPROV", "S12H", "F02", "T", "FM01"]
+            # ["MSP", "IMPROV", "S12H", "F02", "T", "FM01"]
+            _, _, sent_emo, speaker_id, subset_mode, _ = audio_filepath.stem.split("-")
         except ValueError:
             print(f"{audio_filepath}")
 

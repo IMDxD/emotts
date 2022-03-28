@@ -5,7 +5,6 @@ All dataset texts must be already extracted into text files.
 """
 
 
-import shutil
 from pathlib import Path
 from typing import List
 

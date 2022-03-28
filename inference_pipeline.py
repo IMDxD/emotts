@@ -1,26 +1,30 @@
 import json
 import pathlib
-import uuid
 import re
 import subprocess
+import uuid
 from typing import Dict, List, Tuple
 
 import torch
-from scipy.io.wavfile import write as wav_write
+import torchaudio.backend.sox_io_backend
 
-from src.constants import SupportedLanguages, SupportedEmotions, Emotion, Language
+from src.constants import (
+    Emotion, Language, SupportedEmotions, SupportedLanguages,
+)
 from src.models.hifi_gan import load_model as load_hifi
 from src.models.hifi_gan.inference_tensor import inference as hifi_inference
 from src.preprocessing.text.cleaners import english_cleaners, russian_cleaners
 
-
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-SAMPLING_RATE = 22050
-MAX_WAV_VALUE = 32768.0
 
 
 class CleanedTextIsEmptyStringError(Exception):
     """Raised when input text after cleaning is empty string"""
+    pass
+
+
+class SpeakerNotFoundError(Exception):
+    """Raised when app was unable to found proper reference for language-spaker pair"""
     pass
 
 
@@ -86,6 +90,7 @@ def get_tacotron_batch(
 def inference_text_to_speech(
     language: Language,
     input_text: str,
+    speaker: str,
     emotion: Emotion,
     audio_output_path: pathlib.Path,
     device: torch.device = DEVICE,
@@ -107,14 +112,19 @@ def inference_text_to_speech(
     mels_std_path = language.tacotron_checkpoint.path / language.tacotron_checkpoint.mels_std_filename
     mels_std = torch.load(mels_std_path)
 
-    if language == SupportedLanguages.english:
-        speaker_id = emotion.en_speaker_id
-    elif language == SupportedLanguages.russian:
-        speaker_id = emotion.ru_speaker_id
-    else:
-        raise NotImplementedError
+    try:
+        if language == SupportedLanguages.russian:
+            speaker_id = emotion.ru_speaker_id
+            reference_path = language.emo_reference_dir / emotion.reference_mels_path
+        elif language == SupportedLanguages.english:
+            speaker_id = speakers_to_ids.get(speaker)
+            reference_path = language.emo_reference_dir / speaker / emotion.reference_mels_path
+        else:
+            raise NotImplementedError
+    except FileNotFoundError:
+        raise SpeakerNotFoundError
+
     phoneme_ids = phonemize(input_text, language, phonemes_to_ids)
-    reference_path = emotion.reference_mels_path
     reference = torch.load(reference_path)
     batch = get_tacotron_batch(phoneme_ids, reference, speaker_id, mels_mean, mels_std, device)
 
@@ -126,20 +136,20 @@ def inference_text_to_speech(
         mels = mels.permute(0, 2, 1).squeeze(0)
         mels = mels * mels_std.to(device) + mels_mean.to(device)
 
-    generator = load_hifi(hifi_config, device)
+    generator, sampling_rate = load_hifi(hifi_config, device)
     generator.eval()
     with torch.no_grad():
         audio = hifi_inference(generator, mels, device)
-        audio = audio * MAX_WAV_VALUE
-        audio = audio.type(torch.int16).detach().cpu().numpy()
+        audio = audio.unsqueeze(0)
 
-    wav_write(audio_output_path, SAMPLING_RATE, audio)
+    torchaudio.save(audio_output_path, audio.cpu(), sampling_rate)
 
 
 if __name__ == "__main__":
     inference_text_to_speech(
         language=SupportedLanguages.english,
         input_text="Two months after receiving his doctorate, Pauli completed the article, which came to 237 pages",
+        speaker="",
         emotion=SupportedEmotions.happy,
         audio_output_path=pathlib.Path("predictions/generated.wav"),
         device=DEVICE,

@@ -3,7 +3,6 @@ import warnings
 from string import printable, punctuation
 
 import torch
-from tqdm import tqdm
 
 
 class Normalizer:

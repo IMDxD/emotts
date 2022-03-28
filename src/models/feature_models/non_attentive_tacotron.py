@@ -149,12 +149,13 @@ class RangePredictor(nn.Module):
 
 
 class Attention(nn.Module):
+
     def __init__(
         self, embedding_dim: int, config: GaussianUpsampleParams
     ):
         super().__init__()
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
-        self.eps = config.eps
+        self.eps = torch.Tensor([config.eps])
         self.dropout = config.attention_dropout
         self.duration_predictor = DurationPredictor(
             embedding_dim, config.duration_config
@@ -172,12 +173,11 @@ class Attention(nn.Module):
         duration_cumsum = durations.cumsum(dim=1).float()
         max_duration = duration_cumsum[:, -1, :].max().long()
         mu = duration_cumsum - 0.5 * durations
+        ranges = torch.maximum(ranges, self.eps.to(ranges.device))
         distr = Normal(mu, ranges)
         t = torch.arange(0, max_duration.item()).view(1, 1, -1).to(ranges.device)
 
-        weights: torch.Tensor = torch.exp(distr.log_prob(t))
-        weights_norm = torch.sum(weights, dim=1, keepdim=True) + self.eps
-        weights = weights / weights_norm
+        weights: torch.Tensor = f.softmax(distr.log_prob(t), dim=1)
 
         return weights
 

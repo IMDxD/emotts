@@ -5,10 +5,7 @@ import torch
 from torch import nn
 
 from src.models.feature_models.layers import (
-    Conv1DNorm,
-    Idomp,
-    LinearWithActivation,
-    PositionalEncoding,
+    Conv1DNorm, Idomp, LinearWithActivation, PositionalEncoding,
 )
 
 
