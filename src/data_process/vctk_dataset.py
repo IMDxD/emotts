@@ -142,6 +142,7 @@ class VCTKFactory:
         config: VCTKDatasetParams,
         phonemes_to_id: Dict[str, int],
         speakers_to_id: Dict[str, int],
+        ignore_speakers: List[str]
     ):
         self.sample_rate = sample_rate
         self.hop_size = hop_size
@@ -153,6 +154,7 @@ class VCTKFactory:
         self.phoneme_to_id: Dict[str, int] = phonemes_to_id
         self.phoneme_to_id[PAD_TOKEN] = 0
         self.speaker_to_id: Dict[str, int] = speakers_to_id
+        self.ignore_speakers = ignore_speakers
         self._dataset: List[VCTKInfo] = self._build_dataset()
         self.mels_mean, self.mels_std = self._get_mean_and_std()
 
@@ -165,13 +167,13 @@ class VCTKFactory:
         self, test_fraction: float
     ) -> Tuple[VCTKDataset, VCTKDataset]:
         speakers_to_data_id: Dict[int, List[int]] = defaultdict(list)
-
+        ignore_speaker_ids = {self.speaker_to_id[speaker] for speaker in self.ignore_speakers}
         for i, sample in enumerate(self._dataset):
             speakers_to_data_id[sample.speaker_id].append(i)
         test_ids: List[int] = []
-        for ids in speakers_to_data_id.values():
+        for speaker, ids in speakers_to_data_id.items():
             test_size = int(len(ids) * test_fraction)
-            if test_size > 0:
+            if test_size > 0 and speaker not in ignore_speaker_ids:
                 test_indexes = random.choices(ids, k=test_size)
                 test_ids.extend(test_indexes)
 
@@ -240,8 +242,8 @@ class VCTKFactory:
         return dataset
 
     def _get_mean_and_std(self) -> Tuple[torch.Tensor, torch.Tensor]:
-        mel_sum = torch.zeros((self.n_mels), dtype=torch.float64)
-        mel_squared_sum = torch.zeros((self.n_mels), dtype=torch.float64)
+        mel_sum = torch.zeros(self.n_mels, dtype=torch.float64)
+        mel_squared_sum = torch.zeros(self.n_mels, dtype=torch.float64)
         counts = 0
 
         for info in tqdm(self._dataset, desc="Computing mels mean and std"):

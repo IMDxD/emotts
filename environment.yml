@@ -31,3 +31,4 @@ dependencies:
   - uvicorn
   - pip:
       - tgt
+      - mlflow==1.23.0

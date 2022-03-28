@@ -1,6 +1,6 @@
 import argparse
 
-from src import Trainer
+from src.trainer_feature import Trainer
 
 
 def main() -> None:
