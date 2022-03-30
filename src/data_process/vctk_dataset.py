@@ -15,6 +15,7 @@ from src.data_process.config import VCTKDatasetParams
 NUMBER = Union[int, float]
 PHONES_TIER = "phones"
 PAD_TOKEN = "<PAD>"
+REMOVE_SPEAKERS = ["p280", "p315", "0019"]
 
 
 @dataclass
@@ -47,15 +48,14 @@ class VCTKBatch:
 
 
 class VCTKDataset(Dataset[VCTKSample]):
-
     def __init__(
-            self,
-            sample_rate: int,
-            hop_size: int,
-            mels_mean: torch.Tensor,
-            mels_std: torch.Tensor,
-            phoneme_to_ids: Dict[str, int],
-            data: List[VCTKInfo]
+        self,
+        sample_rate: int,
+        hop_size: int,
+        mels_mean: torch.Tensor,
+        mels_std: torch.Tensor,
+        phoneme_to_ids: Dict[str, int],
+        data: List[VCTKInfo],
     ):
         self._phoneme_to_id = phoneme_to_ids
         self._dataset = data
@@ -73,14 +73,16 @@ class VCTKDataset(Dataset[VCTKSample]):
         info = self._dataset[idx]
         text_grid = tgt.read_textgrid(info.text_path)
         phones_tier = text_grid.get_tier_by_name(PHONES_TIER)
-        phoneme_ids = [self._phoneme_to_id[x.text] for x in phones_tier.get_copy_with_gaps_filled()]
+        phoneme_ids = [
+            self._phoneme_to_id[x.text] for x in phones_tier.get_copy_with_gaps_filled()
+        ]
 
         durations = np.array(
             [
                 self.seconds_to_frame(x.duration())
                 for x in phones_tier.get_copy_with_gaps_filled()
             ],
-            dtype=np.float32
+            dtype=np.float32,
         )
 
         mels: torch.Tensor = torch.load(info.mel_path)
@@ -99,7 +101,7 @@ class VCTKDataset(Dataset[VCTKSample]):
             num_phonemes=len(phoneme_ids),
             speaker_id=info.speaker_id,
             mels=mels,
-            durations=durations
+            durations=durations,
         )
 
     def seconds_to_frame(self, seconds: float) -> float:
@@ -142,7 +144,7 @@ class VCTKFactory:
         config: VCTKDatasetParams,
         phonemes_to_id: Dict[str, int],
         speakers_to_id: Dict[str, int],
-        ignore_speakers: List[str]
+        ignore_speakers: List[str],
     ):
         self.sample_rate = sample_rate
         self.hop_size = hop_size
@@ -167,7 +169,9 @@ class VCTKFactory:
         self, test_fraction: float
     ) -> Tuple[VCTKDataset, VCTKDataset]:
         speakers_to_data_id: Dict[int, List[int]] = defaultdict(list)
-        ignore_speaker_ids = {self.speaker_to_id[speaker] for speaker in self.ignore_speakers}
+        ignore_speaker_ids = {
+            self.speaker_to_id[speaker] for speaker in self.ignore_speakers
+        }
         for i, sample in enumerate(self._dataset):
             speakers_to_data_id[sample.speaker_id].append(i)
         test_ids: List[int] = []
@@ -190,7 +194,7 @@ class VCTKFactory:
             mels_mean=self.mels_mean,
             mels_std=self.mels_std,
             phoneme_to_ids=self.phoneme_to_id,
-            data=train_data
+            data=train_data,
         )
         test_dataset = VCTKDataset(
             sample_rate=self.sample_rate,
@@ -198,7 +202,7 @@ class VCTKFactory:
             mels_mean=self.mels_mean,
             mels_std=self.mels_std,
             phoneme_to_ids=self.phoneme_to_id,
-            data=test_data
+            data=test_data,
         )
         return train_dataset, test_dataset
 
@@ -215,6 +219,9 @@ class VCTKFactory:
         }
         samples = list(mels_set & texts_set)
         for sample in tqdm(samples):
+            if sample.parent.name in REMOVE_SPEAKERS:
+                continue
+
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
 
@@ -235,7 +242,7 @@ class VCTKFactory:
                         text_path=tg_path,
                         mel_path=mels_path,
                         phonemes_length=len(phonemes),
-                        speaker_id=speaker_id
+                        speaker_id=speaker_id,
                     )
                 )
 
@@ -251,12 +258,12 @@ class VCTKFactory:
             mel_sum += mels.sum(dim=-1).squeeze(0)
             mel_squared_sum += (mels ** 2).sum(dim=-1).squeeze(0)
             counts += mels.shape[-1]
-            
+
         mels_mean: torch.Tensor = mel_sum / counts
-        mels_std: torch.Tensor = torch.sqrt((
-            mel_squared_sum - mel_sum * mel_sum / counts
-        ) / counts)
-        
+        mels_std: torch.Tensor = torch.sqrt(
+            (mel_squared_sum - mel_sum * mel_sum / counts) / counts
+        )
+
         return mels_mean.view(-1, 1), mels_std.view(-1, 1)
 
 
@@ -277,9 +284,7 @@ class VCTKCollate:
         # Right zero-pad all one-hot text sequences to max input length
         batch_size = len(batch)
         input_lengths, ids_sorted_decreasing = torch.sort(
-            torch.LongTensor([len(x.phonemes) for x in batch]),
-            dim=0,
-            descending=True,
+            torch.LongTensor([len(x.phonemes) for x in batch]), dim=0, descending=True,
         )
         max_input_len = int(input_lengths[0])
 
@@ -312,5 +317,6 @@ class VCTKCollate:
             num_phonemes=input_lengths,
             speaker_ids=input_speaker_ids,
             durations=durations_padded,
-            mels=mel_padded
+            mels=mel_padded,
         )
+

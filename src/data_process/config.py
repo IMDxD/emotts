@@ -12,4 +12,3 @@ class VCTKDatasetParams:
     ignore_speakers: List[str]
     text_ext: str = field(default=".TextGrid")
     mels_ext: str = field(default=".pkl")
-

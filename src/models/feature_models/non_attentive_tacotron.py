@@ -10,8 +10,13 @@ from torch.nn import functional as f
 from src.data_process import VCTKBatch
 
 from .config import (
-    DecoderParams, DurationParams, EncoderParams, GaussianUpsampleParams,
-    ModelParams, PostNetParams, RangeParams,
+    DecoderParams,
+    DurationParams,
+    EncoderParams,
+    GaussianUpsampleParams,
+    ModelParams,
+    PostNetParams,
+    RangeParams,
 )
 from .gst import GST
 from .layers import Conv1DNorm, LinearWithActivation, PositionalEncoding
@@ -53,7 +58,7 @@ class Postnet(nn.Module):
                 dropout_rate=config.dropout,
                 w_init_gain="tanh",
             ),
-            nn.Tanh()
+            nn.Tanh(),
         ]
 
         for _ in range(config.n_convolutions - 2):
@@ -118,7 +123,6 @@ class DurationPredictor(nn.Module):
 
 
 class RangePredictor(nn.Module):
-
     def __init__(self, embedding_dim: int, config: RangeParams):
         super().__init__()
 
@@ -130,7 +134,9 @@ class RangePredictor(nn.Module):
             bidirectional=True,
         )
         self.dropout = config.dropout
-        self.projection = LinearWithActivation(config.lstm_hidden * 2, 1, activation=nn.Softplus())
+        self.projection = LinearWithActivation(
+            config.lstm_hidden * 2, 1, activation=nn.Softplus()
+        )
 
     def forward(
         self, x: torch.Tensor, durations: torch.Tensor, input_lengths: torch.Tensor
@@ -149,10 +155,7 @@ class RangePredictor(nn.Module):
 
 
 class Attention(nn.Module):
-
-    def __init__(
-        self, embedding_dim: int, config: GaussianUpsampleParams
-    ):
+    def __init__(self, embedding_dim: int, config: GaussianUpsampleParams):
         super().__init__()
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
         self.eps = torch.Tensor([config.eps])
@@ -162,8 +165,7 @@ class Attention(nn.Module):
         )
         self.range_predictor = RangePredictor(embedding_dim, config.range_config)
         self.positional_encoder = PositionalEncoding(
-            config.positional_dim,
-            dropout=config.positional_dropout
+            config.positional_dim, dropout=config.positional_dropout
         )
 
     def calc_scores(
@@ -287,10 +289,11 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(
-        self, n_mel_channels: int,
-            n_frames_per_step: int,
-            attention_out_dim: int,
-            config: DecoderParams
+        self,
+        n_mel_channels: int,
+        n_frames_per_step: int,
+        attention_out_dim: int,
+        config: DecoderParams,
     ):
         super().__init__()
         self.n_mel_channels = n_mel_channels
@@ -300,9 +303,7 @@ class Decoder(nn.Module):
         self.n_frames_per_step = n_frames_per_step
 
         self.prenet = Prenet(
-            self.n_mel_channels,
-            config.prenet_layers,
-            config.prenet_dropout,
+            self.n_mel_channels, config.prenet_layers, config.prenet_dropout,
         )
 
         self.decoder_rnn = nn.LSTM(
@@ -315,22 +316,28 @@ class Decoder(nn.Module):
 
         self.linear_projection = LinearWithActivation(
             config.decoder_rnn_dim * self.n_frames_per_step + attention_out_dim,
-            n_mel_channels * self.n_frames_per_step
+            n_mel_channels * self.n_frames_per_step,
         )
 
     def forward(self, memory: torch.Tensor, y_mels: torch.Tensor) -> torch.Tensor:
 
         batch_size = memory.shape[0]
         mels_view_size = self.n_mel_channels * self.n_frames_per_step
-        previous_frame = torch.zeros(memory.shape[0], 1, mels_view_size).to(memory.device)
-        padded_size = math.ceil(y_mels.shape[1] / self.n_frames_per_step) * self.n_frames_per_step
+        previous_frame = torch.zeros(memory.shape[0], 1, mels_view_size).to(
+            memory.device
+        )
+        padded_size = (
+            math.ceil(y_mels.shape[1] / self.n_frames_per_step) * self.n_frames_per_step
+        )
         to_get = padded_size - self.n_frames_per_step
         to_pad = padded_size - y_mels.shape[1]
         padding = torch.zeros(batch_size, to_pad, memory.shape[2]).to(memory.device)
         padded_memory = torch.cat([memory, padding], dim=1)
         padded_y_mels = y_mels[:, :to_get, :].reshape(batch_size, -1, mels_view_size)
         padded_y_mels = torch.cat((previous_frame, padded_y_mels), dim=1)
-        padded_memory = padded_memory.view(batch_size, -1, memory.shape[2], self.n_frames_per_step)
+        padded_memory = padded_memory.view(
+            batch_size, -1, memory.shape[2], self.n_frames_per_step
+        )
         padded_memory = padded_memory.sum(dim=3)
         previous_frame = previous_frame[:, 0, :]
 
@@ -339,11 +346,7 @@ class Decoder(nn.Module):
 
         for i in range(padded_y_mels.shape[1]):
             previous_frame = self.prenet(
-                previous_frame.view(
-                    batch_size,
-                    -1,
-                    self.n_mel_channels
-                )
+                previous_frame.view(batch_size, -1, self.n_mel_channels)
             )
             decoder_input: torch.Tensor = torch.cat(
                 (previous_frame.view(batch_size, -1), padded_memory[:, i, :]), dim=-1
@@ -360,21 +363,26 @@ class Decoder(nn.Module):
                 previous_frame = padded_y_mels[:, i, :]
 
         mel_tensor_outputs: torch.Tensor = torch.cat(mel_outputs, dim=1)
-        mel_tensor_outputs = mel_tensor_outputs.reshape(batch_size, -1, self.n_mel_channels)
-        return mel_tensor_outputs[:, :y_mels.shape[1], :]
+        mel_tensor_outputs = mel_tensor_outputs.reshape(
+            batch_size, -1, self.n_mel_channels
+        )
+        return mel_tensor_outputs[:, : y_mels.shape[1], :]
 
     def inference(self, memory: torch.Tensor) -> torch.Tensor:
 
         batch_size = memory.shape[0]
         previous_frame = torch.zeros(
-            memory.shape[0],
-            self.n_mel_channels * self.n_frames_per_step
+            memory.shape[0], self.n_mel_channels * self.n_frames_per_step
         ).to(memory.device)
-        padded_size = math.ceil(memory.shape[1] / self.n_frames_per_step) * self.n_frames_per_step
+        padded_size = (
+            math.ceil(memory.shape[1] / self.n_frames_per_step) * self.n_frames_per_step
+        )
         to_pad = padded_size - memory.shape[1]
         padding = torch.zeros(batch_size, to_pad, memory.shape[2]).to(memory.device)
         padded_memory = torch.cat([memory, padding], dim=1)
-        padded_memory = padded_memory.view(batch_size, -1, memory.shape[2], self.n_frames_per_step)
+        padded_memory = padded_memory.view(
+            batch_size, -1, memory.shape[2], self.n_frames_per_step
+        )
         padded_memory = padded_memory.sum(dim=3)
 
         mel_outputs = []
@@ -382,11 +390,7 @@ class Decoder(nn.Module):
 
         for i in range(padded_memory.shape[1]):
             previous_frame = self.prenet(
-                previous_frame.view(
-                    batch_size,
-                    -1,
-                    self.n_mel_channels
-                )
+                previous_frame.view(batch_size, -1, self.n_mel_channels)
             )
             decoder_input: torch.Tensor = torch.cat(
                 (previous_frame.view(batch_size, -1), padded_memory[:, i, :]), dim=-1
@@ -400,7 +404,9 @@ class Decoder(nn.Module):
             previous_frame = mel_out.squeeze(1)
 
         mel_tensor_outputs: torch.Tensor = torch.cat(mel_outputs, dim=1)
-        mel_tensor_outputs = mel_tensor_outputs.reshape(batch_size, -1, self.n_mel_channels)
+        mel_tensor_outputs = mel_tensor_outputs.reshape(
+            batch_size, -1, self.n_mel_channels
+        )
         return mel_tensor_outputs
 
 
@@ -411,59 +417,55 @@ class NonAttentiveTacotron(nn.Module):
         n_speakers: int,
         n_mel_channels: int,
         config: ModelParams,
+        finetune: bool,
     ):
         super().__init__()
 
-        full_embedding_dim = config.phonem_embedding_dim + config.speaker_embedding_dim + config.gst_config.emb_dim
-        self.phonem_embedding = nn.Embedding(n_phonems, config.phonem_embedding_dim, padding_idx=0)
-        self.speaker_embedding = nn.Embedding(
-            n_speakers,
-            config.speaker_embedding_dim,
+        full_embedding_dim = (
+            config.phonem_embedding_dim
+            + config.speaker_embedding_dim
+            + config.gst_config.emb_dim
+        )
+        self.finetune = finetune
+        self.gst_emb_dim = config.gst_config.emb_dim
+        self.phonem_embedding = nn.Embedding(
+            n_phonems, config.phonem_embedding_dim, padding_idx=0
+        )
+        self.speaker_embedding = nn.Embedding(n_speakers, config.speaker_embedding_dim,)
+        norm_emb_layer(
+            self.phonem_embedding, n_phonems, config.phonem_embedding_dim,
         )
         norm_emb_layer(
-            self.phonem_embedding,
-            n_phonems,
-            config.phonem_embedding_dim,
+            self.speaker_embedding, n_speakers, config.speaker_embedding_dim,
         )
-        norm_emb_layer(
-            self.speaker_embedding,
-            n_speakers,
-            config.speaker_embedding_dim,
-        )
-        self.encoder = Encoder(
-            config.phonem_embedding_dim,
-            config.encoder_config,
-        )
-        self.attention = Attention(
-            full_embedding_dim,
-            config.attention_config
-        )
-        self.gst = GST(
-            n_mel_channels=n_mel_channels,
-            config=config.gst_config
-        )
+        self.encoder = Encoder(config.phonem_embedding_dim, config.encoder_config,)
+        self.attention = Attention(full_embedding_dim, config.attention_config)
+        self.gst = GST(n_mel_channels=n_mel_channels, config=config.gst_config)
         self.decoder = Decoder(
             n_mel_channels,
             config.n_frames_per_step,
-            full_embedding_dim +
-            config.attention_config.positional_dim,
-            config.decoder_config
+            full_embedding_dim + config.attention_config.positional_dim,
+            config.decoder_config,
         )
-        self.postnet = Postnet(
-            n_mel_channels,
-            config.postnet_config,
-        )
+        self.postnet = Postnet(n_mel_channels, config.postnet_config,)
 
     def forward(
         self, batch: VCTKBatch
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         phonem_emb = self.phonem_embedding(batch.phonemes).transpose(1, 2)
-        speaker_emb: torch.Tensor = self.speaker_embedding(batch.speaker_ids).unsqueeze(1)
-        
+        speaker_emb: torch.Tensor = self.speaker_embedding(batch.speaker_ids).unsqueeze(
+            1
+        )
+
         phonem_emb = self.encoder(phonem_emb, batch.num_phonemes)
-        gst_emb = self.gst(batch.mels)
-        
+        if self.finetune:
+            gst_emb = self.gst(batch.mels)
+        else:
+            gst_emb = torch.zeros(phonem_emb.shape[0], 1, self.gst_emb_dim).to(
+                batch.mels.device
+            )
+
         style_emb = torch.cat((gst_emb, speaker_emb), dim=-1)
         style_emb = torch.repeat_interleave(style_emb, phonem_emb.shape[1], dim=1)
         embeddings = torch.cat((phonem_emb, style_emb), dim=-1)
@@ -471,7 +473,7 @@ class NonAttentiveTacotron(nn.Module):
         durations, attented_embeddings = self.attention(
             embeddings, batch.num_phonemes, batch.durations
         )
-        
+
         mel_outputs = self.decoder(attented_embeddings, batch.mels)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
@@ -481,7 +483,13 @@ class NonAttentiveTacotron(nn.Module):
         mel_outputs_postnet[mask] = 0
         mel_outputs[mask] = 0
 
-        return durations, mel_outputs_postnet, mel_outputs, gst_emb.squeeze(1), speaker_emb.squeeze(1)
+        return (
+            durations,
+            mel_outputs_postnet,
+            mel_outputs,
+            gst_emb.squeeze(1),
+            speaker_emb.squeeze(1),
+        )
 
     def inference(
         self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
@@ -492,8 +500,13 @@ class NonAttentiveTacotron(nn.Module):
         speaker_emb = self.speaker_embedding(speaker_ids).unsqueeze(1)
 
         phonem_emb = self.encoder(phonem_emb, text_lengths)
-        style_emb = self.gst(reference_mel)
-        style_emb = torch.cat((style_emb, speaker_emb), dim=-1)
+        if self.finetune:
+            gst_emb = self.gst(reference_mel)
+        else:
+            gst_emb = torch.zeros(phonem_emb.shape[0], 1, self.gst_emb_dim).to(
+                reference_mel.device
+            )
+        style_emb = torch.cat((gst_emb, speaker_emb), dim=-1)
         style_emb = torch.repeat_interleave(style_emb, phonem_emb.shape[1], dim=1)
         embeddings = torch.cat((phonem_emb, style_emb), dim=-1)
 
