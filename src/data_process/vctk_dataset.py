@@ -229,10 +229,7 @@ class VCTKFactory:
         }
         samples = list(mels_set & texts_set)
         for sample in tqdm(samples):
-            if (
-                sample.parent.name in REMOVE_SPEAKERS
-                or sample.parent.name not in self.speaker_to_use
-            ):
+            if sample.parent.name in REMOVE_SPEAKERS:
                 continue
 
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
@@ -250,14 +247,16 @@ class VCTKFactory:
                 for phoneme in phonemes:
                     self.add_to_mapping(self.phoneme_to_id, phoneme)
 
-                dataset.append(
-                    VCTKInfo(
-                        text_path=tg_path,
-                        mel_path=mels_path,
-                        phonemes_length=len(phonemes),
-                        speaker_id=speaker_id,
+                if sample.parent.name in self.speaker_to_use:
+
+                    dataset.append(
+                        VCTKInfo(
+                            text_path=tg_path,
+                            mel_path=mels_path,
+                            phonemes_length=len(phonemes),
+                            speaker_id=speaker_id,
+                        )
                     )
-                )
 
         return dataset
 
