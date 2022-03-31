@@ -266,8 +266,10 @@ class VCTKFactory:
         mel_squared_sum = torch.zeros(self.n_mels, dtype=torch.float64)
         counts = 0
 
-        for info in tqdm(self._dataset, desc="Computing mels mean and std"):
-            mels: torch.Tensor = torch.load(info.mel_path)
+        for mel_path in self._mels_dir.rglob(self._mels_ext):
+            if mel_path.parent.name in REMOVE_SPEAKERS:
+                continue
+            mels: torch.Tensor = torch.load(mel_path)
             mel_sum += mels.sum(dim=-1).squeeze(0)
             mel_squared_sum += (mels ** 2).sum(dim=-1).squeeze(0)
             counts += mels.shape[-1]
