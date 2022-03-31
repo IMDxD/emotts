@@ -266,7 +266,7 @@ class VCTKFactory:
         mel_squared_sum = torch.zeros(self.n_mels, dtype=torch.float64)
         counts = 0
 
-        for mel_path in self._mels_dir.rglob(self._mels_ext):
+        for mel_path in self._mels_dir.rglob(f"*{self._mels_ext}"):
             if mel_path.parent.name in REMOVE_SPEAKERS:
                 continue
             mels: torch.Tensor = torch.load(mel_path)
