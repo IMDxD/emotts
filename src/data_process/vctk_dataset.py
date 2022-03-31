@@ -145,10 +145,12 @@ class VCTKFactory:
         phonemes_to_id: Dict[str, int],
         speakers_to_id: Dict[str, int],
         ignore_speakers: List[str],
+        finetune: bool,
     ):
         self.sample_rate = sample_rate
         self.hop_size = hop_size
         self.n_mels = n_mels
+        self.finetune = finetune
         self._mels_dir = Path(config.mels_dir)
         self._text_dir = Path(config.text_dir)
         self._text_ext = config.text_ext
@@ -157,6 +159,14 @@ class VCTKFactory:
         self.phoneme_to_id[PAD_TOKEN] = 0
         self.speaker_to_id: Dict[str, int] = speakers_to_id
         self.ignore_speakers = ignore_speakers
+        if finetune:
+            self.speaker_to_use = config.finetune_speakers
+        else:
+            self.speaker_to_use = [
+                speaker.name
+                for speaker in self._mels_dir.iterdir()
+                if speaker not in config.finetune_speakers
+            ]
         self._dataset: List[VCTKInfo] = self._build_dataset()
         self.mels_mean, self.mels_std = self._get_mean_and_std()
 
@@ -219,7 +229,10 @@ class VCTKFactory:
         }
         samples = list(mels_set & texts_set)
         for sample in tqdm(samples):
-            if sample.parent.name in REMOVE_SPEAKERS:
+            if (
+                sample.parent.name in REMOVE_SPEAKERS
+                or sample.parent.name not in self.speaker_to_use
+            ):
                 continue
 
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)

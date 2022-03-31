@@ -1,4 +1,3 @@
-from distutils.command.config import config
 import json
 import os
 from itertools import chain
@@ -207,6 +206,7 @@ class Trainer:
             phonemes_to_id=self.phonemes_to_id,
             speakers_to_id=self.speakers_to_id,
             ignore_speakers=self.config.data.ignore_speakers,
+            finetune=self.config.finetune,
         )
         self.phonemes_to_id = factory.phoneme_to_id
         self.speakers_to_id = factory.speaker_to_id
