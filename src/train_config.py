@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from email.policy import default
+from typing import Optional
 
 import yaml
 from marshmallow_dataclass import class_schema
@@ -46,7 +46,7 @@ class TrainParams:
     checkpoint_name: str
     train_hifi: TrainParamsHiFi
     pretrained_hifi: str
-    base_model: str
+    base_model: Optional[str] = field(default=None)
     finetune: bool = field(default=False)
     iters_per_checkpoint: int = field(default=10000)
     early_stopping_rounds: int = field(default=5)
