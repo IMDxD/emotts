@@ -40,8 +40,12 @@ class Trainer:
 
     def __init__(self, config_path: Path):
         self.config: TrainParams = load_config(config_path)
+        base_model_path = Path(self.config.base_model)
         self.checkpoint_path = (
             CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
+        )
+        mapping_folder = (
+            self.checkpoint_path if self.config.finetune else base_model_path.parent
         )
         self.log_dir = LOG_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         self.references = list(REFERENCE_PATH.rglob("*.pkl"))
@@ -52,7 +56,7 @@ class Trainer:
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
         self.iteration_step = 1
-        self.upload_mapping()
+        self.upload_mapping(mapping_folder)
         self.train_loader, self.valid_loader = self.prepare_loaders()
 
         self.feature_model = NonAttentiveTacotron(
@@ -64,9 +68,7 @@ class Trainer:
         ).to(self.device)
 
         if self.config.finetune:
-            base_model_state = torch.load(
-                self.config.base_model, map_location=self.device
-            )
+            base_model_state = torch.load(base_model_path, map_location=self.device)
             self.feature_model.load_state_dict(base_model_state)
 
         self.style_fc = nn.Sequential(
@@ -147,11 +149,11 @@ class Trainer:
                     return False
         return True
 
-    def upload_mapping(self) -> None:
+    def upload_mapping(self, mapping_folder: Path) -> None:
         if self.mapping_is_exist():
-            with open(self.checkpoint_path / SPEAKERS_FILENAME) as f:
+            with open(mapping_folder / SPEAKERS_FILENAME) as f:
                 self.speakers_to_id.update(json.load(f))
-            with open(self.checkpoint_path / PHONEMES_FILENAME) as f:
+            with open(mapping_folder / PHONEMES_FILENAME) as f:
                 self.phonemes_to_id.update(json.load(f))
 
     def upload_checkpoints(self) -> None:
