@@ -127,10 +127,13 @@ def main() -> None:
         model.to(device)
         model.eval()
         for speaker in get_speakers:
-            for reference in reference_pathes.iterdir():
-                emo = reference.name
+            for reference in reference_pathes.rglob("*.pkl"):
+                emo = reference.stem
                 ref_mel = torch.load(reference)
-                speaker_id = speakers_to_id[speaker]
+                if config.finetune:
+                    speaker_id = speakers_to_id[speaker]
+                else:
+                    speaker_id = speakers_to_id[reference.parent.name]
                 save_folder = save_path / speaker / emo
                 save_folder.mkdir(exist_ok=True, parents=True)
                 for i, phonemes in enumerate(phonemes_list):
