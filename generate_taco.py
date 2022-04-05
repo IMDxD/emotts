@@ -151,7 +151,7 @@ def main() -> None:
                         mels = model.inference(batch)
                         mels = mels.permute(0, 2, 1).squeeze(0)
                         mels = mels * mels_std.to(device) + mels_mean.to(device)
-                        x = mels.unsqueeze(0)
+                        x = mels.unsqueeze(0).float()
                         y_g_hat = vocoder(x)
                         audio = y_g_hat.squeeze()
                         audio = audio * 32768
