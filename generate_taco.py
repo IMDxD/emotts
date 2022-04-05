@@ -136,11 +136,11 @@ def main() -> None:
 
                 if reference is None:
                     ref_mel = torch.zeros(1, 80, 220)
-                    save_folder = save_path / speaker
+                    save_folder = save_path / mp.stem / speaker
                 else:
                     emo = reference.stem
                     ref_mel = torch.load(reference)
-                    save_folder = save_path / speaker / emo
+                    save_folder = save_path / mp.stem / speaker / emo
 
                 save_folder.mkdir(exist_ok=True, parents=True)
                 for i, phonemes in enumerate(phonemes_list):
