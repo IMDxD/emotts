@@ -135,7 +135,7 @@ def main() -> None:
             for reference in references:
 
                 if reference is None:
-                    ref_mel = torch.zeros_like(mels_mean)
+                    ref_mel = torch.zeros(1, 80, 220)
                     save_folder = save_path / speaker
                 else:
                     emo = reference.stem
