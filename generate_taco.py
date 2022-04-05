@@ -127,14 +127,21 @@ def main() -> None:
         model.to(device)
         model.eval()
         for speaker in get_speakers:
-            for reference in reference_pathes.rglob("*.pkl"):
-                emo = reference.stem
-                ref_mel = torch.load(reference)
-                if config.finetune:
-                    speaker_id = speakers_to_id[speaker]
+            speaker_id = speakers_to_id[speaker]
+            if config.finetune:
+                references = (reference_pathes / speaker).iterdir()
+            else:
+                references = [None]
+            for reference in references:
+
+                if reference is None:
+                    ref_mel = torch.zeros_like(mels_mean)
+                    save_folder = save_path / speaker
                 else:
-                    speaker_id = speakers_to_id[reference.parent.name]
-                save_folder = save_path / speaker / emo
+                    emo = reference.stem
+                    ref_mel = torch.load(reference)
+                    save_folder = save_path / speaker / emo
+
                 save_folder.mkdir(exist_ok=True, parents=True)
                 for i, phonemes in enumerate(phonemes_list):
                     batch = get_tacotron_batch(
