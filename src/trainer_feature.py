@@ -1,3 +1,4 @@
+from distutils.command.config import config
 import json
 import os
 from pathlib import Path
@@ -44,7 +45,7 @@ class Trainer:
             CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         )
         mapping_folder = (
-            self.checkpoint_path if self.config.finetune else base_model_path.parent
+            base_model_path if self.config.finetune else self.config.checkpoint_path
         )
         self.log_dir = LOG_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         self.references = list(REFERENCE_PATH.rglob("*.pkl"))
@@ -70,8 +71,10 @@ class Trainer:
         ).to(self.device)
 
         if self.config.finetune:
-            base_model_state = torch.load(base_model_path, map_location=self.device)
-            self.feature_model.load_state_dict(base_model_state)
+            self.feature_model = torch.load(
+                base_model_path / FEATURE_MODEL_FILENAME, map_location=self.device
+            )
+            self.feature_model.finetune = self.config.finetune
             self.feature_model.encoder.requires_grad_ = False
             self.feature_model.phonem_embedding.requires_grad_ = False
             self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
@@ -131,10 +134,10 @@ class Trainer:
         self.checkpoint_path.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-    def mapping_is_exist(self) -> bool:
-        if not os.path.isfile(self.checkpoint_path / SPEAKERS_FILENAME):
+    def mapping_is_exist(self, mapping_folder: Path) -> bool:
+        if not os.path.isfile(mapping_folder / SPEAKERS_FILENAME):
             return False
-        if not os.path.isfile(self.checkpoint_path / PHONEMES_FILENAME):
+        if not os.path.isfile(mapping_folder / PHONEMES_FILENAME):
             return False
         return True
 
@@ -163,7 +166,7 @@ class Trainer:
         return True
 
     def upload_mapping(self, mapping_folder: Path) -> None:
-        if self.mapping_is_exist():
+        if self.mapping_is_exist(mapping_folder):
             with open(mapping_folder / SPEAKERS_FILENAME) as f:
                 self.speakers_to_id.update(json.load(f))
             with open(mapping_folder / PHONEMES_FILENAME) as f:
@@ -205,7 +208,8 @@ class Trainer:
             self.checkpoint_path / self.OPTIMIZER_FILENAME,
         )
         torch.save(
-            self.mels_mean, self.checkpoint_path / MELS_MEAN_FILENAME,
+            self.mels_mean,
+            self.checkpoint_path / MELS_MEAN_FILENAME,
         )
         torch.save(self.mels_std, self.checkpoint_path / MELS_STD_FILENAME)
 
@@ -272,18 +276,19 @@ class Trainer:
     def calc_gst_loss(
         self, style_emb: torch.Tensor, batch: VCTKBatch
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        discrim_output = self.style_fc(style_emb)
-
-        log_adv_model = torch.log(1 - discrim_output)
-        log_adv_dicriminator = torch.log(discrim_output)
+        log_adv_model = torch.log(1 - self.style_fc(style_emb))
         loss_adv_model = (
             self.config.loss.adversarial_weight
             * self.adversatial_criterion(log_adv_model, batch.speaker_ids)
         )
+
+        log_adv_dicriminator = torch.log(self.style_fc(style_emb.detach()))
+
         loss_adv_discriminator = (
             self.config.loss.adversarial_weight
             * self.adversatial_criterion(log_adv_dicriminator, batch.speaker_ids)
         )
+
         return loss_adv_model, loss_adv_discriminator
 
     def train(self) -> None:
@@ -310,9 +315,11 @@ class Trainer:
                     batch.durations,
                     batch.mels,
                 )
+
                 loss_adv_model, loss_adv_discriminator = self.calc_gst_loss(
                     style_emb, batch
                 )
+
                 loss = loss_prenet + loss_postnet + loss_durations
                 loss_full = loss + loss_adv_model
                 loss_full.backward()
@@ -338,7 +345,11 @@ class Trainer:
 
                 if self.iteration_step % self.config.log_steps == 0:
                     self.write_losses(
-                        "train", loss, loss_prenet, loss_postnet, loss_durations,
+                        "train",
+                        loss,
+                        loss_prenet,
+                        loss_postnet,
+                        loss_durations,
                     )
 
                 if self.iteration_step % self.config.iters_per_checkpoint == 0:

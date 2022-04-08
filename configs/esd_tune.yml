@@ -13,6 +13,7 @@ iters_per_checkpoint: 100000
 total_iterations: 500001
 finetune: false
 test_size: 0.05
+finetune: true
 device: cuda:7
 checkpoint_name: esd_tune
 base_model: /pretrained_models/non_attentive_tacotron
