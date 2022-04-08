@@ -72,6 +72,8 @@ class Trainer:
         if self.config.finetune:
             base_model_state = torch.load(base_model_path, map_location=self.device)
             self.feature_model.load_state_dict(base_model_state)
+            self.feature_model.encoder.requires_grad_ = False
+            self.feature_model.phonem_embedding.requires_grad_ = False
             self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
             self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
 
