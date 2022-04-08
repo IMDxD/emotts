@@ -1,11 +1,10 @@
 import json
 import os
-from itertools import chain
 from pathlib import Path
 from typing import Dict, Optional, OrderedDict, Tuple
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
@@ -83,15 +82,22 @@ class Trainer:
             num_mels=self.config.n_mels,
             device=self.device,
         )
-        self.optimizer = Adam(
-            chain(self.feature_model.parameters(), self.style_fc.parameters()),
+        self.model_optimizer = Adam(
+            self.feature_model.parameters(),
+            lr=self.config.optimizer.learning_rate,
+            weight_decay=self.config.optimizer.reg_weight,
+            betas=(self.config.optimizer.adam_beta1, self.config.optimizer.adam_beta2),
+            eps=self.config.optimizer.adam_epsilon,
+        )
+        self.discriminator_optimizer = Adam(
+            self.style_fc.parameters(),
             lr=self.config.optimizer.learning_rate,
             weight_decay=self.config.optimizer.reg_weight,
             betas=(self.config.optimizer.adam_beta1, self.config.optimizer.adam_beta2),
             eps=self.config.optimizer.adam_epsilon,
         )
         self.scheduler = StepLR(
-            optimizer=self.optimizer,
+            optimizer=self.model_optimizer,
             step_size=self.config.scheduler.decay_steps,
             gamma=self.config.scheduler.decay_rate,
         )
@@ -168,9 +174,9 @@ class Trainer:
             with open(self.checkpoint_path / self.ITERATION_FILENAME) as f:
                 iteration_dict: Dict[str, int] = json.load(f)
             self.feature_model = feature_model
-            self.optimizer.load_state_dict(optimizer_state_dict)
+            self.model_optimizer.load_state_dict(optimizer_state_dict)
             self.scheduler = StepLR(
-                optimizer=self.optimizer,
+                optimizer=self.model_optimizer,
                 step_size=self.config.scheduler.decay_steps,
                 gamma=self.config.scheduler.decay_rate,
             )
@@ -188,7 +194,8 @@ class Trainer:
             self.checkpoint_path / f"{self.iteration_step}_{FEATURE_MODEL_FILENAME}",
         )
         torch.save(
-            self.optimizer.state_dict(), self.checkpoint_path / self.OPTIMIZER_FILENAME
+            self.model_optimizer.state_dict(),
+            self.checkpoint_path / self.OPTIMIZER_FILENAME,
         )
         torch.save(
             self.train_loader.dataset.mels_mean,
@@ -259,21 +266,21 @@ class Trainer:
         return audio
 
     def calc_gst_loss(
-        self, style_emb: torch.Tensor, speaker_emb: torch.Tensor, batch: VCTKBatch
-    ) -> torch.Tensor:
-        style_speaker_false = self.style_fc(style_emb)
-        style_speaker_true = self.style_fc(speaker_emb)
-        log_adversarial_speaker_false = torch.log(1 - style_speaker_false)
-        log_adversarial_speaker_true = torch.log(style_speaker_true)
-        loss_adversarial_false = self.adversatial_criterion(
-            log_adversarial_speaker_false, batch.speaker_ids
+        self, style_emb: torch.Tensor, batch: VCTKBatch
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        discrim_output = self.style_fc(style_emb)
+
+        log_adv_model = torch.log(1 - discrim_output)
+        log_adv_dicriminator = torch.log(discrim_output)
+        loss_adv_model = (
+            self.config.loss.adversarial_weight
+            * self.adversatial_criterion(log_adv_model, batch.speaker_ids)
         )
-        loss_adversarial_true = self.adversatial_criterion(
-            log_adversarial_speaker_true, batch.speaker_ids
+        loss_adv_discriminator = (
+            self.config.loss.adversarial_weight
+            * self.adversatial_criterion(log_adv_dicriminator, batch.speaker_ids)
         )
-        return self.config.loss.adversarial_weight * (
-            loss_adversarial_false + loss_adversarial_true
-        )
+        return loss_adv_model, loss_adv_discriminator
 
     def train(self) -> None:
         torch.manual_seed(self.config.seed)
@@ -284,13 +291,12 @@ class Trainer:
         while self.iteration_step < self.config.total_iterations:
             for batch in self.train_loader:
                 batch = self.batch_to_device(batch)
-                self.optimizer.zero_grad()
+                self.model_optimizer.zero_grad()
                 (
                     durations,
                     mel_outputs_postnet,
                     mel_outputs,
                     style_emb,
-                    speaker_emb,
                 ) = self.feature_model(batch)
 
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
@@ -300,16 +306,25 @@ class Trainer:
                     batch.durations,
                     batch.mels,
                 )
-                loss_adversarial = self.calc_gst_loss(style_emb, speaker_emb, batch)
+                loss_adv_model, loss_adv_discriminator = self.calc_gst_loss(
+                    style_emb, batch
+                )
                 loss = loss_prenet + loss_postnet + loss_durations
-                loss_full = loss + loss_adversarial
+                loss_full = loss + loss_adv_model
                 loss_full.backward()
 
                 torch.nn.utils.clip_grad_norm_(
                     self.feature_model.parameters(), self.config.grad_clip_thresh
                 )
 
-                self.optimizer.step()
+                self.model_optimizer.step()
+
+                self.discriminator_optimizer.zero_grad()
+
+                loss_adv_discriminator.backward()
+
+                self.discriminator_optimizer.step()
+
                 if (
                     self.config.scheduler.start_decay
                     <= self.iteration_step
@@ -343,7 +358,7 @@ class Trainer:
             val_loss_durations = 0.0
             for batch in self.valid_loader:
                 batch = self.batch_to_device(batch)
-                durations, mel_outputs_postnet, mel_outputs, _, _ = self.feature_model(
+                durations, mel_outputs_postnet, mel_outputs, _ = self.feature_model(
                     batch
                 )
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
