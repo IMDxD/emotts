@@ -1,23 +1,27 @@
 import json
 import os
-from dataclasses import asdict
 from itertools import chain
 from pathlib import Path
-from typing import Dict, OrderedDict, Tuple
+from typing import Dict, Optional, OrderedDict, Tuple
 
 import torch
-from pandas import json_normalize
 from torch import nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from scipy.io.wavfile import write as wav_write
 
 from src.constants import (
-    CHECKPOINT_DIR, FEATURE_CHECKPOINT_NAME, FEATURE_MODEL_FILENAME, LOG_DIR,
-    MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, REFERENCE_PATH,
-    SPEAKERS_FILENAME, GENERATED_PHONEMES
+    CHECKPOINT_DIR,
+    FEATURE_CHECKPOINT_NAME,
+    FEATURE_MODEL_FILENAME,
+    GENERATED_PHONEMES,
+    LOG_DIR,
+    MELS_MEAN_FILENAME,
+    MELS_STD_FILENAME,
+    PHONEMES_FILENAME,
+    REFERENCE_PATH,
+    SPEAKERS_FILENAME,
 )
 from src.data_process import VCTKBatch, VCTKCollate, VCTKDataset, VCTKFactory
 from src.models.feature_models import NonAttentiveTacotron
@@ -36,8 +40,12 @@ class Trainer:
 
     def __init__(self, config_path: Path):
         self.config: TrainParams = load_config(config_path)
+        base_model_path = Path(self.config.base_model)
         self.checkpoint_path = (
             CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
+        )
+        mapping_folder = (
+            self.checkpoint_path if self.config.finetune else base_model_path.parent
         )
         self.log_dir = LOG_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         self.references = list(REFERENCE_PATH.rglob("*.pkl"))
@@ -48,7 +56,7 @@ class Trainer:
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
         self.iteration_step = 1
-        self.upload_mapping()
+        self.upload_mapping(mapping_folder)
         self.train_loader, self.valid_loader = self.prepare_loaders()
 
         self.feature_model = NonAttentiveTacotron(
@@ -56,7 +64,12 @@ class Trainer:
             n_phonems=len(self.phonemes_to_id),
             n_speakers=len(self.speakers_to_id),
             config=self.config.model,
+            finetune=self.config.finetune,
         ).to(self.device)
+
+        if self.config.finetune:
+            base_model_state = torch.load(base_model_path, map_location=self.device)
+            self.feature_model.load_state_dict(base_model_state)
 
         self.style_fc = nn.Sequential(
             nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id)),
@@ -112,12 +125,19 @@ class Trainer:
             return False
         return True
 
+    def get_last_model(self) -> Optional[Path]:
+        models = list(self.checkpoint_path.rglob(f"*_{FEATURE_MODEL_FILENAME}"))
+        if len(models) == 0:
+            return None
+        return max(models, key=lambda x: int(x.name.split("_")[0]))
+
     def checkpoint_is_exist(self) -> bool:  # noqa: CFQ004
-        if not os.path.isfile(self.checkpoint_path / FEATURE_MODEL_FILENAME):
+        model_path = self.get_last_model()
+        if model_path is None:
             return False
-        if not os.path.isfile(self.checkpoint_path / self.OPTIMIZER_FILENAME):
+        if not (self.checkpoint_path / self.OPTIMIZER_FILENAME).is_file():
             return False
-        if not os.path.isfile(self.checkpoint_path / self.ITERATION_FILENAME):
+        if not (self.checkpoint_path / self.ITERATION_FILENAME).is_file():
             return False
         else:
             with open(self.checkpoint_path / self.ITERATION_FILENAME) as f:
@@ -129,17 +149,18 @@ class Trainer:
                     return False
         return True
 
-    def upload_mapping(self) -> None:
+    def upload_mapping(self, mapping_folder: Path) -> None:
         if self.mapping_is_exist():
-            with open(self.checkpoint_path / SPEAKERS_FILENAME) as f:
+            with open(mapping_folder / SPEAKERS_FILENAME) as f:
                 self.speakers_to_id.update(json.load(f))
-            with open(self.checkpoint_path / PHONEMES_FILENAME) as f:
+            with open(mapping_folder / PHONEMES_FILENAME) as f:
                 self.phonemes_to_id.update(json.load(f))
 
     def upload_checkpoints(self) -> None:
         if self.checkpoint_is_exist():
+            model_path = self.get_last_model()
             feature_model: NonAttentiveTacotron = torch.load(
-                self.checkpoint_path / FEATURE_MODEL_FILENAME, map_location=self.device
+                model_path, map_location=self.device
             )
             optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
                 self.checkpoint_path / self.OPTIMIZER_FILENAME, map_location=self.device
@@ -162,7 +183,10 @@ class Trainer:
             json.dump(self.phonemes_to_id, f)
         with open(self.checkpoint_path / self.ITERATION_FILENAME, "w") as f:
             json.dump({self.ITERATION_NAME: self.iteration_step}, f)
-        torch.save(self.feature_model, self.checkpoint_path / FEATURE_MODEL_FILENAME)
+        torch.save(
+            self.feature_model,
+            self.checkpoint_path / f"{self.iteration_step}_{FEATURE_MODEL_FILENAME}",
+        )
         torch.save(
             self.optimizer.state_dict(), self.checkpoint_path / self.OPTIMIZER_FILENAME
         )
@@ -183,7 +207,8 @@ class Trainer:
             config=self.config.data,
             phonemes_to_id=self.phonemes_to_id,
             speakers_to_id=self.speakers_to_id,
-            ignore_speakers=self.config.data.ignore_speakers
+            ignore_speakers=self.config.data.ignore_speakers,
+            finetune=self.config.finetune,
         )
         self.phonemes_to_id = factory.phoneme_to_id
         self.speakers_to_id = factory.speaker_to_id
@@ -213,7 +238,9 @@ class Trainer:
         postnet_loss: float,
         durations_loss: float,
     ) -> None:
-        self.writer.add_scalar(f"Loss/{tag}/total", total_loss, global_step=self.iteration_step)
+        self.writer.add_scalar(
+            f"Loss/{tag}/total", total_loss, global_step=self.iteration_step
+        )
         self.writer.add_scalar(
             f"Loss/{tag}/prenet", prenet_loss, global_step=self.iteration_step
         )
@@ -292,11 +319,7 @@ class Trainer:
 
                 if self.iteration_step % self.config.log_steps == 0:
                     self.write_losses(
-                        "train",
-                        loss,
-                        loss_prenet,
-                        loss_postnet,
-                        loss_durations,
+                        "train", loss, loss_prenet, loss_postnet, loss_durations,
                     )
 
                 if self.iteration_step % self.config.iters_per_checkpoint == 0:
@@ -311,7 +334,6 @@ class Trainer:
                     break
 
         self.writer.close()
-
 
     def validate(self) -> float:
         with torch.no_grad():
@@ -349,7 +371,6 @@ class Trainer:
                 val_loss_durations,
             )
 
-
     def generate_samples(self) -> None:
         valid_dataset: VCTKDataset = self.valid_loader.dataset  # type: ignore
         mels_mean = valid_dataset.mels_mean.float()
@@ -377,7 +398,9 @@ class Trainer:
                     )
                     output = self.feature_model.inference(batch)
                     output = output.permute(0, 2, 1).squeeze(0)
-                    output = output * mels_std.to(self.device) + mels_mean.to(self.device)
+                    output = output * mels_std.to(self.device) + mels_mean.to(
+                        self.device
+                    )
                     audio = self.vocoder_inference(output.float())
 
                     name = f"{speaker}_{reference_path.stem}_{i}"
