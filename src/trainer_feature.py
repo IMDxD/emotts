@@ -58,6 +58,9 @@ class Trainer:
         self.upload_mapping(mapping_folder)
         self.train_loader, self.valid_loader = self.prepare_loaders()
 
+        self.mels_mean = self.train_loader.dataset.mels_mean
+        self.mels_std = self.train_loader.dataset.mels_std
+
         self.feature_model = NonAttentiveTacotron(
             n_mel_channels=self.config.n_mels,
             n_phonems=len(self.phonemes_to_id),
@@ -69,6 +72,8 @@ class Trainer:
         if self.config.finetune:
             base_model_state = torch.load(base_model_path, map_location=self.device)
             self.feature_model.load_state_dict(base_model_state)
+            self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
+            self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
 
         self.style_fc = nn.Sequential(
             nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id)),
@@ -198,12 +203,9 @@ class Trainer:
             self.checkpoint_path / self.OPTIMIZER_FILENAME,
         )
         torch.save(
-            self.train_loader.dataset.mels_mean,
-            self.checkpoint_path / MELS_MEAN_FILENAME,
+            self.mels_mean, self.checkpoint_path / MELS_MEAN_FILENAME,
         )
-        torch.save(
-            self.train_loader.dataset.mels_std, self.checkpoint_path / MELS_STD_FILENAME
-        )
+        torch.save(self.mels_std, self.checkpoint_path / MELS_STD_FILENAME)
 
     def prepare_loaders(self) -> Tuple[DataLoader[VCTKBatch], DataLoader[VCTKBatch]]:
 
@@ -388,8 +390,7 @@ class Trainer:
 
     def generate_samples(self) -> None:
         valid_dataset: VCTKDataset = self.valid_loader.dataset  # type: ignore
-        mels_mean = valid_dataset.mels_mean.float()
-        mels_std = valid_dataset.mels_std.float()
+
         phonemes = [
             [self.phonemes_to_id.get(p, 0) for p in sequence]
             for sequence in GENERATED_PHONEMES
@@ -404,7 +405,9 @@ class Trainer:
                     num_phonemes_tensor = torch.IntTensor([len(sequence)])
                     speaker = reference_path.parent.name
                     speaker_id = self.speakers_to_id[speaker]
-                    reference = (torch.load(reference_path) - mels_mean) / mels_std
+                    reference = (
+                        torch.load(reference_path) - self.mels_mean
+                    ) / self.mels_std
                     batch = (
                         phonemes_tensor,
                         num_phonemes_tensor,
@@ -413,7 +416,7 @@ class Trainer:
                     )
                     output = self.feature_model.inference(batch)
                     output = output.permute(0, 2, 1).squeeze(0)
-                    output = output * mels_std.to(self.device) + mels_mean.to(
+                    output = output * self.mels_std.to(self.device) + self.mels_mean.to(
                         self.device
                     )
                     audio = self.vocoder_inference(output.float())

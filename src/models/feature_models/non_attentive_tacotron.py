@@ -488,7 +488,6 @@ class NonAttentiveTacotron(nn.Module):
             mel_outputs_postnet,
             mel_outputs,
             gst_emb.squeeze(1),
-            speaker_emb.squeeze(1),
         )
 
     def inference(
