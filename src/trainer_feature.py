@@ -425,7 +425,7 @@ class Trainer:
                         phonemes_tensor,
                         num_phonemes_tensor,
                         torch.LongTensor([speaker_id]).to(self.device),
-                        reference.to(self.device).permute(0, 2, 1),
+                        reference.to(self.device).permute(0, 2, 1).float(),
                     )
                     output = self.feature_model.inference(batch)
                     output = output.permute(0, 2, 1).squeeze(0)
