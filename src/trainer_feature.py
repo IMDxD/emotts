@@ -297,13 +297,11 @@ class Trainer:
     def calc_adv_loss(
         self, style_emb: torch.Tensor, batch: VCTKBatch
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        log_model = torch.log(self.style_fc(style_emb))
+        log_model = torch.log(1 - self.style_fc(style_emb))
         loss_model: torch.Tensor = (
             self.config.loss.adversarial_weight
             * self.adversatial_criterion(log_model, batch.speaker_ids)
         )
-
-        loss_model.register_hook(grad_reverse)
 
         log_dicriminator = torch.log(self.style_fc(style_emb.detach()))
 
@@ -317,20 +315,21 @@ class Trainer:
     def calc_reversal_loss(
         self, style_emb: torch.Tensor, batch: VCTKBatch
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        log_adv_model = torch.log(self.style_fc(style_emb))
-        loss_adv_model = (
+        log_model = torch.log(self.style_fc(style_emb))
+        loss_model = (
             self.config.loss.adversarial_weight
-            * self.adversatial_criterion(log_adv_model, batch.speaker_ids)
+            * self.adversatial_criterion(log_model, batch.speaker_ids)
+        )
+        loss_model.register_hook(grad_reverse)
+
+        log_dicriminator = torch.log(self.style_fc(style_emb.detach()))
+
+        loss_discriminator = (
+            self.config.loss.adversarial_weight
+            * self.adversatial_criterion(log_dicriminator, batch.speaker_ids)
         )
 
-        log_adv_dicriminator = torch.log(1 - self.style_fc(style_emb.detach()))
-
-        loss_adv_discriminator = (
-            self.config.loss.adversarial_weight
-            * self.adversatial_criterion(log_adv_dicriminator, batch.speaker_ids)
-        )
-
-        return loss_adv_model, loss_adv_discriminator
+        return loss_model, loss_discriminator
 
     def adversarial_loss(
             self, style_emb: torch.Tensor, batch: VCTKBatch
@@ -391,6 +390,7 @@ class Trainer:
                     <= self.iteration_step
                     <= self.config.scheduler.last_epoch
                 ):
+                    self.discriminator_scheduler.step()
                     self.model_scheduler.step()
 
                 if self.iteration_step % self.config.log_steps == 0:
