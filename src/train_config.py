@@ -29,6 +29,7 @@ class OptimizerParams:
 
 @dataclass
 class LossParams:
+    is_reversal: bool = field(default=False)
     mels_weight: float = field(default=1.0)
     duration_weight: float = field(default=2.0)
     adversarial_weight: float = field(default=5e-3)
