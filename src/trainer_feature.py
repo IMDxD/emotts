@@ -1,11 +1,11 @@
+from distutils.command.config import config
 import json
 import os
-from itertools import chain
 from pathlib import Path
 from typing import Dict, Optional, OrderedDict, Tuple
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
@@ -45,7 +45,7 @@ class Trainer:
             CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         )
         mapping_folder = (
-            self.checkpoint_path if self.config.finetune else base_model_path.parent
+            base_model_path if self.config.finetune else self.config.checkpoint_path
         )
         self.log_dir = LOG_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         self.references = list(REFERENCE_PATH.rglob("*.pkl"))
@@ -59,6 +59,9 @@ class Trainer:
         self.upload_mapping(mapping_folder)
         self.train_loader, self.valid_loader = self.prepare_loaders()
 
+        self.mels_mean = self.train_loader.dataset.mels_mean
+        self.mels_std = self.train_loader.dataset.mels_std
+
         self.feature_model = NonAttentiveTacotron(
             n_mel_channels=self.config.n_mels,
             n_phonems=len(self.phonemes_to_id),
@@ -68,8 +71,14 @@ class Trainer:
         ).to(self.device)
 
         if self.config.finetune:
-            base_model_state = torch.load(base_model_path, map_location=self.device)
-            self.feature_model.load_state_dict(base_model_state)
+            self.feature_model = torch.load(
+                base_model_path / FEATURE_MODEL_FILENAME, map_location=self.device
+            )
+            self.feature_model.finetune = self.config.finetune
+            self.feature_model.encoder.requires_grad_ = False
+            self.feature_model.phonem_embedding.requires_grad_ = False
+            self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
+            self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
 
         self.style_fc = nn.Sequential(
             nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id)),
@@ -83,15 +92,22 @@ class Trainer:
             num_mels=self.config.n_mels,
             device=self.device,
         )
-        self.optimizer = Adam(
-            chain(self.feature_model.parameters(), self.style_fc.parameters()),
+        self.model_optimizer = Adam(
+            self.feature_model.parameters(),
+            lr=self.config.optimizer.learning_rate,
+            weight_decay=self.config.optimizer.reg_weight,
+            betas=(self.config.optimizer.adam_beta1, self.config.optimizer.adam_beta2),
+            eps=self.config.optimizer.adam_epsilon,
+        )
+        self.discriminator_optimizer = Adam(
+            self.style_fc.parameters(),
             lr=self.config.optimizer.learning_rate,
             weight_decay=self.config.optimizer.reg_weight,
             betas=(self.config.optimizer.adam_beta1, self.config.optimizer.adam_beta2),
             eps=self.config.optimizer.adam_epsilon,
         )
         self.scheduler = StepLR(
-            optimizer=self.optimizer,
+            optimizer=self.model_optimizer,
             step_size=self.config.scheduler.decay_steps,
             gamma=self.config.scheduler.decay_rate,
         )
@@ -118,10 +134,10 @@ class Trainer:
         self.checkpoint_path.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-    def mapping_is_exist(self) -> bool:
-        if not os.path.isfile(self.checkpoint_path / SPEAKERS_FILENAME):
+    def mapping_is_exist(self, mapping_folder: Path) -> bool:
+        if not os.path.isfile(mapping_folder / SPEAKERS_FILENAME):
             return False
-        if not os.path.isfile(self.checkpoint_path / PHONEMES_FILENAME):
+        if not os.path.isfile(mapping_folder / PHONEMES_FILENAME):
             return False
         return True
 
@@ -150,7 +166,7 @@ class Trainer:
         return True
 
     def upload_mapping(self, mapping_folder: Path) -> None:
-        if self.mapping_is_exist():
+        if self.mapping_is_exist(mapping_folder):
             with open(mapping_folder / SPEAKERS_FILENAME) as f:
                 self.speakers_to_id.update(json.load(f))
             with open(mapping_folder / PHONEMES_FILENAME) as f:
@@ -168,9 +184,9 @@ class Trainer:
             with open(self.checkpoint_path / self.ITERATION_FILENAME) as f:
                 iteration_dict: Dict[str, int] = json.load(f)
             self.feature_model = feature_model
-            self.optimizer.load_state_dict(optimizer_state_dict)
+            self.model_optimizer.load_state_dict(optimizer_state_dict)
             self.scheduler = StepLR(
-                optimizer=self.optimizer,
+                optimizer=self.model_optimizer,
                 step_size=self.config.scheduler.decay_steps,
                 gamma=self.config.scheduler.decay_rate,
             )
@@ -188,15 +204,14 @@ class Trainer:
             self.checkpoint_path / f"{self.iteration_step}_{FEATURE_MODEL_FILENAME}",
         )
         torch.save(
-            self.optimizer.state_dict(), self.checkpoint_path / self.OPTIMIZER_FILENAME
+            self.model_optimizer.state_dict(),
+            self.checkpoint_path / self.OPTIMIZER_FILENAME,
         )
         torch.save(
-            self.train_loader.dataset.mels_mean,
+            self.mels_mean,
             self.checkpoint_path / MELS_MEAN_FILENAME,
         )
-        torch.save(
-            self.train_loader.dataset.mels_std, self.checkpoint_path / MELS_STD_FILENAME
-        )
+        torch.save(self.mels_std, self.checkpoint_path / MELS_STD_FILENAME)
 
     def prepare_loaders(self) -> Tuple[DataLoader[VCTKBatch], DataLoader[VCTKBatch]]:
 
@@ -259,21 +274,22 @@ class Trainer:
         return audio
 
     def calc_gst_loss(
-        self, style_emb: torch.Tensor, speaker_emb: torch.Tensor, batch: VCTKBatch
-    ) -> torch.Tensor:
-        style_speaker_false = self.style_fc(style_emb)
-        style_speaker_true = self.style_fc(speaker_emb)
-        log_adversarial_speaker_false = torch.log(1 - style_speaker_false)
-        log_adversarial_speaker_true = torch.log(style_speaker_true)
-        loss_adversarial_false = self.adversatial_criterion(
-            log_adversarial_speaker_false, batch.speaker_ids
+        self, style_emb: torch.Tensor, batch: VCTKBatch
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        log_adv_model = torch.log(1 - self.style_fc(style_emb))
+        loss_adv_model = (
+            self.config.loss.adversarial_weight
+            * self.adversatial_criterion(log_adv_model, batch.speaker_ids)
         )
-        loss_adversarial_true = self.adversatial_criterion(
-            log_adversarial_speaker_true, batch.speaker_ids
+
+        log_adv_dicriminator = torch.log(self.style_fc(style_emb.detach()))
+
+        loss_adv_discriminator = (
+            self.config.loss.adversarial_weight
+            * self.adversatial_criterion(log_adv_dicriminator, batch.speaker_ids)
         )
-        return self.config.loss.adversarial_weight * (
-            loss_adversarial_false + loss_adversarial_true
-        )
+
+        return loss_adv_model, loss_adv_discriminator
 
     def train(self) -> None:
         torch.manual_seed(self.config.seed)
@@ -284,13 +300,12 @@ class Trainer:
         while self.iteration_step < self.config.total_iterations:
             for batch in self.train_loader:
                 batch = self.batch_to_device(batch)
-                self.optimizer.zero_grad()
+                self.model_optimizer.zero_grad()
                 (
                     durations,
                     mel_outputs_postnet,
                     mel_outputs,
                     style_emb,
-                    speaker_emb,
                 ) = self.feature_model(batch)
 
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
@@ -300,16 +315,27 @@ class Trainer:
                     batch.durations,
                     batch.mels,
                 )
-                loss_adversarial = self.calc_gst_loss(style_emb, speaker_emb, batch)
+
+                loss_adv_model, loss_adv_discriminator = self.calc_gst_loss(
+                    style_emb, batch
+                )
+
                 loss = loss_prenet + loss_postnet + loss_durations
-                loss_full = loss + loss_adversarial
+                loss_full = loss + loss_adv_model
                 loss_full.backward()
 
                 torch.nn.utils.clip_grad_norm_(
                     self.feature_model.parameters(), self.config.grad_clip_thresh
                 )
 
-                self.optimizer.step()
+                self.model_optimizer.step()
+
+                self.discriminator_optimizer.zero_grad()
+
+                loss_adv_discriminator.backward()
+
+                self.discriminator_optimizer.step()
+
                 if (
                     self.config.scheduler.start_decay
                     <= self.iteration_step
@@ -319,7 +345,11 @@ class Trainer:
 
                 if self.iteration_step % self.config.log_steps == 0:
                     self.write_losses(
-                        "train", loss, loss_prenet, loss_postnet, loss_durations,
+                        "train",
+                        loss,
+                        loss_prenet,
+                        loss_postnet,
+                        loss_durations,
                     )
 
                 if self.iteration_step % self.config.iters_per_checkpoint == 0:
@@ -343,7 +373,7 @@ class Trainer:
             val_loss_durations = 0.0
             for batch in self.valid_loader:
                 batch = self.batch_to_device(batch)
-                durations, mel_outputs_postnet, mel_outputs, _, _ = self.feature_model(
+                durations, mel_outputs_postnet, mel_outputs, _ = self.feature_model(
                     batch
                 )
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
@@ -373,8 +403,7 @@ class Trainer:
 
     def generate_samples(self) -> None:
         valid_dataset: VCTKDataset = self.valid_loader.dataset  # type: ignore
-        mels_mean = valid_dataset.mels_mean.float()
-        mels_std = valid_dataset.mels_std.float()
+
         phonemes = [
             [self.phonemes_to_id.get(p, 0) for p in sequence]
             for sequence in GENERATED_PHONEMES
@@ -389,16 +418,18 @@ class Trainer:
                     num_phonemes_tensor = torch.IntTensor([len(sequence)])
                     speaker = reference_path.parent.name
                     speaker_id = self.speakers_to_id[speaker]
-                    reference = (torch.load(reference_path) - mels_mean) / mels_std
+                    reference = (
+                        torch.load(reference_path) - self.mels_mean
+                    ) / self.mels_std
                     batch = (
                         phonemes_tensor,
                         num_phonemes_tensor,
                         torch.LongTensor([speaker_id]).to(self.device),
-                        reference.to(self.device).permute(0, 2, 1),
+                        reference.to(self.device).permute(0, 2, 1).float(),
                     )
                     output = self.feature_model.inference(batch)
                     output = output.permute(0, 2, 1).squeeze(0)
-                    output = output * mels_std.to(self.device) + mels_mean.to(
+                    output = output * self.mels_std.to(self.device) + self.mels_mean.to(
                         self.device
                     )
                     audio = self.vocoder_inference(output.float())
