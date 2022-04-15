@@ -27,12 +27,13 @@ def main(input_dir: Path, output_dir: Path) -> None:
         new_dir.mkdir(exist_ok=True)
         new_file = new_dir / filepath.name
 
-        with open(filepath, "r") as fin, open(new_file, "w") as fout:
-            content = fin.read()
-            normalized_content = normalizer.norm_text(content)
-            normalized_content = lowercase(normalized_content)
-            normalized_content = collapse_whitespace(normalized_content)
-            fout.write(normalized_content)
+        with open(filepath, "r", encoding="utf8") as fin:
+            with open(new_file, "w", encoding="utf8") as fout:
+                content = fin.read()
+                normalized_content = normalizer.norm_text(content)
+                normalized_content = lowercase(normalized_content)
+                normalized_content = collapse_whitespace(normalized_content)
+                fout.write(normalized_content)
 
     print("Finished successfully.")
     print(f"Processed files are located at {output_dir}")
