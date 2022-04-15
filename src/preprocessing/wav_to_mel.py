@@ -66,7 +66,9 @@ def main(input_dir: Path, output_dir: Path, audio_ext: str) -> None:
     print("Transforming audio to mel...")
 
     for filepath in tqdm(filepath_list):
-        new_path = output_dir / filepath.stem
+        speaker = filepath.parent.stem
+        new_path = output_dir / speaker / filepath.stem
+        new_path.parent.mkdir(exist_ok=True, parents=True)
 
         wave_tensor, _ = torchaudio.load(filepath)
         assert wave_tensor.shape[0] == 1, "Audio has more than 1 channel"

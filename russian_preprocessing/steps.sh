@@ -10,12 +10,11 @@ export MFA_PREMADE=/media/diskB/ruslan_a/data/datasets/emo_rus_Olga_v2_processed
 echo -e "\n1) Prep raw files"
 python src/preprocessing/prep_files_russian.py --dataset-dir $RUSSIAN_DATASET_PATH/original --text-output-dir $OUTPUT_DIR/text/raw --audio-output-dir $OUTPUT_DIR/audio/raw --meta-output-dir $OUTPUT_DIR/meta
 
-# ~1.5-2.0 hours
-echo -e "\n2) Pausation cutting with VAD"
-python src/preprocessing/pausation_cutting.py --input-dir $OUTPUT_DIR/audio/raw --output-dir $OUTPUT_DIR/audio/no_pause --target-sr 96000 --audio-ext wav
+# ~1.5-2.0 hours (Deprecated)
+# echo -e "\n2) Pausation cutting with VAD"
+# python src/preprocessing/pausation_cutting.py --input-dir $OUTPUT_DIR/audio/raw --output-dir $OUTPUT_DIR/audio/no_pause --target-sr 96000 --audio-ext wav
 
 # 16071/16071 [02:50<00:00, 94.26it/s]
-# 25429/25429 [04:18<00:00, 98.26it/s] mix
 echo -e "\n3) Resampling and Converting audio to 1-channel"
 # python src/preprocessing/resampling.py --input-dir $OUTPUT_DIR/audio/no_pause --output-dir $OUTPUT_DIR/audio/resampled --resample-rate 22050 --audio-ext wav
 python src/preprocessing/resampling.py --input-dir $OUTPUT_DIR/audio/raw --output-dir $OUTPUT_DIR/audio/resampled --resample-rate 22050 --audio-ext wav
@@ -25,7 +24,6 @@ conda deactivate
 conda activate emotts
 
 # 16071/16071 [13:09<00:00, 20.37it/s]
-# 25429/25429 [13:11<00:00, 32.15it/s] mix
 echo -e "\n4) Audio to Mel"
 python src/preprocessing/wav_to_mel.py --input-dir $OUTPUT_DIR/audio/resampled --output-dir $OUTPUT_DIR/mels --audio-ext wav
 
