@@ -18,6 +18,7 @@ dependencies:
   - matplotlib
   - montreal-forced-aligner=2.0.0b4
   - numpy
+  - openpyxl
   - pip
   - python=3.8
   - pytorch=1.10.0
@@ -29,6 +30,7 @@ dependencies:
   - unidecode
   - unzip
   - uvicorn
+  - xlrd
   - pip:
       - tgt
   

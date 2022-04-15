@@ -3,15 +3,12 @@ conda env create -n emotts -f russian_preprocessing/environment.yaml
 conda activate emotts
 conda config --set ssl_verify no
 export RUSSIAN_DATASET_PATH=/media/diskB/ruslan_a/data/datasets/EMO/russian
-export OUTPUT_DIR=$RUSSIAN_DATASET_PATH/processed
-export OUTPUT_DIR=$RUSSIAN_DATASET_PATH/processed_mix
+export OUTPUT_DIR=$RUSSIAN_DATASET_PATH/processed_v2
 export MFA_PREMADE=/media/diskB/ruslan_a/data/datasets/emo_rus_Olga_v2_processed/mfa_espeak_grids
 
 # 16164it [03:36, 74.61it/s]
-# 25544it [02:45, 154.48it/s] mix
 echo -e "\n1) Prep raw files"
-# python src/preprocessing/prep_files_russian.py --dataset-dir $RUSSIAN_DATASET_PATH/original --text-output-dir $OUTPUT_DIR/text/raw --audio-output-dir $OUTPUT_DIR/audio/raw
-python src/preprocessing/prep_files_russian.py --dataset-dir $RUSSIAN_DATASET_PATH/original_and_neutral --text-output-dir $OUTPUT_DIR/text/raw --audio-output-dir $OUTPUT_DIR/audio/raw
+python src/preprocessing/prep_files_russian.py --dataset-dir $RUSSIAN_DATASET_PATH/original --text-output-dir $OUTPUT_DIR/text/raw --audio-output-dir $OUTPUT_DIR/audio/raw --meta-output-dir $OUTPUT_DIR/meta
 
 # ~1.5-2.0 hours
 echo -e "\n2) Pausation cutting with VAD"
