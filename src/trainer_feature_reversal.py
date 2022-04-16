@@ -26,24 +26,51 @@ from src.data_process import VCTKBatch, VCTKCollate, VCTKFactory
 from src.models.feature_models import NonAttentiveTacotron
 from src.models.feature_models.loss_function import NonAttentiveTacotronLoss
 from src.models.hifi_gan.models import Generator, load_model as load_hifi
-from src.train_config import TrainParams, load_config
+from src.train_config import TrainParams
 
 
-def grad_reverse(grad):
-    return -grad.clone()
+class GradReverse(nn.Module):
+
+    @staticmethod
+    def forward(x: torch.Tensor) -> torch.Tensor:
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(grad_output: torch.Tensor) -> torch.Tensor:
+        return -grad_output
+
+
+class ReversalModel(nn.Module):
+
+    def __init__(self, feature_model: NonAttentiveTacotron, discriminator: nn.Linear):
+        super().__init__()
+        self.feature_model = feature_model
+        self.reversal_layer = GradReverse()
+        self.discriminator = discriminator
+
+    def forward(self, batch: VCTKBatch):
+        (
+            durations,
+            mel_outputs_postnet,
+            mel_outputs,
+            style_emb,
+        ) = self.feature_model(batch)
+        reverse_style = self.reversal_layer(style_emb)
+        out = self.discriminator(reverse_style)
+        return durations, mel_outputs_postnet, mel_outputs, out
 
 
 class Trainer:
 
     MODEL_OPTIMIZER_FILENAME = "model_optimizer.pth"
-    DISC_OPTIMIZER_FILENAME = "disc_optimizer.pth"
+    DISC_MODEL_FILENAME = "discriminator.pth"
     ITERATION_FILENAME = "iter.json"
     ITERATION_NAME = "iteration"
     EPOCH_NAME = "epoch"
     SAMPLE_SIZE = 10
 
-    def __init__(self, config_path: Path):
-        self.config: TrainParams = load_config(config_path)
+    def __init__(self, config: TrainParams):
+        self.config = config
         base_model_path = Path(self.config.base_model)
         self.checkpoint_path = (
             CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
@@ -66,29 +93,28 @@ class Trainer:
         self.mels_mean = self.train_loader.dataset.mels_mean
         self.mels_std = self.train_loader.dataset.mels_std
 
-        self.feature_model = NonAttentiveTacotron(
+        feature_model = NonAttentiveTacotron(
             n_mel_channels=self.config.n_mels,
             n_phonems=len(self.phonemes_to_id),
             n_speakers=len(self.speakers_to_id),
             config=self.config.model,
             finetune=self.config.finetune,
-        ).to(self.device)
+        )
 
         if self.config.finetune:
-            self.feature_model = torch.load(
-                base_model_path / FEATURE_MODEL_FILENAME, map_location=self.device
+            feature_model = torch.load(
+                base_model_path / FEATURE_MODEL_FILENAME, map_location="cpu"
             )
-            self.feature_model.finetune = self.config.finetune
-            self.feature_model.encoder.requires_grad_ = False
-            self.feature_model.phonem_embedding.requires_grad_ = False
+            feature_model.finetune = self.config.finetune
+            feature_model.encoder.requires_grad_ = False
+            feature_model.phonem_embedding.requires_grad_ = False
             self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
             self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
 
-        self.style_fc = nn.Sequential(
-            nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id)),
-            nn.Softmax(),
-        )
-        self.style_fc = self.style_fc.to(self.device)
+        discriminator = nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id))
+
+        self.model = ReversalModel(feature_model, discriminator)
+        self.model.to(self.device)
 
         self.vocoder: Generator = load_hifi(
             model_path=self.config.pretrained_hifi,
@@ -97,14 +123,7 @@ class Trainer:
             device=self.device,
         )
         self.model_optimizer = Adam(
-            self.feature_model.parameters(),
-            lr=self.config.optimizer.learning_rate,
-            weight_decay=self.config.optimizer.reg_weight,
-            betas=(self.config.optimizer.adam_beta1, self.config.optimizer.adam_beta2),
-            eps=self.config.optimizer.adam_epsilon,
-        )
-        self.discriminator_optimizer = Adam(
-            self.style_fc.parameters(),
+            self.model.parameters(),
             lr=self.config.optimizer.learning_rate,
             weight_decay=self.config.optimizer.reg_weight,
             betas=(self.config.optimizer.adam_beta1, self.config.optimizer.adam_beta2),
@@ -115,18 +134,13 @@ class Trainer:
             step_size=self.config.scheduler.decay_steps,
             gamma=self.config.scheduler.decay_rate,
         )
-        self.discriminator_scheduler = StepLR(
-            optimizer=self.discriminator_optimizer,
-            step_size=self.config.scheduler.decay_steps,
-            gamma=self.config.scheduler.decay_rate,
-        )
 
         self.criterion = NonAttentiveTacotronLoss(
             sample_rate=self.config.sample_rate,
             hop_size=self.config.hop_size,
             config=self.config.loss,
         )
-        self.adversatial_criterion = nn.NLLLoss()
+        self.adversatial_criterion = nn.CrossEntropyLoss()
 
         self.upload_checkpoints()
 
@@ -164,17 +178,14 @@ class Trainer:
             return False
         if not (self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME).is_file():
             return False
-        if not (self.checkpoint_path / self.DISC_OPTIMIZER_FILENAME).is_file():
+        if not (self.checkpoint_path / self.DISC_MODEL_FILENAME).is_file():
             return False
         if not (self.checkpoint_path / self.ITERATION_FILENAME).is_file():
             return False
         else:
             with open(self.checkpoint_path / self.ITERATION_FILENAME) as f:
                 iter_dict = json.load(f)
-                if (
-                    self.EPOCH_NAME not in iter_dict
-                    or self.ITERATION_NAME not in iter_dict
-                ):
+                if self.ITERATION_NAME not in iter_dict:
                     return False
         return True
 
@@ -189,24 +200,19 @@ class Trainer:
         if self.checkpoint_is_exist():
             model_path = self.get_last_model()
             feature_model: NonAttentiveTacotron = torch.load(
-                model_path, map_location=self.device
+                model_path, map_location="cpu"
+            )
+            discriminator: nn.Linear = torch.load(
+                self.checkpoint_path / self.DISC_MODEL_FILENAME, map_location="cpu"
             )
             model_optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
                 self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME, map_location=self.device
             )
-            disc_optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
-                self.checkpoint_path / self.DISC_OPTIMIZER_FILENAME, map_location=self.device
-            )
             with open(self.checkpoint_path / self.ITERATION_FILENAME) as f:
                 iteration_dict: Dict[str, int] = json.load(f)
-            self.feature_model = feature_model
+            self.model = ReversalModel(feature_model, discriminator)
+            self.model.to(self.device)
             self.model_optimizer.load_state_dict(model_optimizer_state_dict)
-            self.discriminator_optimizer.load_state_dict(disc_optimizer_state_dict)
-            self.model_scheduler = StepLR(
-                optimizer=self.model_optimizer,
-                step_size=self.config.scheduler.decay_steps,
-                gamma=self.config.scheduler.decay_rate,
-            )
             self.iteration_step = iteration_dict[self.ITERATION_NAME]
 
     def save_checkpoint(self) -> None:
@@ -217,16 +223,16 @@ class Trainer:
         with open(self.checkpoint_path / self.ITERATION_FILENAME, "w") as f:
             json.dump({self.ITERATION_NAME: self.iteration_step}, f)
         torch.save(
-            self.feature_model,
+            self.model.feature_model,
             self.checkpoint_path / f"{self.iteration_step}_{FEATURE_MODEL_FILENAME}",
+        )
+        torch.save(
+            self.model.discriminator,
+            self.checkpoint_path / self.DISC_MODEL_FILENAME,
         )
         torch.save(
             self.model_optimizer.state_dict(),
             self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME,
-        )
-        torch.save(
-            self.discriminator_optimizer.state_dict(),
-            self.checkpoint_path / self.DISC_OPTIMIZER_FILENAME,
         )
         torch.save(
             self.mels_mean,
@@ -269,23 +275,12 @@ class Trainer:
     def write_losses(
         self,
         tag: str,
-        total_loss: float,
-        prenet_loss: float,
-        postnet_loss: float,
-        durations_loss: float,
+        losses_dict: Dict[str, float],
     ) -> None:
-        self.writer.add_scalar(
-            f"Loss/{tag}/total", total_loss, global_step=self.iteration_step
-        )
-        self.writer.add_scalar(
-            f"Loss/{tag}/prenet", prenet_loss, global_step=self.iteration_step
-        )
-        self.writer.add_scalar(
-            f"Loss/{tag}/postnet", postnet_loss, global_step=self.iteration_step
-        )
-        self.writer.add_scalar(
-            f"Loss/{tag}/durations", durations_loss, global_step=self.iteration_step
-        )
+        for name, value in losses_dict.items():
+            self.writer.add_scalar(
+                f"Loss/{tag}/{name}", value, global_step=self.iteration_step
+            )
 
     def vocoder_inference(self, tensor: torch.Tensor) -> torch.Tensor:
         with torch.no_grad():
@@ -294,56 +289,11 @@ class Trainer:
             audio = y_g_hat.squeeze()
         return audio
 
-    def calc_adv_loss(
-        self, style_emb: torch.Tensor, batch: VCTKBatch
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        log_model = torch.log(1 - self.style_fc(style_emb))
-        loss_model: torch.Tensor = (
-            self.config.loss.adversarial_weight
-            * self.adversatial_criterion(log_model, batch.speaker_ids)
-        )
-
-        log_dicriminator = torch.log(self.style_fc(style_emb.detach()))
-
-        loss_discriminator = (
-            self.config.loss.adversarial_weight
-            * self.adversatial_criterion(log_dicriminator, batch.speaker_ids)
-        )
-
-        return loss_model, loss_discriminator
-
-    def calc_reversal_loss(
-        self, style_emb: torch.Tensor, batch: VCTKBatch
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        log_model = torch.log(self.style_fc(style_emb))
-        loss_model = (
-            self.config.loss.adversarial_weight
-            * self.adversatial_criterion(log_model, batch.speaker_ids)
-        )
-        loss_model.register_hook(grad_reverse)
-
-        log_dicriminator = torch.log(self.style_fc(style_emb.detach()))
-
-        loss_discriminator = (
-            self.config.loss.adversarial_weight
-            * self.adversatial_criterion(log_dicriminator, batch.speaker_ids)
-        )
-
-        return loss_model, loss_discriminator
-
-    def adversarial_loss(
-            self, style_emb: torch.Tensor, batch: VCTKBatch
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.config.loss.is_reversal:
-            return self.calc_reversal_loss(style_emb, batch)
-        else:
-            return self.calc_adv_loss(style_emb, batch)
-
     def train(self) -> None:
         torch.manual_seed(self.config.seed)
         torch.cuda.manual_seed(self.config.seed)
 
-        self.feature_model.train()
+        self.model.train()
 
         while self.iteration_step < self.config.total_iterations:
             for batch in self.train_loader:
@@ -353,8 +303,8 @@ class Trainer:
                     durations,
                     mel_outputs_postnet,
                     mel_outputs,
-                    style_emb,
-                ) = self.feature_model(batch)
+                    speaker_out,
+                ) = self.model(batch)
 
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
@@ -366,48 +316,44 @@ class Trainer:
 
                 loss = loss_prenet + loss_postnet + loss_durations
 
-                loss_model, loss_discriminator = self.adversarial_loss(
-                    style_emb, batch
+                loss_reversal = self.adversatial_criterion(
+                    speaker_out, batch.speaker_ids
                 )
 
-                loss_full = loss + loss_model
+                loss_full = loss + loss_reversal
                 loss_full.backward()
 
                 torch.nn.utils.clip_grad_norm_(
-                    self.feature_model.parameters(), self.config.grad_clip_thresh
+                    self.model.parameters(), self.config.grad_clip_thresh
                 )
 
                 self.model_optimizer.step()
-
-                self.discriminator_optimizer.zero_grad()
-
-                loss_discriminator.backward()
-
-                self.discriminator_optimizer.step()
 
                 if (
                     self.config.scheduler.start_decay
                     <= self.iteration_step
                     <= self.config.scheduler.last_epoch
                 ):
-                    self.discriminator_scheduler.step()
                     self.model_scheduler.step()
 
                 if self.iteration_step % self.config.log_steps == 0:
                     self.write_losses(
                         "train",
-                        loss,
-                        loss_prenet,
-                        loss_postnet,
-                        loss_durations,
+                        {
+                            "total": loss,
+                            "prenet": loss_prenet,
+                            "postnet": loss_postnet,
+                            "duration": loss_durations,
+                            "reversal": loss_reversal
+                        }
                     )
 
                 if self.iteration_step % self.config.iters_per_checkpoint == 0:
-                    self.feature_model.eval()
+                    self.model.eval()
                     self.validate()
                     self.generate_samples()
                     self.save_checkpoint()
-                    self.feature_model.train()
+                    self.model.train()
 
                 self.iteration_step += 1
                 if self.iteration_step >= self.config.total_iterations:
@@ -423,7 +369,7 @@ class Trainer:
             val_loss_durations = 0.0
             for batch in self.valid_loader:
                 batch = self.batch_to_device(batch)
-                durations, mel_outputs_postnet, mel_outputs, _ = self.feature_model(
+                durations, mel_outputs_postnet, mel_outputs, _ = self.model.feature_model(
                     batch
                 )
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
@@ -445,10 +391,12 @@ class Trainer:
             val_loss_durations = val_loss_durations / len(self.valid_loader)
             self.write_losses(
                 "valid",
-                val_loss,
-                val_loss_prenet,
-                val_loss_postnet,
-                val_loss_durations,
+                {
+                    "total": val_loss,
+                    "prenet": val_loss_prenet,
+                    "postnet": val_loss_postnet,
+                    "duration": val_loss_durations,
+                }
             )
 
     def generate_samples(self) -> None:
@@ -476,7 +424,7 @@ class Trainer:
                         torch.LongTensor([speaker_id]).to(self.device),
                         reference.to(self.device).permute(0, 2, 1).float(),
                     )
-                    output = self.feature_model.inference(batch)
+                    output = self.model.feature_model.inference(batch)
                     output = output.permute(0, 2, 1).squeeze(0)
                     output = output * self.mels_std.to(self.device) + self.mels_mean.to(
                         self.device

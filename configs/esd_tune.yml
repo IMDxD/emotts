@@ -13,21 +13,21 @@ iters_per_checkpoint: 100000
 total_iterations: 500001
 test_size: 0.05
 finetune: true
-device: cuda:7
+device: cuda:0
 checkpoint_name: esd_tune
-base_model: /pretrained_models/non_attentive_tacotron
+base_model: models/en/tacotron
 data:
-  text_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_vctk/mfa_outputs
-  mels_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_vctk/mels
-  wav_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_vctk/resampled
-  feature_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_tune/feature_output
+  text_dir: data/esd/mfa_outputs
+  mels_dir: data/esd/mels
+  wav_dir: data/esd/resampled
+  feature_dir: data/esd/feature_output
   ignore_speakers:
     - "0011"
     - "0012"
     - "0013"
     - "0014"
     - "0020"
-pretrained_hifi: /media/diskB/ruslan_a/experiments/emotts/models/hifi
+pretrained_hifi: models/en/hifi
 train_hifi:
   split_data: true
   training_epochs: 1000
@@ -65,6 +65,7 @@ train_hifi:
     resblock_initial_channel: 256
   segment_size: 8192
 loss:
+  is_reversal: true
   mels_weight: 1.0
   duration_weight: 2.0
   adversarial_weight: 0.1
