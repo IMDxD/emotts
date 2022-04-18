@@ -28,6 +28,7 @@ def process_metadata(metadata_path: Path, text_output_dir: Path, emo_speaker: de
     df: pd.DataFrame = pd.read_csv(metadata_path, delimiter="|", header=None, names=["path", "original", "stressed"])
     for (_, path, original, stressed) in df.itertuples():
         old_dir, filename = path.split("/")
+        old_dir = old_dir.replace("_", "-")
         new_filename = f"{old_dir}-{emotion}_{filename}.{text_ext}"
         new_dir = text_output_dir / speaker
         new_dir.mkdir(parents=True, exist_ok=True)
