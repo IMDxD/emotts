@@ -30,7 +30,15 @@ CORPUS_STRING_WORD_SEPARATOR = " "
     help="Filepath to write lexicon.",
     required=False,
 )
-def main(input_path: Path, output_path: Path) -> None:
+@click.option(
+    "-l",
+    "--language",
+    type=str,
+    default="en-us",
+    help="Language in espeak format. See for more info: https://github.com/espeak-ng/espeak-ng/blob/master/docs/languages.md",
+    required=False,
+)
+def main(input_path: Path, output_path: Path, language: str) -> None:
 
     print("Reading corpus...", end=" ")
     with open(input_path, "r", encoding=ENCODING) as corpus_file:
@@ -38,11 +46,12 @@ def main(input_path: Path, output_path: Path) -> None:
             corpus_file.read().splitlines()
         )
     print("Done.")
+    print(corpus_string[:80], end="\n\n")
 
     print("Getting phonemizations...", end=" ")
     phones_string = phonemize(
         corpus_string,
-        language="ru",
+        language=language,
         backend="espeak",
         preserve_punctuation=True,
         with_stress=True,
@@ -50,22 +59,25 @@ def main(input_path: Path, output_path: Path) -> None:
         separator=SEPARATOR,
     )
     print("Done.")
+    print(phones_string[:80], end="\n\n")
 
     print("Creating lexicon...", end=" ")
     corpus = corpus_string.split(CORPUS_STRING_WORD_SEPARATOR)
     phones = phones_string.split(SEPARATOR.word)
     assert len(corpus) == len(phones), (
-        f"# of words should match # of phones after phomenization"
-        f"but you have {len(corpus)} words and {len(phones)} phones"
+        f"# of words should match # of phones after phomenization\n"
+        f"but you have {len(corpus)} words and {len(phones)} phones\n"
+        f"First 5 words: {corpus[:5]}\n"
+        f"First 5 phones: {phones[:5]}\n"
     )
     lexicon = [f"{word}\t{phon}" for word, phon in zip(corpus, phones)]
     lexicon_str = "\n".join(lexicon)
-    print("Done.")
+    print("Done.", end="\n\n")
 
     output_path.parent.mkdir(exist_ok=True, parents=True)
     with open(output_path, "w", encoding=ENCODING) as lexicon_file:
         lexicon_file.write(lexicon_str)
-    print(f"Lexicon file saved at:\n{output_path}")
+    print(f"Lexicon file saved at:\n{output_path}", end="\n\n")
 
 
 if __name__ == "__main__":
