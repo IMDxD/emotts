@@ -32,5 +32,6 @@ dependencies:
   - uvicorn
   - xlrd
   - pip:
+      - phonemizer
       - tgt
   
