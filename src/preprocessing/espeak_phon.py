@@ -1,4 +1,5 @@
 from phonemizer.phonemize import phonemize
+from phonemizer.separator import Separator
 import re, regex
 
 
@@ -23,6 +24,8 @@ def espeak_phon(
         language += f"-{accent}"
     if verbose:
         print(f"Original input:\n{text}\n")
+
+    separator = Separator(phone=" ", syllable="", word="\n")
 
     punkt = None
     if add_punkt:
