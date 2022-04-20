@@ -53,12 +53,17 @@ export RUS_ESPEAK_LEXICON=/media/diskB/ruslan_a/models/mfa/rus-espeak-mfa/rus-mf
 
 # 16069/16069 [00:00<00:00, 21508.15it/s]
 echo -e "\n6.1) Creating word list from dataset"
-python src/preprocessing/create_corpus.py --input-dir $EMO_OUTPUT_DIR/text/raw --output-path $EMO_OUTPUT_DIR/meta/words.txt
+python src/preprocessing/create_corpus.py --input-dir $EMO_OUTPUT_DIR/mfa_inputs --output-path $EMO_OUTPUT_DIR/meta/words.txt
+python src/preprocessing/create_corpus.py --input-dir $NEUTRAL_OUTPUT_DIR/mfa_inputs --output-path $NEUTRAL_OUTPUT_DIR/meta/words.txt
 
 # 25849/25983 [01:19<00:00, 326.82it/s]
-echo -e "\n6.2) Creating G2P lexicon from word list"
+echo -e "\n6.2.a) Creating G2P lexicon from word list with G2P"
 mfa g2p -t mfa_tmp -j 32 --clean --overwrite models/g2p/russian_g2p.zip $EMO_OUTPUT_DIR/meta/words.txt models/mfa/russian_lexicon.txt
 rm -rf mfa_tmp
+
+echo -e "\n6.2.b) Creating G2P lexicon from word list with espeak"
+python src/preprocessing/create_lexicon.py -i $EMO_OUTPUT_DIR/meta/words.txt -o $EMO_OUTPUT_DIR/meta/lexicon.txt -l ru
+python src/preprocessing/create_lexicon.py -i $NEUTRAL_OUTPUT_DIR/meta/words.txt -o $NEUTRAL_OUTPUT_DIR/meta/lexicon.txt -l ru
 
 # 42it [00:10,  4.01it/s]
 # 58it [00:12,  4.54it/s] mix
