@@ -67,6 +67,7 @@ def get_tacotron_batch(
     text_lengths_tensor = torch.LongTensor([len(phonemes_ids)])
     reference = (reference - mels_mean) / mels_std
     reference = reference.permute(0, 2, 1).to(device)
+    reference = reference.float()
     phonemes_ids_tensor = torch.LongTensor(phonemes_ids).unsqueeze(0).to(device)
     speaker_ids_tensor = torch.LongTensor([speaker_id]).to(device)
     return phonemes_ids_tensor, text_lengths_tensor, speaker_ids_tensor, reference
