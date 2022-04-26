@@ -433,8 +433,7 @@ class Trainer:
             [self.phonemes_to_id.get(p, 0) for p in sequence]
             for sequence in GENERATED_PHONEMES
         ]
-        audio_folder = self.checkpoint_path / f"{self.iteration_step}"
-        audio_folder.mkdir(exist_ok=True, parents=True)
+
         with torch.no_grad():
 
             for reference_path in self.references:
