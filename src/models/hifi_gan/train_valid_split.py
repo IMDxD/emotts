@@ -5,6 +5,13 @@ from typing import List
 from src.data_process.config import VCTKDatasetParams
 
 
+def get_mel_file_path(full_wav_name: str, mels_dir: str, suffix: str=".pth"):
+    return Path(
+            mels_dir,
+            Path(*list(Path(full_wav_name).parts[-2:])).with_suffix(suffix)
+            )
+
+
 def split_vctk_data(data_config: VCTKDatasetParams, test_size: float):
     wavs_dir_path = Path(data_config.wav_dir)
     mels_dir_path = Path(data_config.mels_dir)
