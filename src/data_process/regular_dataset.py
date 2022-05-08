@@ -10,7 +10,7 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from src.data_process.config import VCTKDatasetParams
+from src.data_process.config import DatasetParams
 from src.constants import REMOVE_SPEAKERS
 
 NUMBER = Union[int, float]
@@ -19,7 +19,7 @@ PAD_TOKEN = "<PAD>"
 
 
 @dataclass
-class VCTKSample:
+class RegularSample:
 
     phonemes: List[int]
     num_phonemes: int
@@ -29,7 +29,7 @@ class VCTKSample:
 
 
 @dataclass
-class VCTKInfo:
+class RegularInfo:
 
     text_path: Path
     mel_path: Path
@@ -38,7 +38,7 @@ class VCTKInfo:
 
 
 @dataclass
-class VCTKBatch:
+class RegularBatch:
 
     phonemes: torch.Tensor
     num_phonemes: torch.Tensor
@@ -47,7 +47,7 @@ class VCTKBatch:
     mels: torch.Tensor
 
 
-class VCTKDataset(Dataset[VCTKSample]):
+class RegularDataset(Dataset[RegularSample]):
     def __init__(
         self,
         sample_rate: int,
@@ -55,7 +55,7 @@ class VCTKDataset(Dataset[VCTKSample]):
         mels_mean: torch.Tensor,
         mels_std: torch.Tensor,
         phoneme_to_ids: Dict[str, int],
-        data: List[VCTKInfo],
+        data: List[RegularInfo],
     ):
         self._phoneme_to_id = phoneme_to_ids
         self._dataset = data
@@ -68,7 +68,7 @@ class VCTKDataset(Dataset[VCTKSample]):
     def __len__(self) -> int:
         return len(self._dataset)
 
-    def __getitem__(self, idx: int) -> VCTKSample:
+    def __getitem__(self, idx: int) -> RegularSample:
 
         info = self._dataset[idx]
         text_grid = tgt.read_textgrid(info.text_path)
@@ -96,7 +96,7 @@ class VCTKDataset(Dataset[VCTKSample]):
             phoneme_ids.append(self._phoneme_to_id[PAD_TOKEN])
             np.append(durations, pad_size)
 
-        return VCTKSample(
+        return RegularSample(
             phonemes=phoneme_ids,
             num_phonemes=len(phoneme_ids),
             speaker_id=info.speaker_id,
@@ -108,7 +108,7 @@ class VCTKDataset(Dataset[VCTKSample]):
         return seconds * self.sample_rate / self.hop_size
 
 
-class VCTKFactory:
+class RegularFactory:
 
     """Create VCTK Dataset
 
@@ -141,7 +141,7 @@ class VCTKFactory:
         sample_rate: int,
         hop_size: int,
         n_mels: int,
-        config: VCTKDatasetParams,
+        config: DatasetParams,
         phonemes_to_id: Dict[str, int],
         speakers_to_id: Dict[str, int],
         ignore_speakers: List[str],
@@ -167,7 +167,7 @@ class VCTKFactory:
                 for speaker in self._mels_dir.iterdir()
                 if speaker not in config.finetune_speakers
             ]
-        self._dataset: List[VCTKInfo] = self._build_dataset()
+        self._dataset: List[RegularInfo] = self._build_dataset()
         self.mels_mean, self.mels_std = self._get_mean_and_std()
 
     @staticmethod
@@ -177,7 +177,7 @@ class VCTKFactory:
 
     def split_train_valid(
         self, test_fraction: float
-    ) -> Tuple[VCTKDataset, VCTKDataset]:
+    ) -> Tuple[RegularDataset, RegularDataset]:
         speakers_to_data_id: Dict[int, List[int]] = defaultdict(list)
         ignore_speaker_ids = {
             self.speaker_to_id[speaker] for speaker in self.ignore_speakers
@@ -198,7 +198,7 @@ class VCTKFactory:
                 test_data.append(self._dataset[i])
             else:
                 train_data.append(self._dataset[i])
-        train_dataset = VCTKDataset(
+        train_dataset = RegularDataset(
             sample_rate=self.sample_rate,
             hop_size=self.hop_size,
             mels_mean=self.mels_mean,
@@ -206,7 +206,7 @@ class VCTKFactory:
             phoneme_to_ids=self.phoneme_to_id,
             data=train_data,
         )
-        test_dataset = VCTKDataset(
+        test_dataset = RegularDataset(
             sample_rate=self.sample_rate,
             hop_size=self.hop_size,
             mels_mean=self.mels_mean,
@@ -216,9 +216,9 @@ class VCTKFactory:
         )
         return train_dataset, test_dataset
 
-    def _build_dataset(self) -> List[VCTKInfo]:
+    def _build_dataset(self) -> List[RegularInfo]:
 
-        dataset: List[VCTKInfo] = []
+        dataset: List[RegularInfo] = []
         texts_set = {
             Path(x.parent.name) / x.stem
             for x in self._text_dir.rglob(f"*{self._text_ext}")
@@ -250,7 +250,7 @@ class VCTKFactory:
                 if sample.parent.name in self.speaker_to_use:
 
                     dataset.append(
-                        VCTKInfo(
+                        RegularInfo(
                             text_path=tg_path,
                             mel_path=mels_path,
                             phonemes_length=len(phonemes),
@@ -281,7 +281,7 @@ class VCTKFactory:
         return mels_mean.view(-1, 1), mels_std.view(-1, 1)
 
 
-class VCTKCollate:
+class RegularCollate:
     """
     Zero-pads model inputs and targets based on number of frames per setep
     """
@@ -289,7 +289,7 @@ class VCTKCollate:
     def __init__(self, n_frames_per_step: int = 1):
         self.n_frames_per_step = n_frames_per_step
 
-    def __call__(self, batch: List[VCTKSample]) -> VCTKBatch:
+    def __call__(self, batch: List[RegularSample]) -> RegularBatch:
         """Collate's training batch from normalized text and mel-spectrogram
         PARAMS
         ------
@@ -326,7 +326,7 @@ class VCTKCollate:
             mel_padded[i, :, : mel.shape[1]] = mel
         mel_padded = mel_padded.permute(0, 2, 1)
 
-        return VCTKBatch(
+        return RegularBatch(
             phonemes=text_padded,
             num_phonemes=input_lengths,
             speaker_ids=input_speaker_ids,

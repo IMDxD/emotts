@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import torch
 
-from src.data_process import VCTKBatch
+from src.data_process import RegularBatch
 from src.models.feature_models.config import (
     DecoderParams,
     DurationParams,
@@ -64,7 +64,7 @@ for i, l in enumerate(DURATIONS_MAX):
 ATTENTION_OUT_DIM = EMBEDDING_DIM + ATTENTION_CONFIG.positional_dim
 DECODER_RNN_OUT = torch.randn(16, 1, DECODER_CONFIG.decoder_rnn_dim)
 
-MODEL_INPUT = VCTKBatch(
+MODEL_INPUT = RegularBatch(
     phonemes=INPUT_PHONEMES,
     num_phonemes=INPUT_LENGTH,
     speaker_ids=INPUT_SPEAKERS,
@@ -258,7 +258,7 @@ def test_model_forward_gpu() -> None:
     model = NonAttentiveTacotron(
         N_PHONEMES, N_SPEAKER, N_MELS_DIM, config=MODEL_CONFIG, finetune=False
     ).to("cuda")
-    gpu_input = VCTKBatch(
+    gpu_input = RegularBatch(
         phonemes=INPUT_PHONEMES.to("cuda"),
         num_phonemes=INPUT_LENGTH,
         speaker_ids=INPUT_SPEAKERS.to("cuda"),

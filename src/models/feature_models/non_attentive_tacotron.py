@@ -7,7 +7,7 @@ from torch import nn
 from torch.distributions import Normal
 from torch.nn import functional as f
 
-from src.data_process import VCTKBatch
+from src.data_process import RegularBatch
 
 from .config import (
     DecoderParams,
@@ -468,7 +468,7 @@ class NonAttentiveTacotron(nn.Module):
         )
 
     def forward(
-        self, batch: VCTKBatch
+        self, batch: RegularBatch
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         phonem_emb = self.phonem_embedding(batch.phonemes).transpose(1, 2)

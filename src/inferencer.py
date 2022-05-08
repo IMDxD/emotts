@@ -12,7 +12,7 @@ from src.constants import (
     MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, REMOVE_SPEAKERS,
     SPEAKERS_FILENAME,
 )
-from src.data_process import VCTKBatch
+from src.data_process import RegularBatch
 from src.models.feature_models.non_attentive_tacotron import (
     NonAttentiveTacotron,
 )
@@ -125,7 +125,7 @@ class Inferencer:
                 np.append(durations, pad_size)
 
             with torch.no_grad():
-                batch = VCTKBatch(
+                batch = RegularBatch(
                     phonemes=torch.LongTensor([phoneme_ids]).to(self.device),
                     num_phonemes=torch.LongTensor([len(phoneme_ids)]),
                     speaker_ids=torch.LongTensor([speaker_id]).to(self.device),

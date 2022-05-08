@@ -22,7 +22,7 @@ from src.constants import (
     REFERENCE_PATH,
     SPEAKERS_FILENAME,
 )
-from src.data_process import VCTKBatch, VCTKCollate, VCTKFactory
+from src.data_process import RegularBatch, RegularCollate, RegularFactory
 from src.models.feature_models import NonAttentiveTacotron
 from src.models.feature_models.loss_function import NonAttentiveTacotronLoss
 from src.models.hifi_gan.models import Generator, load_model as load_hifi
@@ -48,7 +48,7 @@ class ReversalModel(nn.Module):
         self.reversal_layer = GradReverse()
         self.discriminator = discriminator
 
-    def forward(self, batch: VCTKBatch):
+    def forward(self, batch: RegularBatch):
         (
             durations,
             mel_outputs_postnet,
@@ -144,8 +144,8 @@ class Trainer:
 
         self.upload_checkpoints()
 
-    def batch_to_device(self, batch: VCTKBatch) -> VCTKBatch:
-        batch_on_device = VCTKBatch(
+    def batch_to_device(self, batch: RegularBatch) -> RegularBatch:
+        batch_on_device = RegularBatch(
             phonemes=batch.phonemes.to(self.device).detach(),
             num_phonemes=batch.num_phonemes.detach(),
             speaker_ids=batch.speaker_ids.to(self.device).detach(),
@@ -240,9 +240,9 @@ class Trainer:
         )
         torch.save(self.mels_std, self.checkpoint_path / MELS_STD_FILENAME)
 
-    def prepare_loaders(self) -> Tuple[DataLoader[VCTKBatch], DataLoader[VCTKBatch]]:
+    def prepare_loaders(self) -> Tuple[DataLoader[RegularBatch], DataLoader[RegularBatch]]:
 
-        factory = VCTKFactory(
+        factory = RegularFactory(
             sample_rate=self.config.sample_rate,
             hop_size=self.config.hop_size,
             n_mels=self.config.n_mels,
@@ -255,7 +255,7 @@ class Trainer:
         self.phonemes_to_id = factory.phoneme_to_id
         self.speakers_to_id = factory.speaker_to_id
         trainset, valset = factory.split_train_valid(self.config.test_size)
-        collate_fn = VCTKCollate()
+        collate_fn = RegularCollate()
 
         train_loader = DataLoader(
             trainset,
