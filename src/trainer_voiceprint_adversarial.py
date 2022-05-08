@@ -383,7 +383,7 @@ class Trainer:
                 if self.iteration_step % self.config.iters_per_checkpoint == 0:
                     self.feature_model.eval()
                     self.validate()
-                    self.generate_samples()
+                    # self.generate_samples()
                     self.save_checkpoint()
                     self.feature_model.train()
 
