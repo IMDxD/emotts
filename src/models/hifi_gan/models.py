@@ -382,7 +382,7 @@ class MultiScaleDiscriminator(torch.nn.Module):
     def forward(
         self, y: torch.Tensor, y_hat: torch.Tensor
     ) -> Tuple[
-        List[torch.Tensor], List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]
+        torch.Tensor, torch.Tensor, List[torch.Tensor], List[torch.Tensor]
     ]:
         y_d_rs = []
         y_d_gs = []

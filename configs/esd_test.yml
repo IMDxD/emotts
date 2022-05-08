@@ -8,8 +8,8 @@ n_mels: 80
 seed: 42
 batch_size: 16
 grad_clip_thresh: 1.0
-log_steps: 1000
-iters_per_checkpoint: 100000
+log_steps: 10
+iters_per_checkpoint: 10
 total_iterations: 500001
 test_size: 0.05
 finetune: true
@@ -21,6 +21,7 @@ data:
   mels_dir: data/esd/mels
   wav_dir: data/esd/resampled
   feature_dir: data/esd/feature_output
+  speaker_emb_dir: data/esd/embs
   ignore_speakers:
     - "0011"
     - "0012"
@@ -68,6 +69,7 @@ loss:
   mels_weight: 1.0
   duration_weight: 2.0
   adversarial_weight: 0.1
+  is_reversal: true
 optimizer:
   learning_rate: 0.001
   adam_beta1: 0.9

@@ -1,3 +1,3 @@
-from .non_attentive_tacotron import NonAttentiveTacotron
+from .non_attentive_tacotron import NonAttentiveTacotron, NonAttentiveTacotronVoicePrint
 
-__all__ = ["NonAttentiveTacotron"]
+__all__ = ["NonAttentiveTacotron", "NonAttentiveTacotronVoicePrint"]
