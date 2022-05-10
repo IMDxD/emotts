@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from typing import Dict, Optional, OrderedDict, Tuple
 
+import numpy as np
 import torch
 from torch import nn
 from torch.optim import Adam
@@ -21,9 +22,17 @@ from src.constants import (
     PHONEMES_FILENAME,
     REFERENCE_PATH,
     SPEAKERS_FILENAME,
+    SPEAKER_PRINT_DIR,
 )
-from src.data_process.voiceprint_dataset import VoicePrintBatch, VoicePrintCollate, VoicePrintFactory
-from src.models.feature_models import NonAttentiveTacotron, NonAttentiveTacotronVoicePrint
+from src.data_process.voiceprint_dataset import (
+    VoicePrintBatch,
+    VoicePrintCollate,
+    VoicePrintFactory,
+)
+from src.models.feature_models import (
+    NonAttentiveTacotron,
+    NonAttentiveTacotronVoicePrint,
+)
 from src.models.feature_models.loss_function import NonAttentiveTacotronLoss
 from src.models.hifi_gan.models import Generator, load_model as load_hifi
 from src.train_config import TrainParams
@@ -193,13 +202,15 @@ class Trainer:
             )
             self.discriminator: nn.Module = torch.load(
                 self.checkpoint_path / self.DISC_MODEL_FILENAME,
-                map_location=self.device
+                map_location=self.device,
             )
             model_optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
-                self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME, map_location=self.device
+                self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME,
+                map_location=self.device,
             )
             disc_optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
-                self.checkpoint_path / self.DISC_OPTIMIZER_FILENAME, map_location=self.device
+                self.checkpoint_path / self.DISC_OPTIMIZER_FILENAME,
+                map_location=self.device,
             )
             with open(self.checkpoint_path / self.ITERATION_FILENAME) as f:
                 iteration_dict: Dict[str, int] = json.load(f)
@@ -228,10 +239,7 @@ class Trainer:
             self.feature_model,
             self.checkpoint_path / f"{self.iteration_step}_{FEATURE_MODEL_FILENAME}",
         )
-        torch.save(
-            self.discriminator,
-            self.checkpoint_path / self.DISC_MODEL_FILENAME
-        )
+        torch.save(self.discriminator, self.checkpoint_path / self.DISC_MODEL_FILENAME)
         torch.save(
             self.model_optimizer.state_dict(),
             self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME,
@@ -246,7 +254,9 @@ class Trainer:
         )
         torch.save(self.mels_std, self.checkpoint_path / MELS_STD_FILENAME)
 
-    def prepare_loaders(self) -> Tuple[DataLoader[VoicePrintBatch], DataLoader[VoicePrintBatch]]:
+    def prepare_loaders(
+        self,
+    ) -> Tuple[DataLoader[VoicePrintBatch], DataLoader[VoicePrintBatch]]:
 
         factory = VoicePrintFactory(
             sample_rate=self.config.sample_rate,
@@ -376,14 +386,14 @@ class Trainer:
                             "postnet": loss_postnet,
                             "duration": loss_durations,
                             "generator": loss_generator,
-                            "discriminator": loss_discriminator
-                        }
+                            "discriminator": loss_discriminator,
+                        },
                     )
 
                 if self.iteration_step % self.config.iters_per_checkpoint == 0:
                     self.feature_model.eval()
                     self.validate()
-                    # self.generate_samples()
+                    self.generate_samples()
                     self.save_checkpoint()
                     self.feature_model.train()
 
@@ -428,7 +438,7 @@ class Trainer:
                     "prenet": val_loss_prenet,
                     "postnet": val_loss_postnet,
                     "duration": val_loss_durations,
-                }
+                },
             )
 
     def generate_samples(self) -> None:
@@ -437,7 +447,8 @@ class Trainer:
             [self.phonemes_to_id.get(p, 0) for p in sequence]
             for sequence in GENERATED_PHONEMES
         ]
-
+        audio_folder = self.checkpoint_path / f"{self.iteration_step}"
+        audio_folder.mkdir(exist_ok=True, parents=True)
         with torch.no_grad():
 
             for reference_path in self.references:
@@ -445,14 +456,19 @@ class Trainer:
                     phonemes_tensor = torch.LongTensor([sequence]).to(self.device)
                     num_phonemes_tensor = torch.IntTensor([len(sequence)])
                     speaker = reference_path.parent.name
-                    speaker_id = self.speakers_to_id[speaker]
+                    emo = reference_path.stem
+                    speaker_print_file = SPEAKER_PRINT_DIR / speaker / f"{emo}.npy"
+                    speaker_print_array = np.load(str(speaker_print_file))
+                    speaker_print_tensor = torch.FloatTensor(
+                        speaker_print_array
+                    ).unsqueeze(0)
                     reference = (
                         torch.load(reference_path) - self.mels_mean
                     ) / self.mels_std
                     batch = (
                         phonemes_tensor,
                         num_phonemes_tensor,
-                        torch.LongTensor([speaker_id]).to(self.device),
+                        speaker_print_tensor.to(self.device),
                         reference.to(self.device).permute(0, 2, 1).float(),
                     )
                     output = self.feature_model.inference(batch)
@@ -462,7 +478,7 @@ class Trainer:
                     )
                     audio = self.vocoder_inference(output.float())
 
-                    name = f"{speaker}_{reference_path.stem}_{i}"
+                    name = f"{speaker}_{emo}_{i}"
                     self.writer.add_audio(
                         f"Audio/Val/{name}",
                         audio.cpu(),

@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from typing import Dict, Optional, OrderedDict, Tuple
 
+import numpy as np
 import torch
 from torch import nn
 from torch.optim import Adam
@@ -21,16 +22,23 @@ from src.constants import (
     PHONEMES_FILENAME,
     REFERENCE_PATH,
     SPEAKERS_FILENAME,
+    SPEAKER_PRINT_DIR,
 )
-from src.data_process.voiceprint_dataset import VoicePrintBatch, VoicePrintCollate, VoicePrintFactory
-from src.models.feature_models import NonAttentiveTacotron, NonAttentiveTacotronVoicePrint
+from src.data_process.voiceprint_dataset import (
+    VoicePrintBatch,
+    VoicePrintCollate,
+    VoicePrintFactory,
+)
+from src.models.feature_models import (
+    NonAttentiveTacotron,
+    NonAttentiveTacotronVoicePrint,
+)
 from src.models.feature_models.loss_function import NonAttentiveTacotronLoss
 from src.models.hifi_gan.models import Generator, load_model as load_hifi
 from src.train_config import TrainParams
 
 
 class GradReverse(nn.Module):
-
     @staticmethod
     def forward(x: torch.Tensor) -> torch.Tensor:
         return x.view_as(x)
@@ -41,8 +49,9 @@ class GradReverse(nn.Module):
 
 
 class ReversalModel(nn.Module):
-
-    def __init__(self, feature_model: NonAttentiveTacotronVoicePrint, discriminator: nn.Linear):
+    def __init__(
+        self, feature_model: NonAttentiveTacotronVoicePrint, discriminator: nn.Linear
+    ):
         super().__init__()
         self.feature_model = feature_model
         self.reversal_layer = GradReverse()
@@ -113,7 +122,9 @@ class Trainer:
             self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
             self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
 
-        discriminator = nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id))
+        discriminator = nn.Linear(
+            self.config.model.gst_config.emb_dim, len(self.speakers_to_id)
+        )
 
         self.model = ReversalModel(feature_model, discriminator)
         self.model.to(self.device)
@@ -209,7 +220,8 @@ class Trainer:
                 self.checkpoint_path / self.DISC_MODEL_FILENAME, map_location="cpu"
             )
             model_optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
-                self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME, map_location=self.device
+                self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME,
+                map_location=self.device,
             )
             with open(self.checkpoint_path / self.ITERATION_FILENAME) as f:
                 iteration_dict: Dict[str, int] = json.load(f)
@@ -243,7 +255,9 @@ class Trainer:
         )
         torch.save(self.mels_std, self.checkpoint_path / MELS_STD_FILENAME)
 
-    def prepare_loaders(self) -> Tuple[DataLoader[VoicePrintBatch], DataLoader[VoicePrintBatch]]:
+    def prepare_loaders(
+        self,
+    ) -> Tuple[DataLoader[VoicePrintBatch], DataLoader[VoicePrintBatch]]:
 
         factory = VoicePrintFactory(
             sample_rate=self.config.sample_rate,
@@ -347,14 +361,14 @@ class Trainer:
                             "prenet": loss_prenet,
                             "postnet": loss_postnet,
                             "duration": loss_durations,
-                            "reversal": loss_reversal
-                        }
+                            "reversal": loss_reversal,
+                        },
                     )
 
                 if self.iteration_step % self.config.iters_per_checkpoint == 0:
                     self.model.eval()
                     self.validate()
-                    # self.generate_samples()
+                    self.generate_samples()
                     self.save_checkpoint()
                     self.model.train()
 
@@ -372,9 +386,12 @@ class Trainer:
             val_loss_durations = 0.0
             for batch in self.valid_loader:
                 batch = self.batch_to_device(batch)
-                durations, mel_outputs_postnet, mel_outputs, _ = self.model.feature_model(
-                    batch
-                )
+                (
+                    durations,
+                    mel_outputs_postnet,
+                    mel_outputs,
+                    _,
+                ) = self.model.feature_model(batch)
                 loss_prenet, loss_postnet, loss_durations = self.criterion(
                     mel_outputs,
                     mel_outputs_postnet,
@@ -399,7 +416,7 @@ class Trainer:
                     "prenet": val_loss_prenet,
                     "postnet": val_loss_postnet,
                     "duration": val_loss_durations,
-                }
+                },
             )
 
     def generate_samples(self) -> None:
@@ -417,14 +434,19 @@ class Trainer:
                     phonemes_tensor = torch.LongTensor([sequence]).to(self.device)
                     num_phonemes_tensor = torch.IntTensor([len(sequence)])
                     speaker = reference_path.parent.name
-                    speaker_id = self.speakers_to_id[speaker]
+                    emo = reference_path.stem
+                    speaker_print_file = SPEAKER_PRINT_DIR / speaker / f"{emo}.npy"
+                    speaker_print_array = np.load(str(speaker_print_file))
+                    speaker_print_tensor = torch.FloatTensor(
+                        speaker_print_array
+                    ).unsqueeze(0)
                     reference = (
                         torch.load(reference_path) - self.mels_mean
                     ) / self.mels_std
                     batch = (
                         phonemes_tensor,
                         num_phonemes_tensor,
-                        torch.LongTensor([speaker_id]).to(self.device),
+                        speaker_print_tensor.to(self.device),
                         reference.to(self.device).permute(0, 2, 1).float(),
                     )
                     output = self.model.feature_model.inference(batch)
@@ -434,7 +456,7 @@ class Trainer:
                     )
                     audio = self.vocoder_inference(output.float())
 
-                    name = f"{speaker}_{reference_path.stem}_{i}"
+                    name = f"{speaker}_{emo}_{i}"
                     self.writer.add_audio(
                         f"Audio/Val/{name}",
                         audio.cpu(),

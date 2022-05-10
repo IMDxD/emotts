@@ -14,7 +14,7 @@ total_iterations: 500001
 test_size: 0.05
 finetune: true
 device: cuda:0
-checkpoint_name: esd_tune
+checkpoint_name: esd_test
 base_model: models/en/tacotron
 data:
   text_dir: data/esd/mfa_outputs
@@ -69,7 +69,7 @@ loss:
   mels_weight: 1.0
   duration_weight: 2.0
   adversarial_weight: 0.1
-  is_reversal: true
+  is_reversal: false
 optimizer:
   learning_rate: 0.001
   adam_beta1: 0.9
