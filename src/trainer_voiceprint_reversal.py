@@ -30,7 +30,6 @@ from src.data_process.voiceprint_dataset import (
     VoicePrintFactory,
 )
 from src.models.feature_models import (
-    NonAttentiveTacotron,
     NonAttentiveTacotronVoicePrint,
 )
 from src.models.feature_models.loss_function import NonAttentiveTacotronLoss
@@ -85,7 +84,7 @@ class Trainer:
             CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         )
         mapping_folder = (
-            base_model_path if self.config.finetune else self.config.checkpoint_name
+            base_model_path if self.config.finetune else self.checkpoint_path
         )
         self.log_dir = LOG_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         self.references = list(REFERENCE_PATH.rglob("*.pkl"))
@@ -111,11 +110,9 @@ class Trainer:
         )
 
         if self.config.finetune:
-            pretrained_model: NonAttentiveTacotron = torch.load(
+            feature_model: NonAttentiveTacotronVoicePrint = torch.load(
                 base_model_path / FEATURE_MODEL_FILENAME, map_location=self.device
             )
-            feature_model.load_state_dict(pretrained_model.state_dict())
-            del pretrained_model
             feature_model.finetune = self.config.finetune
             feature_model.encoder.requires_grad_ = False
             feature_model.phonem_embedding.requires_grad_ = False

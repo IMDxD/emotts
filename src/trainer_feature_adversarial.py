@@ -46,7 +46,7 @@ class Trainer:
             CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         )
         mapping_folder = (
-            base_model_path if self.config.finetune else self.config.checkpoint_name
+            base_model_path if self.config.finetune else self.checkpoint_path
         )
         self.log_dir = LOG_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         self.references = list(REFERENCE_PATH.rglob("*.pkl"))
