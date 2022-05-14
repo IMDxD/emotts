@@ -453,9 +453,10 @@ def load_model(
 ) -> Generator:
 
     cp_g = scan_checkpoint(model_path, "g_")
-    generator = Generator(config=hifi_config, num_mels=num_mels).to(device)
-    state_dict = torch.load(cp_g, map_location=device)
+    generator = Generator(config=hifi_config, num_mels=num_mels).to("cpu")
+    state_dict = torch.load(cp_g, map_location="cpu")
     generator.load_state_dict(state_dict["generator"])
     generator.remove_weight_norm()
     generator.eval()
+    generator.to(device)
     return generator

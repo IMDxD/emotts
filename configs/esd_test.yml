@@ -12,22 +12,17 @@ log_steps: 10
 iters_per_checkpoint: 10
 total_iterations: 500001
 test_size: 0.05
-finetune: true
+finetune: false
 device: cuda:0
 checkpoint_name: esd_test
 base_model: models/en/tacotron
 data:
-  text_dir: data/esd/mfa_outputs
-  mels_dir: data/esd/mels
-  wav_dir: data/esd/resampled
-  feature_dir: data/esd/feature_output
-  speaker_emb_dir: data/esd/embs
-  ignore_speakers:
-    - "0011"
-    - "0012"
-    - "0013"
-    - "0014"
-    - "0020"
+  text_dir: data/esd_vctk/mfa_outputs
+  mels_dir: data/esd_vctk/mels
+  wav_dir: data/esd_vctk/resampled
+  feature_dir: data/esd_vctk/feature_output
+  speaker_emb_dir: data/esd_vctk/speaker_embs
+  ignore_speakers: []
 pretrained_hifi: models/en/hifi
 train_hifi:
   split_data: true
