@@ -382,7 +382,7 @@ class MultiScaleDiscriminator(torch.nn.Module):
     def forward(
         self, y: torch.Tensor, y_hat: torch.Tensor
     ) -> Tuple[
-        List[torch.Tensor], List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]
+        torch.Tensor, torch.Tensor, List[torch.Tensor], List[torch.Tensor]
     ]:
         y_d_rs = []
         y_d_gs = []
@@ -453,9 +453,10 @@ def load_model(
 ) -> Generator:
 
     cp_g = scan_checkpoint(model_path, "g_")
-    generator = Generator(config=hifi_config, num_mels=num_mels).to(device)
-    state_dict = torch.load(cp_g, map_location=device)
+    generator = Generator(config=hifi_config, num_mels=num_mels).to("cpu")
+    state_dict = torch.load(cp_g, map_location="cpu")
     generator.load_state_dict(state_dict["generator"])
     generator.remove_weight_norm()
     generator.eval()
+    generator.to(device)
     return generator

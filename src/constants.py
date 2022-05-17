@@ -17,6 +17,8 @@ DATA_DIR = Path("checkpoints")
 LOG_DIR = Path("logs")
 MODEL_DIR = Path("models")
 REFERENCE_PATH = Path("references")
+SPEAKER_PRINT_DIR = Path("speakers_prints")
+REMOVE_SPEAKERS = ["p280", "p315", "0019"]
 
 GENERATED_PHONEMES = [
     [
@@ -99,6 +101,7 @@ class TacoTronCheckpoint:
     speakers_file_name: str = SPEAKERS_FILENAME
     mels_mean_filename: str = MELS_MEAN_FILENAME
     mels_std_filename: str = MELS_STD_FILENAME
+
 
 #
 # @dataclass

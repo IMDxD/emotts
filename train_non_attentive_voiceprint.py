@@ -1,7 +1,7 @@
 import argparse
 
-from src.trainer_feature_adversarial import Trainer as TrainerAdv
-from src.trainer_feature_reversal import Trainer as TrainerRes
+from src.trainer_voiceprint_adversarial import Trainer as TrainerAdv
+from src.trainer_voiceprint_reversal import Trainer as TrainerRes
 from src.train_config import load_config
 
 

@@ -28,11 +28,3 @@ def load_filepaths_and_text(filename: str, sep: str = "|") -> List[List[str]]:
     with open(filename, encoding="utf-8") as f:
         filepaths_and_text = [line.strip().split(sep) for line in f]
     return filepaths_and_text
-
-
-def to_gpu(x: torch.Tensor) -> torch.Tensor:
-    x = x.contiguous()
-
-    if torch.cuda.is_available():
-        x = x.cuda(non_blocking=True)
-    return torch.autograd.Variable(x)

@@ -2,7 +2,7 @@ import argparse
 from shutil import rmtree
 
 from src.inferencer import Inferencer
-from src.trainer_feature import Trainer
+from src.trainer_feature_adversarial import Trainer
 from src.trainer_hifi import HIFITrainer
 
 

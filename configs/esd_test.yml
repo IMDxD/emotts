@@ -8,26 +8,22 @@ n_mels: 80
 seed: 42
 batch_size: 16
 grad_clip_thresh: 1.0
-log_steps: 1000
-iters_per_checkpoint: 100000
+log_steps: 10
+iters_per_checkpoint: 10
 total_iterations: 500001
 test_size: 0.05
-finetune: true
-device: cuda:7
-checkpoint_name: esd_tune
-base_model: pretrained_models/non_attentive_tacotron
+finetune: false
+device: cuda:0
+checkpoint_name: esd_test
+base_model: models/en/tacotron
 data:
-  text_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_vctk/mfa_outputs
-  mels_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_vctk/mels
-  wav_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_vctk/resampled
-  feature_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_tune/feature_output
-  ignore_speakers:
-    - "0011"
-    - "0012"
-    - "0013"
-    - "0014"
-    - "0020"
-pretrained_hifi: checkpoints/esd_tune/hifi
+  text_dir: data/esd_vctk/mfa_outputs
+  mels_dir: data/esd_vctk/mels
+  wav_dir: data/esd_vctk/resampled
+  feature_dir: data/esd_vctk/feature_output
+  speaker_emb_dir: data/esd_vctk/speaker_embs
+  ignore_speakers: []
+pretrained_hifi: models/en/hifi
 train_hifi:
   split_data: true
   training_epochs: 1000
@@ -68,6 +64,7 @@ loss:
   mels_weight: 1.0
   duration_weight: 2.0
   adversarial_weight: 0.1
+  is_reversal: false
 optimizer:
   learning_rate: 0.001
   adam_beta1: 0.9

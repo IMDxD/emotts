@@ -1,0 +1,46 @@
+gender,speaker_id,emotion,wav_id,comment
+male,0011,angry,0011_000367,
+male,0011,happy,0011_000720,S sounds more like surprise
+male,0011,neutral,0011_000019,
+male,0011,surprise,0011_001412,
+male,0011,sad,0011_001058,S sounds more like neutral
+male,0012,angry,0012_000371,
+male,0012,happy,0012_000721,S sounds more like anger
+male,0012,neutral,0012_000009,
+male,0012,surprise,0012_001425,
+male,0012,sad,0012_001054,
+male,0013,angry,0013_000468,"S does not sound like an anger, just emotional speech"
+male,0013,happy,0013_000714,unrepresentative original
+male,0013,neutral,0013_000020,
+male,0013,surprise,0013_001417,
+male,0013,sad,0013_001070,unrepresentative original
+male,0014,angry,0014_000367,
+male,0014,happy,0014_000723,unrepresentative original
+male,0014,neutral,0014_000009,
+male,0014,surprise,0014_001419,
+male,0014,sad,0014_001068,
+female,0015,angry,0015_000357,
+female,0015,happy,0015_000718,unrepresentative original
+female,0015,neutral,0015_000005,
+female,0015,surprise,0015_001415,bad S quality
+female,0015,sad,0015_001055,S sounds more like neutral
+female,0016,angry,0016_000352,
+female,0016,happy,0016_000702,S does not sound like happiness
+female,0016,neutral,0016_000002,
+female,0016,surprise,0016_001415,
+female,0016,sad,0016_001070,
+female,0017,angry,0017_000370,
+female,0017,happy,0017_000728,"sometimes S is OK, sometimes is not"
+female,0017,neutral,0017_000011,
+female,0017,surprise,0017_001411,
+female,0017,sad,0017_001054,S sounds more like neutral
+female,0018,angry,0018_000383,
+female,0018,happy,0018_000720,unrepresentative original
+female,0018,neutral,0018_000003,
+female,0018,surprise,0018_001419,
+female,0018,sad,0018_001066,
+male,0020,angry,0020_000687,
+male,0020,happy,0020_000712,S sounds more like neutral
+male,0020,neutral,0020_000008,bad S quality
+male,0020,surprise,0020_001401,bad S quality
+male,0020,sad,0020_001070,
