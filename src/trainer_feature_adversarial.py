@@ -376,7 +376,7 @@ class Trainer:
                         }
                     )
 
-                if self.iteration_step % self.config.iters_per_checkpoint == 0:
+                if self.iteration_step % self.config.iters_per_checkpoint == 0 or self.iteration_step == 1:
                     self.feature_model.eval()
                     self.validate()
                     self.generate_samples()
@@ -443,8 +443,9 @@ class Trainer:
                     speaker = reference_path.parent.name
                     speaker_id = self.speakers_to_id[speaker]
                     reference = (
-                        torch.load(reference_path) - self.mels_mean
+                        torch.load(reference_path, map_location="cpu") - self.mels_mean
                     ) / self.mels_std
+                    reference = reference.unsqueeze(0)
                     batch = (
                         phonemes_tensor,
                         num_phonemes_tensor,
