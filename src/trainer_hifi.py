@@ -88,8 +88,7 @@ class HIFITrainer:
 
     def init_data(self) -> Tuple[DataLoader, DataLoader]:
         training_filelist, validation_filelist = split_vctk_data(
-            self.config.data.wav_dir,
-            self.config.data.feature_dir
+            self.config.data, self.config.test_size
         )
 
         trainset = MelDataset(

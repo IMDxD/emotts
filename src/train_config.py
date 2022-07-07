@@ -1,10 +1,11 @@
 from dataclasses import dataclass, field
+from typing import Optional
 
 import yaml
 from marshmallow_dataclass import class_schema
 
 from src.constants import PATHLIKE
-from src.data_process.config import VCTKDatasetParams
+from src.data_process.config import DatasetParams
 from src.models.feature_models.config import ModelParams
 from src.models.hifi_gan.hifi_config import TrainParamsHiFi
 
@@ -28,6 +29,7 @@ class OptimizerParams:
 
 @dataclass
 class LossParams:
+    is_reversal: bool = field(default=False)
     mels_weight: float = field(default=1.0)
     duration_weight: float = field(default=2.0)
     adversarial_weight: float = field(default=5e-3)
@@ -35,7 +37,7 @@ class LossParams:
 
 @dataclass
 class TrainParams:
-    data: VCTKDatasetParams
+    data: DatasetParams
     test_size: float
     model: ModelParams
     optimizer: OptimizerParams
@@ -45,6 +47,8 @@ class TrainParams:
     checkpoint_name: str
     train_hifi: TrainParamsHiFi
     pretrained_hifi: str
+    base_model: Optional[str] = field(default=None)
+    finetune: bool = field(default=False)
     iters_per_checkpoint: int = field(default=10000)
     early_stopping_rounds: int = field(default=5)
     log_steps: int = field(default=1000)

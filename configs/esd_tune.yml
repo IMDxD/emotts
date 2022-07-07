@@ -1,0 +1,132 @@
+sample_rate: 22050
+hop_size: 256
+f_min: 0
+f_max: 8000
+win_size: 1024
+n_fft: 1024
+n_mels: 80
+seed: 42
+batch_size: 16
+grad_clip_thresh: 1.0
+log_steps: 1000
+iters_per_checkpoint: 100000
+total_iterations: 500001
+test_size: 0.05
+finetune: true
+device: cuda:7
+checkpoint_name: esd_tune
+base_model: pretrained_models/non_attentive_tacotron
+data:
+  text_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_vctk/mfa_outputs
+  mels_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_vctk/mels
+  wav_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_vctk/resampled
+  feature_dir: /media/diskB/ruslan_a/experiments/emotts/data/esd_tune/feature_output
+  ignore_speakers:
+    - "0011"
+    - "0012"
+    - "0013"
+    - "0014"
+    - "0020"
+pretrained_hifi: checkpoints/esd_tune/hifi
+train_hifi:
+  split_data: true
+  training_epochs: 1000
+  logging_interval: 5
+  checkpoint_interval: 15000
+  summary_interval: 1000
+  fine_tuning: true
+  fmax_loss: null
+  batch_size: 16
+  learning_rate: 0.0002
+  adam_b1: 0.8
+  adam_b2: 0.99
+  lr_decay: 0.999
+  model_param:
+    resblock: "1"
+    upsample_rates:
+      - 8
+      - 8
+      - 2
+      - 2
+    upsample_kernel_sizes:
+      - 16
+      - 16
+      - 4
+      - 4
+    upsample_initial_channel: 512
+    resblock_kernel_sizes:
+      - 3
+      - 7
+      - 11
+    resblock_dilation_sizes:
+      - [1, 3, 5]
+      - [1, 3, 5]
+      - [1, 3, 5]
+    resblock_initial_channel: 256
+  segment_size: 8192
+loss:
+  mels_weight: 1.0
+  duration_weight: 2.0
+  adversarial_weight: 0.1
+optimizer:
+  learning_rate: 0.001
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1e-06
+  reg_weight: 1e-06
+scheduler:
+  start_decay: 4000
+  decay_steps: 50000
+  decay_rate: 0.5
+  last_epoch: 400000
+model:
+  n_frames_per_step: 3
+  encoder_config:
+    n_convolutions: 3
+    kernel_size: 5
+    conv_channel: 512
+    lstm_layers: 1
+    lstm_hidden: 256
+    dropout: 0.1
+  gst_config:
+    ref_enc_filters:
+      - 32
+      - 32
+      - 64
+      - 64
+      - 128
+      - 128
+    emb_dim: 256
+    num_heads: 8
+    token_num: 10
+  attention_config:
+    duration_config:
+      lstm_layers: 2
+      lstm_hidden: 256
+      dropout: 0.5
+    range_config:
+      lstm_layers: 2
+      lstm_hidden: 256
+      dropout: 0.5
+    eps: 1e-6
+    positional_dim: 32
+    teacher_forcing_ratio: 1.0
+    attention_dropout: 0.1
+    positional_dropout: 0.0
+  decoder_config:
+    prenet_layers:
+      - 256
+      - 256
+    prenet_dropout: 0.5
+    decoder_rnn_dim: 512
+    decoder_num_layers: 3
+    teacher_forcing_ratio: 1.0
+    dropout: 0.1
+  postnet_config:
+    embedding_dim: 512
+    n_convolutions: 5
+    kernel_size: 5
+    dropout: 0.1
+  mask_padding: true
+  phonem_embedding_dim: 512
+  speaker_embedding_dim: 256

@@ -1,6 +1,8 @@
 import argparse
 
-from src.trainer_feature import Trainer
+from src.trainer_feature_adversarial import Trainer as TrainerAdv
+from src.trainer_feature_reversal import Trainer as TrainerRes
+from src.train_config import load_config
 
 
 def main() -> None:
@@ -9,7 +11,11 @@ def main() -> None:
         "--config", type=str, required=True, help="configuration file path"
     )
     args = parser.parse_args()
-    trainer = Trainer(args.config)
+    config = load_config(args.config)
+    if config.loss.is_reversal:
+        trainer = TrainerRes(config)
+    else:
+        trainer = TrainerAdv(config)
     trainer.train()
 
 

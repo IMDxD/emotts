@@ -140,6 +140,7 @@ mlruns/
 generated_hifi/
 logs/
 data/
+!data/reference_wavs.csv
 checkpoints/
 cp_hifigan/
 ft_dataset/
