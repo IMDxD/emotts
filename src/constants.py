@@ -17,6 +17,7 @@ DATA_DIR = Path("checkpoints")
 LOG_DIR = Path("logs")
 MODEL_DIR = Path("models")
 REFERENCE_PATH = Path("references")
+REMOVE_SPEAKERS = ["p280", "p315", "0019"]
 
 GENERATED_PHONEMES = [
     [

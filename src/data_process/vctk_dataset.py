@@ -11,11 +11,11 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from src.data_process.config import VCTKDatasetParams
+from src.constants import REMOVE_SPEAKERS
 
 NUMBER = Union[int, float]
 PHONES_TIER = "phones"
 PAD_TOKEN = "<PAD>"
-REMOVE_SPEAKERS = ["p280", "p315", "0019"]
 
 
 @dataclass

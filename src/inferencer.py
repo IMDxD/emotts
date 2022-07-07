@@ -9,7 +9,8 @@ from tqdm import tqdm
 
 from src.constants import (
     CHECKPOINT_DIR, FEATURE_CHECKPOINT_NAME, FEATURE_MODEL_FILENAME,
-    MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, SPEAKERS_FILENAME,
+    MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, REMOVE_SPEAKERS,
+    SPEAKERS_FILENAME,
 )
 from src.data_process import VCTKBatch
 from src.models.feature_models.non_attentive_tacotron import (
@@ -50,6 +51,14 @@ class Inferencer:
         self.feature_model_mels_path.mkdir(parents=True, exist_ok=True)
         self.mels_mean = torch.load(checkpoint_path / MELS_MEAN_FILENAME)
         self.mels_std = torch.load(checkpoint_path / MELS_STD_FILENAME)
+        if config.finetune:
+            self.speaker_to_use = config.data.finetune_speakers
+        else:
+            self.speaker_to_use = [
+                speaker.name
+                for speaker in self._mels_dir.iterdir()
+                if speaker not in config.data.finetune_speakers
+            ]
 
     def seconds_to_frame(self, seconds: float) -> float:
         return seconds * self.sample_rate / self.hop_size
@@ -65,6 +74,10 @@ class Inferencer:
         }
         samples = list(mels_set & texts_set)
         for sample in tqdm(samples):
+            if sample.parent.name in REMOVE_SPEAKERS:
+                continue
+            elif sample.parent.name not in self.speaker_to_use:
+                continue
 
             tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
             text_grid = tgt.read_textgrid(tg_path)
@@ -119,7 +132,7 @@ class Inferencer:
                     durations=torch.FloatTensor([durations]).to(self.device),
                     mels=mels.permute(0, 2, 1).float().to(self.device)
                 )
-                _, output, _, _, _ = self.feature_model(batch)
+                _, output, _, _ = self.feature_model(batch)
                 output = output.permute(0, 2, 1).squeeze(0)
                 output = output * self.mels_std.to(self.device) + self.mels_mean.to(self.device)
 

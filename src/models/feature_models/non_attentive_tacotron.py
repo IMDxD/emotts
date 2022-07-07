@@ -30,7 +30,10 @@ class Prenet(nn.Module):
         self.layers = nn.ModuleList(
             [
                 LinearWithActivation(
-                    in_size, out_size, bias=False, activation=nn.ReLU(),
+                    in_size,
+                    out_size,
+                    bias=False,
+                    activation=nn.ReLU(),
                 )
                 for (in_size, out_size) in zip(in_sizes, sizes)
             ]
@@ -303,7 +306,9 @@ class Decoder(nn.Module):
         self.n_frames_per_step = n_frames_per_step
 
         self.prenet = Prenet(
-            self.n_mel_channels, config.prenet_layers, config.prenet_dropout,
+            self.n_mel_channels,
+            config.prenet_layers,
+            config.prenet_dropout,
         )
 
         self.decoder_rnn = nn.LSTM(
@@ -431,14 +436,24 @@ class NonAttentiveTacotron(nn.Module):
         self.phonem_embedding = nn.Embedding(
             n_phonems, config.phonem_embedding_dim, padding_idx=0
         )
-        self.speaker_embedding = nn.Embedding(n_speakers, config.speaker_embedding_dim,)
-        norm_emb_layer(
-            self.phonem_embedding, n_phonems, config.phonem_embedding_dim,
+        self.speaker_embedding = nn.Embedding(
+            n_speakers,
+            config.speaker_embedding_dim,
         )
         norm_emb_layer(
-            self.speaker_embedding, n_speakers, config.speaker_embedding_dim,
+            self.phonem_embedding,
+            n_phonems,
+            config.phonem_embedding_dim,
         )
-        self.encoder = Encoder(config.phonem_embedding_dim, config.encoder_config,)
+        norm_emb_layer(
+            self.speaker_embedding,
+            n_speakers,
+            config.speaker_embedding_dim,
+        )
+        self.encoder = Encoder(
+            config.phonem_embedding_dim,
+            config.encoder_config,
+        )
         self.attention = Attention(full_embedding_dim, config.attention_config)
         self.gst = GST(n_mel_channels=n_mel_channels, config=config.gst_config)
         self.decoder = Decoder(
@@ -447,7 +462,10 @@ class NonAttentiveTacotron(nn.Module):
             full_embedding_dim + config.attention_config.positional_dim,
             config.decoder_config,
         )
-        self.postnet = Postnet(n_mel_channels, config.postnet_config,)
+        self.postnet = Postnet(
+            n_mel_channels,
+            config.postnet_config,
+        )
 
     def forward(
         self, batch: VCTKBatch
@@ -480,15 +498,15 @@ class NonAttentiveTacotron(nn.Module):
         mask = get_mask_from_lengths(
             batch.durations.cumsum(dim=1)[:, -1].long(), device=batch.phonemes.device
         )
-        mel_outputs_postnet[mask] = 0
-        mel_outputs[mask] = 0
+        mask = mask.unsqueeze(2)
+        mel_outputs_postnet = mel_outputs_postnet * (1 - mask.float())
+        mel_outputs = mel_outputs * (1 - mask.float())
 
         return (
             durations,
             mel_outputs_postnet,
             mel_outputs,
             gst_emb.squeeze(1),
-            speaker_emb.squeeze(1),
         )
 
     def inference(
