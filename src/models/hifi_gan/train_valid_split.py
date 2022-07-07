@@ -2,7 +2,7 @@ import random
 from pathlib import Path
 from typing import List
 
-from src.data_process.config import VCTKDatasetParams
+from src.data_process.config import DatasetParams
 
 
 def get_mel_file_path(full_wav_name: str, mels_dir: str, suffix: str = ".pth"):
@@ -11,7 +11,7 @@ def get_mel_file_path(full_wav_name: str, mels_dir: str, suffix: str = ".pth"):
     )
 
 
-def split_vctk_data(data_config: VCTKDatasetParams, test_fraction: float):
+def split_vctk_data(data_config: DatasetParams, test_fraction: float):
     wavs_dir_path = Path(data_config.wav_dir)
     mels_dir_path = Path(data_config.feature_dir)
 

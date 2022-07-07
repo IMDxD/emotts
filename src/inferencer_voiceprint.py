@@ -12,9 +12,9 @@ from src.constants import (
     MELS_MEAN_FILENAME, MELS_STD_FILENAME, PHONEMES_FILENAME, REMOVE_SPEAKERS,
     SPEAKERS_FILENAME,
 )
-from src.data_process import RegularBatch
+from src.data_process.voiceprint_dataset import VoicePrintBatch
 from src.models.feature_models.non_attentive_tacotron import (
-    NonAttentiveTacotron,
+    NonAttentiveTacotronVoicePrint,
 )
 from src.train_config import load_config
 
@@ -25,6 +25,7 @@ class Inferencer:
     PHONES_TIER = "phones"
     LEXICON_OOV_TOKEN = "spn"
     MEL_EXT = "pth"
+    _speaker_emb_ext = ".npy"
 
     def __init__(
         self, config_path: str
@@ -38,13 +39,14 @@ class Inferencer:
         self.sample_rate = config.sample_rate
         self.hop_size = config.hop_size
         self.device = torch.device(config.device)
-        self.feature_model: NonAttentiveTacotron = torch.load(
+        self.feature_model: NonAttentiveTacotronVoicePrint = torch.load(
             checkpoint_path / FEATURE_MODEL_FILENAME, map_location=config.device
         )
         if isinstance(self.feature_model.attention.eps, float):
             self.feature_model.attention.eps = torch.Tensor([self.feature_model.attention.eps])
         self._mels_dir = Path(config.data.mels_dir)
         self._text_dir = Path(config.data.text_dir)
+        self._speaker_emb_dir = Path(config.data.speaker_emb_dir)
         self._text_ext = config.data.text_ext
         self._mels_ext = config.data.mels_ext
         self.feature_model_mels_path = Path(config.data.feature_dir)
@@ -72,7 +74,11 @@ class Inferencer:
             Path(x.parent.name) / x.stem
             for x in self._mels_dir.rglob(f"*{self._mels_ext}")
         }
-        samples = list(mels_set & texts_set)
+        speaker_emb_set = {
+            Path(x.parent.name) / x.stem
+            for x in self._speaker_emb_dir.rglob(f"*{self._speaker_emb_ext}")
+        }
+        samples = list(mels_set & texts_set & speaker_emb_set)
         for sample in tqdm(samples):
             if sample.parent.name in REMOVE_SPEAKERS:
                 continue
@@ -124,11 +130,16 @@ class Inferencer:
                 phoneme_ids.append(self.phonemes_to_idx[self.PAD_TOKEN])
                 np.append(durations, pad_size)
 
+            speaker_emb_path = (self._speaker_emb_dir / sample).with_suffix(self._speaker_emb_ext)
+            speaker_emb_array = np.load(str(speaker_emb_path)).astype(np.float32)
+            speaker_emb_tensor = torch.from_numpy(speaker_emb_array).unsqueeze(0)
+
             with torch.no_grad():
-                batch = RegularBatch(
+                batch = VoicePrintBatch(
                     phonemes=torch.LongTensor([phoneme_ids]).to(self.device),
                     num_phonemes=torch.LongTensor([len(phoneme_ids)]),
                     speaker_ids=torch.LongTensor([speaker_id]).to(self.device),
+                    speaker_embs=speaker_emb_tensor.to(self.device),
                     durations=torch.FloatTensor([durations]).to(self.device),
                     mels=mels.permute(0, 2, 1).float().to(self.device)
                 )

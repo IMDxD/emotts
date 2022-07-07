@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
-class VCTKDatasetParams:
+class DatasetParams:
 
     text_dir: str
     mels_dir: str
@@ -15,3 +15,4 @@ class VCTKDatasetParams:
     finetune_speakers: List[str] = field(
         default_factory=lambda: [f"00{i}" for i in range(11, 21)]
     )
+    speaker_emb_dir: Optional[str] = field(default=None)
