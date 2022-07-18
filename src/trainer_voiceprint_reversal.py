@@ -339,7 +339,7 @@ class Trainer:
                     speaker_out, batch.speaker_ids
                 )
 
-                loss_full = loss + loss_reversal
+                loss_full = loss + self.config.loss.adversarial_weight * loss_reversal
                 loss_full.backward()
 
                 torch.nn.utils.clip_grad_norm_(
