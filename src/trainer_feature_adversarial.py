@@ -82,7 +82,12 @@ class Trainer:
             self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
 
         self.discriminator = nn.Sequential(
-            nn.Linear(self.config.model.gst_config.emb_dim, len(self.speakers_to_id)),
+            nn.Linear(self.config.model.gst_config.emb_dim, self.config.model.discriminator_hidden_size),
+            nn.LeakyReLU(),
+            nn.Linear(
+                self.config.model.discriminator_hidden_size,
+                len(self.speakers_to_id)
+            ),
             nn.Softmax(),
         )
         self.discriminator = self.discriminator.to(self.device)

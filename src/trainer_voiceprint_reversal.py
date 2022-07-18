@@ -49,7 +49,7 @@ class GradReverse(nn.Module):
 
 class ReversalModel(nn.Module):
     def __init__(
-        self, feature_model: NonAttentiveTacotronVoicePrint, discriminator: nn.Linear
+        self, feature_model: NonAttentiveTacotronVoicePrint, discriminator: nn.Sequential
     ):
         super().__init__()
         self.feature_model = feature_model
@@ -119,8 +119,13 @@ class Trainer:
             self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
             self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
 
-        discriminator = nn.Linear(
-            self.config.model.gst_config.emb_dim, len(self.speakers_to_id)
+        discriminator = nn.Sequential(
+            nn.Linear(
+                self.config.model.gst_config.emb_dim,
+                self.config.model.discriminator_hidden_size
+            ),
+            nn.LeakyReLU(),
+            nn.Linear(self.config.model.discriminator_hidden_size, len(self.speakers_to_id)),
         )
 
         self.model = ReversalModel(feature_model, discriminator)
