@@ -209,7 +209,7 @@ class Trainer:
             feature_model: NonAttentiveTacotron = torch.load(
                 model_path, map_location="cpu"
             )
-            discriminator: nn.Linear = torch.load(
+            discriminator: nn.Sequential = torch.load(
                 self.checkpoint_path / self.DISC_MODEL_FILENAME, map_location="cpu"
             )
             model_optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
@@ -423,7 +423,7 @@ class Trainer:
                     speaker = reference_path.parent.name
                     speaker_id = self.speakers_to_id[speaker]
                     reference = (
-                        torch.load(reference_path, map_location=self.device) - self.mels_mean
+                        torch.load(reference_path, map_location="cpu") - self.mels_mean
                     ) / self.mels_std
                     batch = (
                         phonemes_tensor,

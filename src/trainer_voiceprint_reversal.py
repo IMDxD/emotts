@@ -218,7 +218,7 @@ class Trainer:
             feature_model: NonAttentiveTacotronVoicePrint = torch.load(
                 model_path, map_location="cpu"
             )
-            discriminator: nn.Linear = torch.load(
+            discriminator: nn.Sequential = torch.load(
                 self.checkpoint_path / self.DISC_MODEL_FILENAME, map_location="cpu"
             )
             model_optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
@@ -443,7 +443,7 @@ class Trainer:
                         speaker_print_array
                     ).unsqueeze(0)
                     reference = (
-                        torch.load(reference_path, map_location=self.device) - self.mels_mean
+                        torch.load(reference_path, map_location="cpu") - self.mels_mean
                     ) / self.mels_std
                     batch = (
                         phonemes_tensor,
