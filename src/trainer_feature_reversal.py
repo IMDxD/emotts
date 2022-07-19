@@ -423,7 +423,7 @@ class Trainer:
                     speaker = reference_path.parent.name
                     speaker_id = self.speakers_to_id[speaker]
                     reference = (
-                        torch.load(reference_path) - self.mels_mean
+                        torch.load(reference_path, map_location=self.device) - self.mels_mean
                     ) / self.mels_std
                     batch = (
                         phonemes_tensor,

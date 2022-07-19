@@ -443,7 +443,7 @@ class Trainer:
                         speaker_print_array
                     ).unsqueeze(0)
                     reference = (
-                        torch.load(reference_path) - self.mels_mean
+                        torch.load(reference_path, map_location=self.device) - self.mels_mean
                     ) / self.mels_std
                     batch = (
                         phonemes_tensor,
