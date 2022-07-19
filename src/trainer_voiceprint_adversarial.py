@@ -372,6 +372,10 @@ class Trainer:
 
                 loss_discriminator.backward()
 
+                torch.nn.utils.clip_grad_norm_(
+                    self.discriminator.parameters(), self.config.grad_clip_thresh
+                )
+
                 self.discriminator_optimizer.step()
 
                 if (
