@@ -445,6 +445,7 @@ class Trainer:
                     reference = (
                         torch.load(reference_path, map_location="cpu") - self.mels_mean
                     ) / self.mels_std
+                    reference = reference.unsqueeze(0)
                     batch = (
                         phonemes_tensor,
                         num_phonemes_tensor,
