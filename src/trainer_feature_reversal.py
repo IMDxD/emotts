@@ -31,12 +31,10 @@ from src.train_config import TrainParams
 
 class GradReverse(nn.Module):
 
-    @staticmethod
-    def forward(x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x.view_as(x)
 
-    @staticmethod
-    def backward(grad_output: torch.Tensor) -> torch.Tensor:
+    def backward(self, grad_output: torch.Tensor) -> torch.Tensor:
         return -grad_output
 
 
