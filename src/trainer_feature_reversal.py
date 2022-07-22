@@ -40,9 +40,8 @@ class RevGrad(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):  # pragma: no cover
         grad_input = None
-        _, alpha_ = ctx.saved_tensors
         if ctx.needs_input_grad[0]:
-            grad_input = -grad_output * alpha_
+            grad_input = -grad_output
         return grad_input, None
 
 
