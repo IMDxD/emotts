@@ -63,6 +63,7 @@ class ReversalModel(nn.Module):
 class Trainer:
 
     MODEL_OPTIMIZER_FILENAME = "model_optimizer.pth"
+    DISC_OPTIMIZER_FILENAME = "disc_optimizer.pth"
     DISC_MODEL_FILENAME = "discriminator.pth"
     ITERATION_FILENAME = "iter.json"
     ITERATION_NAME = "iteration"
@@ -130,7 +131,14 @@ class Trainer:
             device=self.device,
         )
         self.model_optimizer = Adam(
-            self.model.parameters(),
+            self.model.feature_model.parameters(),
+            lr=self.config.optimizer.learning_rate,
+            weight_decay=self.config.optimizer.reg_weight,
+            betas=(self.config.optimizer.adam_beta1, self.config.optimizer.adam_beta2),
+            eps=self.config.optimizer.adam_epsilon,
+        )
+        self.discriminator_optimizer = Adam(
+            self.model.discriminator.parameters(),
             lr=self.config.optimizer.learning_rate,
             weight_decay=self.config.optimizer.reg_weight,
             betas=(self.config.optimizer.adam_beta1, self.config.optimizer.adam_beta2),
@@ -215,11 +223,15 @@ class Trainer:
             model_optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
                 self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME, map_location=self.device
             )
+            discriminator_optimizer_state_dict: OrderedDict[str, torch.Tensor] = torch.load(
+                self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME, map_location=self.device
+            )
             with open(self.checkpoint_path / self.ITERATION_FILENAME) as f:
                 iteration_dict: Dict[str, int] = json.load(f)
             self.model = ReversalModel(feature_model, discriminator)
             self.model.to(self.device)
             self.model_optimizer.load_state_dict(model_optimizer_state_dict)
+            self.discriminator_optimizer.load_state_dict(discriminator_optimizer_state_dict)
             self.iteration_step = iteration_dict[self.ITERATION_NAME]
 
     def save_checkpoint(self) -> None:
@@ -240,6 +252,10 @@ class Trainer:
         torch.save(
             self.model_optimizer.state_dict(),
             self.checkpoint_path / self.MODEL_OPTIMIZER_FILENAME,
+        )
+        torch.save(
+            self.model.discriminator,
+            self.checkpoint_path / self.DISC_OPTIMIZER_FILENAME,
         )
         torch.save(
             self.mels_mean,
@@ -306,6 +322,7 @@ class Trainer:
             for batch in self.train_loader:
                 batch = self.batch_to_device(batch)
                 self.model_optimizer.zero_grad()
+                self.discriminator_optimizer.zero_grad()
                 (
                     durations,
                     mel_outputs_postnet,
@@ -335,6 +352,7 @@ class Trainer:
                 )
 
                 self.model_optimizer.step()
+                self.discriminator_optimizer.step()
 
                 if (
                     self.config.scheduler.start_decay
