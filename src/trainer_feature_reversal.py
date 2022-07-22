@@ -29,13 +29,30 @@ from src.models.hifi_gan.models import Generator, load_model as load_hifi
 from src.train_config import TrainParams
 
 
+class RevGrad(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, input_):
+        ctx.save_for_backward(input_)
+        output = input_
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):  # pragma: no cover
+        grad_input = None
+        _, alpha_ = ctx.saved_tensors
+        if ctx.needs_input_grad[0]:
+            grad_input = -grad_output * alpha_
+        return grad_input, None
+
+
+revgrad = RevGrad.apply
+
+
 class GradReverse(nn.Module):
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return x.view_as(x)
-
-    def backward(self, grad_output: torch.Tensor) -> torch.Tensor:
-        return -grad_output
+    def forward(self, input_):
+        return revgrad(input_)
 
 
 class ReversalModel(nn.Module):
